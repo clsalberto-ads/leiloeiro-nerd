@@ -14,6 +14,9 @@ export default async function DashboardPage() {
       <p className="text-muted-foreground">
         Olá, {session?.user.name} · {session?.user.email} · Papel: {session?.user.role}
       </p>
+      <p>
+        <a className="text-primary underline" href="/dashboard/settings">Editar perfil</a>
+      </p>
     </div>
   );
 }
