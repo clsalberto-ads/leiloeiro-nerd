@@ -1,4 +1,11 @@
+// Adapter Drizzle: mapeamos explicitamente os modelos do Better Auth
+// para as tabelas do auth-schema.ts, que é o arquivo gerado pelo
+// @better-auth/cli e NÃO deve ser editado manualmente.
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
+import { db } from "@/infrastructure/database/drizzle";
+import { user, session, account, verification } from "@/infrastructure/database/auth-schema";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
@@ -18,4 +25,9 @@ export const auth = betterAuth({
       address: { type: "string", required: false },
     },
   },
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: { user, session, account, verification },
+  }),
+  plugins: [nextCookies()],
 });
