@@ -6,6 +6,9 @@ export async function updateProfile(
   userId: string,
   input: UpdateProfileInput,
 ): Promise<UserProfile> {
-  const slug = input.slug ? createSlug(input.slug) : input.slug;
-  return repo.updateProfile(userId, { ...input, slug });
+  const fields = Object.fromEntries(
+    Object.entries(input).filter(([, value]) => !(typeof value === "string" && value.trim() === "")),
+  ) as UpdateProfileInput;
+  const slug = fields.slug ? createSlug(fields.slug) : fields.slug;
+  return repo.updateProfile(userId, { ...fields, slug });
 }

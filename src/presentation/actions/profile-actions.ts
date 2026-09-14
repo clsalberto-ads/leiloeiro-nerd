@@ -10,9 +10,9 @@ export type ProfileActionResult = { ok?: boolean; error?: string };
 
 const profileSchema = z.object({
   name: z.string().min(2, "Nome muito curto").optional(),
-  phone: z.string().optional(),
-  slug: z.string().optional(),
-  address: z.string().optional(),
+  phone: z.string().trim().optional().transform((v) => v || undefined),
+  slug: z.string().trim().optional().transform((v) => v || undefined),
+  address: z.string().trim().optional().transform((v) => v || undefined),
 });
 
 export async function updateProfileAction(_prev: ProfileActionResult | null, formData: FormData): Promise<ProfileActionResult> {

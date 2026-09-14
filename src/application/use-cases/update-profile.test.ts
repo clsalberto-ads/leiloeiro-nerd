@@ -42,4 +42,12 @@ describe("updateProfile", () => {
     await expect(updateProfile(repo, "u1", { slug: "!!" })).rejects.toThrow();
     expect(repo.calls).toHaveLength(0);
   });
+
+  it("não persiste strings vazias em slug/phone/address (trata como não enviado)", async () => {
+    const repo = new FakeUserRepository();
+    await updateProfile(repo, "u1", { slug: "", phone: "", address: "" });
+    expect(repo.calls[0]!.slug).toBeUndefined();
+    expect(repo.calls[0]!.phone).toBeUndefined();
+    expect(repo.calls[0]!.address).toBeUndefined();
+  });
 });
