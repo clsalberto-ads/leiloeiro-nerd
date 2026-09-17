@@ -21,6 +21,12 @@ class FakeUserRepository implements UserRepository {
   async findBySlug() {
     return null;
   }
+  async findById() {
+    return baseUser;
+  }
+  async updateRole() {
+    return baseUser;
+  }
 }
 
 describe("updateProfile", () => {

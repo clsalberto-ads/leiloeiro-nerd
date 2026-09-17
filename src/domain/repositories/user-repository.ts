@@ -20,4 +20,6 @@ export interface UpdateProfileInput {
 export interface UserRepository {
   updateProfile(userId: string, input: UpdateProfileInput): Promise<UserProfile>;
   findBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null>;
+  findById(userId: string): Promise<UserProfile | null>;
+  updateRole(userId: string, role: UserRole, slug: string): Promise<UserProfile>;
 }
