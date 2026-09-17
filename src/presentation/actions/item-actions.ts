@@ -13,7 +13,7 @@ import { drizzleUserRepository } from "@/infrastructure/database/repositories/dr
 
 export type ItemActionResult = { ok?: boolean; error?: string };
 
-export async function createItemAction(_prev: ItemActionResult, formData: FormData): Promise<ItemActionResult> {
+export async function createItemAction(_prev: ItemActionResult | null, formData: FormData): Promise<ItemActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
   const parsed = itemSchema.safeParse(formToObject(formData));
@@ -29,7 +29,7 @@ export async function createItemAction(_prev: ItemActionResult, formData: FormDa
   return { ok: true };
 }
 
-export async function updateItemAction(_prev: ItemActionResult, formData: FormData): Promise<ItemActionResult> {
+export async function updateItemAction(_prev: ItemActionResult | null, formData: FormData): Promise<ItemActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
   const id = String(formData.get("id") ?? "");
@@ -46,7 +46,7 @@ export async function updateItemAction(_prev: ItemActionResult, formData: FormDa
   return { ok: true };
 }
 
-export async function publishItemAction(_prev: ItemActionResult, formData: FormData): Promise<ItemActionResult> {
+export async function publishItemAction(_prev: ItemActionResult | null, formData: FormData): Promise<ItemActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
   const id = String(formData.get("id") ?? "");
@@ -61,7 +61,7 @@ export async function publishItemAction(_prev: ItemActionResult, formData: FormD
   return { ok: true };
 }
 
-export async function cancelItemAction(_prev: ItemActionResult, formData: FormData): Promise<ItemActionResult> {
+export async function cancelItemAction(_prev: ItemActionResult | null, formData: FormData): Promise<ItemActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
   const id = String(formData.get("id") ?? "");
@@ -76,7 +76,7 @@ export async function cancelItemAction(_prev: ItemActionResult, formData: FormDa
   return { ok: true };
 }
 
-export async function deleteItemAction(_prev: ItemActionResult, formData: FormData): Promise<ItemActionResult> {
+export async function deleteItemAction(_prev: ItemActionResult | null, formData: FormData): Promise<ItemActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
   const id = String(formData.get("id") ?? "");
