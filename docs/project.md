@@ -354,7 +354,7 @@ src/
 - [ ] Configurar variáveis de ambiente (`.env`)
 
 ### 🟡 Fase 2 — Core do Leilão (Semanas 3–5)
-- [ ] CRUD de itens (Server Actions + formulários)
+- [x] CRUD de itens (Server Actions + formulários)
 - [ ] Upload de imagens (sugestão: Uploadthing ou Cloudinary)
 - [ ] Página de vitrine do leiloeiro (`/{slug}`)
 - [ ] Página de detalhe do item (`/{slug}/{itemId}`)
