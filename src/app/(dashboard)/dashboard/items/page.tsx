@@ -1,0 +1,38 @@
+import { getSession } from "@/presentation/actions/auth-actions";
+import { listSellerItems } from "@/application/use-cases/list-seller-items";
+import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
+import type { ItemStatus } from "@/domain/repositories/item-repository";
+import { ItemsList } from "./items-list";
+import { BecomeSellerForm } from "@/components/become-seller-form";
+
+export const dynamic = "force-dynamic";
+
+export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/items">) {
+  const session = await getSession();
+  if (!session) return null;
+  const isSeller = session.user.role === "seller" || session.user.role === "both";
+  const { status } = await searchParams;
+  const items = isSeller
+    ? await listSellerItems(drizzleItemRepository, session.user.id, status ? { status: status as ItemStatus } : undefined)
+    : [];
+
+  if (!isSeller) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Meus itens</h1>
+        <p className="text-muted-foreground">Você ainda não é leiloeiro.</p>
+        <BecomeSellerForm />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Meus itens</h1>
+        <a href="/dashboard/items/new" className="text-sm font-medium text-primary underline">+ Novo item</a>
+      </div>
+      <ItemsList items={items} current={typeof status === "string" && status ? status : "all"} />
+    </div>
+  );
+}

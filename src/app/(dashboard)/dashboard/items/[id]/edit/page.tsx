@@ -1,0 +1,19 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/presentation/actions/auth-actions";
+import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
+import { ItemForm } from "@/components/item-form";
+
+export const dynamic = "force-dynamic";
+
+export default async function EditItemPage({ params }: PageProps<"/dashboard/items/[id]/edit">) {
+  const [session, { id }] = await Promise.all([getSession(), params]);
+  if (!session) return null;
+  const item = await drizzleItemRepository.findById(id);
+  if (!item || item.sellerId !== session.user.id) notFound();
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Editar item</h1>
+      <ItemForm item={item} mode="edit" />
+    </div>
+  );
+}
