@@ -16,6 +16,8 @@ export default async function DashboardPage() {
       </p>
       <p>
         <a className="text-primary underline" href="/dashboard/settings">Editar perfil</a>
+        {" · "}
+        <a className="text-primary underline" href="/dashboard/items">Meus itens</a>
       </p>
     </div>
   );
