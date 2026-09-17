@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
-import type { UserProfile, UserRole, UserRepository } from "@/domain/repositories/user-repository";
+import type { UserProfile, UserRepository } from "@/domain/repositories/user-repository";
 
 export const drizzleUserRepository: UserRepository = {
   async updateProfile(userId, input) {
