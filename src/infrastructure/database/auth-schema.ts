@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+
+export const roleEnum = pgEnum("role", ["seller", "bidder", "both"]);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -12,7 +14,7 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  role: text("role").default("bidder"),
+  role: roleEnum("role").default("bidder"),
   slug: text("slug").unique(),
   phone: text("phone"),
   address: text("address"),

@@ -1,7 +1,6 @@
 import { integer, index, pgEnum, pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
 import { user as userTable } from "./auth-schema";
 
-export const roleEnum = pgEnum("role", ["seller", "bidder", "both"]);
 export const itemTypeEnum = pgEnum("item_type", ["product", "service", "piece"]);
 export const itemStatusEnum = pgEnum("item_status", ["draft", "active", "closed", "awaiting_payment", "paid", "cancelled"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "approved", "expired", "cancelled", "refunded"]);

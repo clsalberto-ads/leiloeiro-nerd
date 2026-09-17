@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Leiloeiro Nerd
 
-## Getting Started
+Plataforma web de leilões onde leiloeiros expõem peças, produtos e serviços, e
+arrematantes dão lances. Este repositório contém a base técnica do projeto
+(Next.js 16, PostgreSQL, Redis, Better Auth, Drizzle ORM).
 
-First, run the development server:
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Linguagem | TypeScript (strict) |
+| Estilização | Tailwind CSS v4 + shadcn/ui |
+| Banco | PostgreSQL 17 (Docker) |
+| ORM | Drizzle ORM |
+| Autenticação | Better Auth |
+| Fila / Cron | Redis 7 + BullMQ |
+| Testes | Vitest |
+| Package manager | pnpm |
+
+## Requisitos
+
+- Node.js >= 20.9.0 (recomendado: 24 LTS — ver `.nvmrc`)
+- pnpm
+- Docker + Docker Compose
+
+## Início rápido
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Instalar dependências
+pnpm install
+
+# 2. Configurar variáveis de ambiente
+cp .env.example .env
+# gere um secret: openssl rand -hex 32, e coloque em BETTER_AUTH_SECRET
+
+# 3. Subir infraestrutura (PostgreSQL + Redis)
+docker compose up -d
+
+# 4. Aplicar migrações do banco
+pnpm db:migrate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Script | Descrição |
+|---|---|
+| `pnpm dev` | Servidor de desenvolvimento |
+| `pnpm build` | Build de produção |
+| `pnpm start` | Sobe o build de produção |
+| `pnpm lint` | ESLint |
+| `pnpm test` | Executa os testes (Vitest) |
+| `pnpm typecheck` | Checagem de tipos (tsc --noEmit) |
+| `pnpm db:generate` | Gera migrações a partir do schema Drizzle |
+| `pnpm db:migrate` | Aplica migrações no banco |
+| `pnpm db:push` | Push direto do schema (dev) |
+| `pnpm auth:generate` | Regenera o `auth-schema.ts` do Better Auth |
+| `pnpm worker` | Sobe o worker BullMQ (espelha fila `auction-jobs`) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Arquitetura
 
-## Learn More
+Clean Architecture pragmática em camadas:
 
-To learn more about Next.js, take a look at the following resources:
+- `src/domain/` — value objects e contratos de repositório (regras puras)
+- `src/application/` — use cases (funções com dependências injetadas)
+- `src/infrastructure/` — implementações concretas (Drizzle, Better Auth, filas)
+- `src/app/` e `src/presentation/actions/` — camada de apresentação (rotas e server actions)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Funcionalidades atuais
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Autenticação: registro, login e recuperação de senha (Better Auth)
+- Dashboard protegido com proxy de guard
+- Atualização de perfil (nome, slug, telefone, endereço) via use case + repositório
+- Worker BullMQ conectado ao Redis (placeholder)
+- Schema Drizzle completo: `user`, `items`, `bids`, `payments`, `notifications`
 
-## Deploy on Vercel
+## Autenticação
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+As rotas de auth ficam em `/api/auth/*` (handler do Better Auth). A verificação
+de e-mail não é ativada nesta fase; o link de redefinição de senha é logado no
+console pela implementação placeholder de `emailSender`.

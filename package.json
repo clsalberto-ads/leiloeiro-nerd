@@ -11,6 +11,8 @@
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config src/infrastructure/auth/better-auth.ts --output src/infrastructure/database/auth-schema.ts -y",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "typecheck": "tsc --noEmit",
     "worker": "tsx watch src/infrastructure/cron/worker.ts"
   },
   "dependencies": {

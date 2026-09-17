@@ -61,6 +61,7 @@ Scripts (`package.json`):
 - `db:generate`, `db:migrate`, `db:push` (drizzle-kit)
 - `auth:generate` → `npx @better-auth/cli generate`
 - `test` → `vitest`
+- `typecheck` → `tsc --noEmit`
 - `build` → `next build`
 
 ---
@@ -69,28 +70,29 @@ Scripts (`package.json`):
 
 ```
 src/
+├── app/                        # rotas Next.js (App Router): (public), (auth), (dashboard), api
 ├── domain/
-│   ├── entities/            # entidades puras (user, item, bid, payment, notification)
-│   ├── value-objects/       # money, slug, bid-increment
-│   └── repositories/        # interfaces de contrato (user, item, bid, payment, notification)
+│   ├── entities/               # entidades puras (user, item, bid, payment, notification)
+│   ├── value-objects/          # money, slug, bid-increment
+│   └── repositories/           # interfaces de contrato (user, item, bid, payment, notification)
 ├── application/
-│   ├── use-cases/           # funções puras com deps injetadas
-│   └── dtos/                # DTOs de entrada/saída
+│   ├── use-cases/              # funções puras com deps injetadas
+│   └── dtos/                   # DTOs de entrada/saída
 ├── infrastructure/
 │   ├── database/
-│   │   ├── schema.ts        # tabelas do app (inclui users estendida)
-│   │   ├── auth-schema.ts   # GERADO pelo Better Auth (user/session/account/verification)
-│   │   ├── drizzle.ts       # client node-postgres (Pool)
-│   │   └── repositories/    # implementações Drizzle
-│   ├── auth/better-auth.ts  # instância auth
-│   ├── payments/            # placeholder (fase 3)
-│   ├── email/               # placeholder (fase 3)
-│   └── cron/worker.ts       # consumer BullMQ placeholder
+│   │   ├── schema.ts           # tabelas do app
+│   │   ├── auth-schema.ts      # GERADO pelo Better Auth (user/session/account/verification)
+│   │   ├── drizzle.ts          # client node-postgres (Pool)
+│   │   └── repositories/       # implementações Drizzle
+│   ├── auth/better-auth.ts     # instância auth
+│   ├── payments/               # placeholder (fase 3)
+│   ├── email/                  # placeholder (fase 3)
+│   └── cron/worker.ts          # consumer BullMQ placeholder
 ├── presentation/
-│   ├── app/                 # (public), (auth), (dashboard), api, proxy
-│   ├── components/          # ui (shadcn), layout
-│   └── actions/             # server actions
-└── lib/                     # utils, constants, validators (zod)
+│   └── actions/                # server actions
+├── components/ui/              # shadcn/ui
+└── lib/                        # utils, constants, validators (zod)
+proxy.ts                        # proxy de proteção do dashboard (na raiz de src/)
 ```
 
 - **Use case = função pura**, recebe repositórios/interfaces como parâmetros; sem import de infra.
@@ -134,8 +136,8 @@ Valores monetários sempre `integer` (centavos). Enums via `pgEnum`.
 - `BETTER_AUTH_SECRET` da env; URL base `BETTER_AUTH_URL`.
 
 Rotas:
-- `presentation/app/api/auth/[...all]/route.ts` → handler do Better Auth.
-- `presentation/app/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password` → formulários shadcn (client components) + server actions em `lib/actions/auth-actions.ts` (`signIn.email`, `signUp.email`, `requestPasswordReset`).
+- `src/app/api/auth/[...all]/route.ts` → handler do Better Auth.
+- `src/app/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password` → formulários shadcn (client components) + server actions em `src/presentation/actions/auth-actions.ts` (`signIn.email`, `signUp.email`, `requestPasswordReset`).
 - **Verificação de e-mail NÃO é ativada na fase 1** (o campo `emailVerified` existirá no schema, mas segue `false`). Será habilitada na fase de refinamento junto com os e-mails via Resend.
 - Proteção do `(dashboard)` via **proxy** (convenção Next 16 substitui middleware) verificando sessão e redirecionando não autenticados.
 

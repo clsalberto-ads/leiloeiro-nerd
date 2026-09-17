@@ -43,9 +43,9 @@
 | `src/infrastructure/database/repositories/drizzle-user-repository.ts` | Impl Drizzle do repositório |
 | `src/infrastructure/cron/queue.ts`, `worker.ts` | Fila BullMQ + consumer placeholder |
 | `src/presentation/actions/auth-actions.ts`, `profile-actions.ts` | Server actions |
-| `src/presentation/app/(auth)/{login,register,forgot-password}` | Páginas de auth + client forms |
-| `src/presentation/app/(dashboard)/{layout,dashboard}` | Shell protegido |
-| `src/presentation/app/api/auth/[...all]/route.ts` | Handler do Better Auth |
+| `src/app/(auth)/{login,register,forgot-password}` | Páginas de auth + client forms |
+| `src/app/(dashboard)/{layout,dashboard}` | Shell protegido |
+| `src/app/api/auth/[...all]/route.ts` | Handler do Better Auth |
 | `src/proxy.ts` | Guard leve de `/dashboard` (Next 16 proxy) |
 | `src/lib/utils.ts`, `validators.ts` | cn() (shadcn) + schemas Zod |
 
@@ -544,7 +544,7 @@ git commit -m "chore: gerar auth-schema do Better Auth com additionalFields"
 - Modify: `src/infrastructure/auth/better-auth.ts` — final, com adapter
 - Modify: `src/infrastructure/database/drizzle.ts` — client com schema completo
 - Create: `drizzle.config.ts`, `drizzle/` (migrações)
-- Create: `src/presentation/app/api/auth/[...all]/route.ts`
+- Create: `src/app/api/auth/[...all]/route.ts`
 - Modify: `package.json` (scripts `db:generate`, `db:migrate`)
 
 **Interfaces:**
@@ -729,7 +729,7 @@ Esperado: `users`(ou nome gerado), `items`, `bids`, `payments`, `notifications`,
 
 - [ ] **Step 7: Criar o endpoint de auth**
 
-`src/presentation/app/api/auth/[...all]/route.ts`:
+`src/app/api/auth/[...all]/route.ts`:
 
 ```ts
 import { toNextJsHandler } from "better-auth/next-js";
@@ -770,10 +770,10 @@ git commit -m "feat: schema Drizzle completo, migração inicial e endpoint de a
 **Files:**
 - Create: `src/lib/validators.ts`
 - Create: `src/presentation/actions/auth-actions.ts`
-- Create: `src/presentation/app/(auth)/login/{page.tsx,login-form.tsx}`
-- Create: `src/presentation/app/(auth)/register/{page.tsx,register-form.tsx}`
-- Create: `src/presentation/app/(auth)/forgot-password/{page.tsx,forgot-password-form.tsx}`
-- Create: `src/presentation/app/(dashboard)/layout.tsx`, `src/presentation/app/(dashboard)/dashboard/page.tsx`
+- Create: `src/app/(auth)/login/{page.tsx,login-form.tsx}`
+- Create: `src/app/(auth)/register/{page.tsx,register-form.tsx}`
+- Create: `src/app/(auth)/forgot-password/{page.tsx,forgot-password-form.tsx}`
+- Create: `src/app/(dashboard)/layout.tsx`, `src/app/(dashboard)/dashboard/page.tsx`
 - Create: `src/proxy.ts`
 
 **Interfaces:**
@@ -860,7 +860,7 @@ export async function forgotPasswordAction(_prev: ActionResult, formData: FormDa
 
 - [ ] **Step 3: Criar o login form + página**
 
-`src/presentation/app/(auth)/login/login-form.tsx`:
+`src/app/(auth)/login/login-form.tsx`:
 
 ```tsx
 "use client";
@@ -907,7 +907,7 @@ export function LoginForm() {
 
 > O form usa `name` atributos; o `FormData` gerado é convertido e validado com Zod dentro da action.
 
-`src/presentation/app/(auth)/login/page.tsx`:
+`src/app/(auth)/login/page.tsx`:
 
 ```tsx
 import { LoginForm } from "./login-form";
@@ -923,7 +923,7 @@ export default function LoginPage() {
 
 - [ ] **Step 4: Criar register**
 
-`src/presentation/app/(auth)/register/register-form.tsx`:
+`src/app/(auth)/register/register-form.tsx`:
 
 ```tsx
 "use client";
@@ -971,7 +971,7 @@ export function RegisterForm() {
 }
 ```
 
-`src/presentation/app/(auth)/register/page.tsx`:
+`src/app/(auth)/register/page.tsx`:
 
 ```tsx
 import { RegisterForm } from "./register-form";
@@ -987,7 +987,7 @@ export default function RegisterPage() {
 
 - [ ] **Step 5: Criar forgot-password**
 
-`src/presentation/app/(auth)/forgot-password/forgot-password-form.tsx`:
+`src/app/(auth)/forgot-password/forgot-password-form.tsx`:
 
 ```tsx
 "use client";
@@ -1024,7 +1024,7 @@ export function ForgotPasswordForm() {
 }
 ```
 
-`src/presentation/app/(auth)/forgot-password/page.tsx`:
+`src/app/(auth)/forgot-password/page.tsx`:
 
 ```tsx
 import { ForgotPasswordForm } from "./forgot-password-form";
@@ -1042,7 +1042,7 @@ export default function ForgotPasswordPage() {
 
 - [ ] **Step 6: Dashboard layout protegido**
 
-`src/presentation/app/(dashboard)/layout.tsx`:
+`src/app/(dashboard)/layout.tsx`:
 
 ```tsx
 import { redirect } from "next/navigation";
@@ -1057,7 +1057,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 }
 ```
 
-`src/presentation/app/(dashboard)/dashboard/page.tsx`:
+`src/app/(dashboard)/dashboard/page.tsx`:
 
 ```tsx
 import { getSession } from "@/presentation/actions/auth-actions";
@@ -1124,8 +1124,8 @@ git commit -m "feat: páginas de auth, dashboard protegido e proxy /dashboard"
 - Test: `src/application/use-cases/update-profile.test.ts`
 - Create: `src/infrastructure/database/repositories/drizzle-user-repository.ts`
 - Create: `src/presentation/actions/profile-actions.ts`
-- Create: `src/presentation/app/(dashboard)/settings/` (page + form)
-- Modify: `src/presentation/app/(dashboard)/dashboard/page.tsx` (link p/ `settings`)
+- Create: `src/app/(dashboard)/settings/` (page + form)
+- Modify: `src/app/(dashboard)/dashboard/page.tsx` (link p/ `settings`)
 
 **Interfaces:**
 - Consumes: Task 6 (`db` tipado), Task 7 (`getSession`).
@@ -1325,7 +1325,7 @@ export async function updateProfileAction(_prev: ProfileActionResult | null, for
 
 - [ ] **Step 8: Criar página e form de settings**
 
-`src/presentation/app/(dashboard)/settings/settings-form.tsx`:
+`src/app/(dashboard)/settings/settings-form.tsx`:
 
 ```tsx
 "use client";
@@ -1365,7 +1365,7 @@ export function SettingsForm() {
 }
 ```
 
-`src/presentation/app/(dashboard)/settings/page.tsx`:
+`src/app/(dashboard)/settings/page.tsx`:
 
 ```tsx
 import { SettingsForm } from "./settings-form";
@@ -1382,7 +1382,7 @@ export default function SettingsPage() {
 
 - [ ] **Step 9: Adicionar link no dashboard**
 
-Em `src/presentation/app/(dashboard)/dashboard/page.tsx`, adicione:
+Em `src/app/(dashboard)/dashboard/page.tsx`, adicione:
 
 ```tsx
 <p>

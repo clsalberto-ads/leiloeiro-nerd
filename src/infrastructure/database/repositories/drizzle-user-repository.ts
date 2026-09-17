@@ -12,7 +12,6 @@ export const drizzleUserRepository: UserRepository = {
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.address !== undefined ? { address: input.address } : {}),
-        updatedAt: new Date(),
       })
       .where(eq(userTable.id, userId))
       .returning({ id: userTable.id, name: userTable.name, email: userTable.email, phone: userTable.phone, slug: userTable.slug, address: userTable.address, role: userTable.role });
