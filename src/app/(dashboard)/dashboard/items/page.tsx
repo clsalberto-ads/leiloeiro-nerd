@@ -5,6 +5,8 @@ import type { ItemStatus } from "@/domain/repositories/item-repository";
 import { ItemsList } from "./items-list";
 import { BecomeSellerForm } from "@/components/become-seller-form";
 
+const VALID_STATUSES: ItemStatus[] = ["draft", "active", "closed", "awaiting_payment", "paid", "cancelled"];
+
 export const dynamic = "force-dynamic";
 
 export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/items">) {
@@ -12,8 +14,11 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   if (!session) return null;
   const isSeller = session.user.role === "seller" || session.user.role === "both";
   const { status } = await searchParams;
+  const filterStatus = typeof status === "string" && VALID_STATUSES.includes(status as ItemStatus)
+    ? (status as ItemStatus)
+    : undefined;
   const items = isSeller
-    ? await listSellerItems(drizzleItemRepository, session.user.id, status ? { status: status as ItemStatus } : undefined)
+    ? await listSellerItems(drizzleItemRepository, session.user.id, filterStatus ? { status: filterStatus } : undefined)
     : [];
 
   if (!isSeller) {
@@ -32,7 +37,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
         <h1 className="text-2xl font-bold">Meus itens</h1>
         <a href="/dashboard/items/new" className="text-sm font-medium text-primary underline">+ Novo item</a>
       </div>
-      <ItemsList items={items} current={typeof status === "string" && status ? status : "all"} />
+      <ItemsList items={items} current={typeof status === "string" && VALID_STATUSES.includes(status as ItemStatus) ? status : "all"} />
     </div>
   );
 }
