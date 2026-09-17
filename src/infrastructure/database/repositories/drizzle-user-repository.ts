@@ -12,6 +12,7 @@ export const drizzleUserRepository: UserRepository = {
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.address !== undefined ? { address: input.address } : {}),
+        updatedAt: new Date(),
       })
       .where(eq(userTable.id, userId))
       .returning({ id: userTable.id, name: userTable.name, email: userTable.email, phone: userTable.phone, slug: userTable.slug, address: userTable.address, role: userTable.role });
@@ -43,7 +44,7 @@ export const drizzleUserRepository: UserRepository = {
   async updateRole(userId, role, slug) {
     const [row] = await db
       .update(userTable)
-      .set({ role, slug })
+      .set({ role, slug, updatedAt: new Date() })
       .where(eq(userTable.id, userId))
       .returning({ id: userTable.id, name: userTable.name, email: userTable.email, phone: userTable.phone, slug: userTable.slug, address: userTable.address, role: userTable.role });
     if (!row) throw new Error("Usuário não encontrado");

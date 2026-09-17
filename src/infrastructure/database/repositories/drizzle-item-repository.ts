@@ -53,6 +53,7 @@ export const drizzleItemRepository: ItemRepository = {
         ...(input.minBidIncrement !== undefined ? { minBidIncrement: input.minBidIncrement } : {}),
         ...(input.bidDeadline !== undefined ? { bidDeadline: input.bidDeadline } : {}),
         ...(input.paymentDeadlineDays !== undefined ? { paymentDeadlineDays: input.paymentDeadlineDays } : {}),
+        updatedAt: new Date(),
       })
       .where(eq(items.id, id))
       .returning();
@@ -82,7 +83,7 @@ export const drizzleItemRepository: ItemRepository = {
   async setStatus(id, status) {
     const [row] = await db
       .update(items)
-      .set({ status })
+      .set({ status, updatedAt: new Date() })
       .where(eq(items.id, id))
       .returning();
     return row ? toItem(row) : null;
