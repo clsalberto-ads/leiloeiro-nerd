@@ -33,6 +33,18 @@ export const itemSchema = z.object({
   paymentDeadlineDays: z.coerce.number().int("Dias de pagamento inválido").min(1, "Mínimo 1 dia para pagamento").max(30, "Máximo 30 dias para pagamento").default(3),
 });
 
+export const imageUploadSchema = z.object({
+  images: z
+    .custom<FileList>(
+      (v): v is FileList =>
+        v != null && typeof v !== "string" && typeof (v as { length?: unknown }).length === "number",
+      "Lista de imagens inválida",
+    )
+    .refine((f) => f.length <= 10, "Máximo 10 imagens")
+    .refine((f) => Array.from(f).every((file) => file.size <= 5 * 1024 * 1024), "Máximo 5MB por imagem")
+    .refine((f) => Array.from(f).every((file) => file.type.startsWith("image/")), "Apenas imagens"),
+});
+
 export const becomeSellerSchema = z.object({
   slug: z
     .string()
