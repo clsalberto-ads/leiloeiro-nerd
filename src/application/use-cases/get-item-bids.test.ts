@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getItemBids } from "./get-item-bids";
-import type { Bid, BidRepository } from "@/domain/repositories/bid-repository";
+import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
 import type { UserProfile, UserRepository } from "@/domain/repositories/user-repository";
 
 function makeBid(overrides: Partial<Bid> = {}): Bid {
@@ -30,6 +30,9 @@ class FakeBidRepository implements BidRepository {
   constructor(private bids: Bid[]) {}
   async findByItemId() {
     return this.bids;
+  }
+  async createBid(_input: CreateBidInput): Promise<Bid> {
+    throw new Error("não usado");
   }
 }
 

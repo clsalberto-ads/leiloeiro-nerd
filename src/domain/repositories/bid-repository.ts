@@ -8,6 +8,13 @@ export interface Bid {
   createdAt: Date;
 }
 
+export interface CreateBidInput {
+  itemId: string;
+  bidderId: string;
+  amount: number;
+}
+
 export interface BidRepository {
   findByItemId(itemId: string): Promise<Bid[]>;
+  createBid(input: CreateBidInput): Promise<Bid>;
 }

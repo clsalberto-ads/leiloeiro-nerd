@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getItemBySlugAndId } from "./get-item-by-slug-and-id";
-import type { Bid, BidRepository } from "@/domain/repositories/bid-repository";
+import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
 import type { Item, ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
 import type { UserProfile, UserRepository } from "@/domain/repositories/user-repository";
 
@@ -93,6 +93,9 @@ class FakeBidRepository implements BidRepository {
   constructor(private bids: Bid[] = []) {}
   async findByItemId() {
     return this.bids;
+  }
+  async createBid(_input: CreateBidInput): Promise<Bid> {
+    throw new Error("não usado");
   }
 }
 
