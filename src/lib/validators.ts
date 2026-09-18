@@ -31,6 +31,23 @@ export const itemSchema = z.object({
   minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
   bidDeadline: z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),
   paymentDeadlineDays: z.coerce.number().int("Dias de pagamento inválido").min(1, "Mínimo 1 dia para pagamento").max(30, "Máximo 30 dias para pagamento").default(3),
+  imageUrls: z
+    .string()
+    .optional()
+    .transform((s, ctx) => {
+      if (!s) return undefined;
+      try {
+        const parsed = JSON.parse(s);
+        if (!Array.isArray(parsed)) {
+          ctx.addIssue({ code: "custom", message: "field inválido" });
+          return z.INVALID;
+        }
+        return parsed;
+      } catch {
+        return undefined;
+      }
+    })
+    .pipe(z.array(z.string().url()).max(10).optional()),
 });
 
 export const imageUploadSchema = z.object({

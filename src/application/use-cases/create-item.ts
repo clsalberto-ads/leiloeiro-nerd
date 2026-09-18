@@ -1,5 +1,6 @@
 import type { CreateItemInput, Item, ItemRepository } from "@/domain/repositories/item-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
+import { createItemImages } from "./create-item-images";
 
 const SELLER_ROLES = new Set(["seller", "both"]);
 
@@ -19,5 +20,9 @@ export async function createItem(
   if (input.minInitialBid < 100 || input.minBidIncrement < 100) {
     throw new Error("Lance mínimo deve ser de pelo menos R$ 1,00");
   }
-  return itemRepo.create({ ...input, sellerId: userId });
+  const item = await itemRepo.create({ ...input, sellerId: userId });
+  if (input.imageUrls?.length) {
+    await createItemImages(itemRepo, item.id, input.imageUrls);
+  }
+  return item;
 }

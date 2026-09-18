@@ -26,6 +26,7 @@ export interface CreateItemInput {
   minBidIncrement: number;
   bidDeadline: Date;
   paymentDeadlineDays?: number;
+  imageUrls?: string[];
 }
 
 export interface UpdateItemInput {
@@ -36,6 +37,7 @@ export interface UpdateItemInput {
   minBidIncrement?: number;
   bidDeadline?: Date;
   paymentDeadlineDays?: number;
+  imageUrls?: string[];
 }
 
 export interface ItemImage {

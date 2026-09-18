@@ -31,6 +31,7 @@ class FakeUserRepository implements UserRepository {
 
 class FakeItemRepository implements ItemRepository {
   captures: (Omit<CreateItemInput, "sellerId"> & { sellerId: string })[] = [];
+  imagesCaptures: { itemId: string; urls: string[] }[] = [];
   async create(input: CreateItemInput) {
     this.captures.push(input);
     return {
@@ -65,7 +66,8 @@ class FakeItemRepository implements ItemRepository {
   async findImageById() {
     return null;
   }
-  async createImages() {
+  async createImages(itemId: string, urls: string[]) {
+    this.imagesCaptures.push({ itemId, urls });
     return [];
   }
   async deleteImage() {}
@@ -87,6 +89,20 @@ describe("createItem", () => {
     const item = await createItem(itemRepo, userRepo, baseUser.id, valid);
     expect(item.status).toBe("draft");
     expect(itemRepo.captures[0]?.sellerId).toBe("u1");
+  });
+
+  it("registra imageUrls no repositório quando fornecidas", async () => {
+    const userRepo = new FakeUserRepository(baseUser);
+    const itemRepo = new FakeItemRepository();
+    await createItem(itemRepo, userRepo, "u1", { ...valid, imageUrls: ["https://ex.com/a.jpg"] });
+    expect(itemRepo.imagesCaptures).toEqual([{ itemId: "i1", urls: ["https://ex.com/a.jpg"] }]);
+  });
+
+  it("não chama createImages sem imageUrls", async () => {
+    const userRepo = new FakeUserRepository(baseUser);
+    const itemRepo = new FakeItemRepository();
+    await createItem(itemRepo, userRepo, "u1", valid);
+    expect(itemRepo.imagesCaptures).toEqual([]);
   });
 
   it("aceita usuário com role both", async () => {

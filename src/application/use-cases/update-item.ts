@@ -1,4 +1,5 @@
 import type { Item, ItemRepository, UpdateItemInput } from "@/domain/repositories/item-repository";
+import { createItemImages } from "./create-item-images";
 
 export async function updateItem(
   itemRepo: ItemRepository,
@@ -14,5 +15,8 @@ export async function updateItem(
   if (bids > 0) throw new Error("Item com lances não pode ser editado");
   const result = await itemRepo.update(itemId, input);
   if (!result) throw new Error("Item não encontrado");
+  if (input.imageUrls?.length) {
+    await createItemImages(itemRepo, itemId, input.imageUrls);
+  }
   return result;
 }

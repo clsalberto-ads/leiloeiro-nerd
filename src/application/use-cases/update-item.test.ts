@@ -19,6 +19,7 @@ const baseItem: Item = {
 };
 
 class FakeItemRepository implements ItemRepository {
+  imagesCaptures: { itemId: string; urls: string[] }[] = [];
   constructor(private item: Item | null, private bidCount = 0) {}
   async create() {
     return baseItem;
@@ -47,7 +48,8 @@ class FakeItemRepository implements ItemRepository {
   async findImageById() {
     return null;
   }
-  async createImages() {
+  async createImages(itemId: string, urls: string[]) {
+    this.imagesCaptures.push({ itemId, urls });
     return [];
   }
   async deleteImage() {}
@@ -78,5 +80,17 @@ describe("updateItem", () => {
   it("lança erro sem permissão", async () => {
     const repo = new FakeItemRepository(baseItem);
     await expect(updateItem(repo, "u2", "i1", { title: "X" })).rejects.toThrow("Sem permissão");
+  });
+
+  it("adiciona imageUrls ao repositório quando fornecidas", async () => {
+    const repo = new FakeItemRepository(baseItem);
+    await updateItem(repo, "u1", "i1", { title: "Novo título", imageUrls: ["https://ex.com/a.jpg"] });
+    expect(repo.imagesCaptures).toEqual([{ itemId: "i1", urls: ["https://ex.com/a.jpg"] }]);
+  });
+
+  it("não chama createImages sem imageUrls", async () => {
+    const repo = new FakeItemRepository(baseItem);
+    await updateItem(repo, "u1", "i1", { title: "Novo título" });
+    expect(repo.imagesCaptures).toEqual([]);
   });
 });

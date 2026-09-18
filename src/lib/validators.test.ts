@@ -23,15 +23,17 @@ describe("imageUploadSchema", () => {
 });
 
 describe("itemSchema", () => {
+  const base = {
+    title: "Action Figure rara",
+    description: "Colecionável lacrado em estojo.",
+    type: "product",
+    minInitialBid: "50.00",
+    minBidIncrement: "5.00",
+    bidDeadline: new Date(Date.now() + 86400000).toISOString(),
+  };
+
   it("aceita dados válidos e converte reais para centavos", () => {
-    const result = itemSchema.safeParse({
-      title: "Action Figure rara",
-      description: "Colecionável lacrado em estojo.",
-      type: "product",
-      minInitialBid: "50.00",
-      minBidIncrement: "5.00",
-      bidDeadline: new Date(Date.now() + 86400000).toISOString(),
-    });
+    const result = itemSchema.safeParse(base);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.minInitialBid).toBe(5000);
@@ -56,14 +58,38 @@ describe("itemSchema", () => {
   it("rejeita valores abaixo de R$ 1,00", () => {
     expect(
       itemSchema.safeParse({
-        title: "Action Figure rara",
-        description: "Colecionável lacrado em estojo.",
-        type: "product",
+        ...base,
         minInitialBid: "0.50",
         minBidIncrement: "5.00",
-        bidDeadline: new Date(Date.now() + 86400000).toISOString(),
       }).success,
     ).toBe(false);
+  });
+
+  it("aceita ausência de imageUrls", () => {
+    expect(itemSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("converte imageUrls JSON para lista de urls", () => {
+    const result = itemSchema.safeParse({
+      ...base,
+      imageUrls: JSON.stringify(["https://ex.com/a.jpg", "https://ex.com/b.jpg"]),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.imageUrls).toEqual(["https://ex.com/a.jpg", "https://ex.com/b.jpg"]);
+  });
+
+  it("trata JSON inválido como ausência de imagens", () => {
+    const result = itemSchema.safeParse({ ...base, imageUrls: "not-json{{" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.imageUrls).toBeUndefined();
+  });
+
+  it("rejeita imageUrls que não é array", () => {
+    expect(itemSchema.safeParse({ ...base, imageUrls: '"https://ex.com/a.jpg"' }).success).toBe(false);
+  });
+
+  it("rejeita url inválida em imageUrls", () => {
+    expect(itemSchema.safeParse({ ...base, imageUrls: JSON.stringify(["not-a-url"]) }).success).toBe(false);
   });
 });
 
