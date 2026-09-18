@@ -355,9 +355,9 @@ src/
 
 ### 🟡 Fase 2 — Core do Leilão (Semanas 3–5)
 - [x] CRUD de itens (Server Actions + formulários)
-- [ ] Upload de imagens (sugestão: Uploadthing ou Cloudinary)
-- [ ] Página de vitrine do leiloeiro (`/{slug}`)
-- [ ] Página de detalhe do item (`/{slug}/{itemId}`)
+- [x] Upload de imagens (UploadThing)
+- [x] Página de vitrine do leiloeiro (`/{slug}`)
+- [x] Página de detalhe do item (`/{slug}/{itemId}`)
 - [ ] Sistema de lances com validações
 - [ ] Notificação de lance superado (Resend)
 - [ ] Componente de countdown para `bidDeadline`
