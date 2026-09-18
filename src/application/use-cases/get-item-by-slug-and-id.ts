@@ -9,6 +9,8 @@ export async function getItemBySlugAndId(
   slug: string,
   itemId: string,
 ): Promise<{ item: Item; images: ItemImage[]; bids: Bid[] } | null> {
+  // ponytail: guarda UUID no use case (única saída se o DB sq mudar para outro tipo de PK)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId)) return null;
   const item = await itemRepo.findById(itemId);
   if (!item) return null;
   const user = await userRepo.findById(item.sellerId);

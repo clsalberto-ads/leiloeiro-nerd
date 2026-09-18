@@ -16,7 +16,7 @@ const seller: UserProfile = {
 
 function makeItem(overrides: Partial<Item> = {}): Item {
   return {
-    id: "i1",
+    id: "f083f5e5-f629-4a2b-a443-1e911ccd2f26",
     sellerId: "u1",
     title: "Action Figure rara",
     description: "Lacrada.",
@@ -98,7 +98,7 @@ class FakeBidRepository implements BidRepository {
 
 const bid: Bid = {
   id: "b1",
-  itemId: "i1",
+  itemId: "f083f5e5-f629-4a2b-a443-1e911ccd2f26",
   bidderId: "bob",
   bidderName: "bob",
   amount: 5500,
@@ -109,28 +109,34 @@ const bid: Bid = {
 describe("getItemBySlugAndId", () => {
   it("retorna item, imagens e lances para item ativo com slug correto", async () => {
     const item = makeItem();
-    const images = [{ id: "img1", itemId: "i1", url: "/a.jpg", position: 0, createdAt: new Date() }];
+    const images = [{ id: "img1", itemId: "f083f5e5-f629-4a2b-a443-1e911ccd2f26", url: "/a.jpg", position: 0, createdAt: new Date() }];
     const uc = getItemBySlugAndId;
     await expect(
-      uc(new FakeItemRepository(item, images), new FakeUserRepository(seller), new FakeBidRepository([bid]), "ana-impala", "i1"),
+      uc(new FakeItemRepository(item, images), new FakeUserRepository(seller), new FakeBidRepository([bid]), "ana-impala", "f083f5e5-f629-4a2b-a443-1e911ccd2f26"),
     ).resolves.toEqual({ item, images, bids: [bid] });
   });
 
   it("retorna null quando o slug não corresponde ao seller do item", async () => {
     await expect(
-      getItemBySlugAndId(new FakeItemRepository(makeItem()), new FakeUserRepository(seller), new FakeBidRepository(), "outro-slug", "i1"),
+      getItemBySlugAndId(new FakeItemRepository(makeItem()), new FakeUserRepository(seller), new FakeBidRepository(), "outro-slug", "f083f5e5-f629-4a2b-a443-1e911ccd2f26"),
     ).resolves.toBeNull();
   });
 
   it("retorna null quando o item não está ativo", async () => {
     await expect(
-      getItemBySlugAndId(new FakeItemRepository(makeItem({ status: "draft" })), new FakeUserRepository(seller), new FakeBidRepository(), "ana-impala", "i1"),
+      getItemBySlugAndId(new FakeItemRepository(makeItem({ status: "draft" })), new FakeUserRepository(seller), new FakeBidRepository(), "ana-impala", "f083f5e5-f629-4a2b-a443-1e911ccd2f26"),
     ).resolves.toBeNull();
   });
 
   it("retorna null quando o item não existe", async () => {
     await expect(
-      getItemBySlugAndId(new FakeItemRepository(null), new FakeUserRepository(seller), new FakeBidRepository(), "ana-impala", "i1"),
+      getItemBySlugAndId(new FakeItemRepository(null), new FakeUserRepository(seller), new FakeBidRepository(), "ana-impala", "f083f5e5-f629-4a2b-a443-1e911ccd2f26"),
+    ).resolves.toBeNull();
+  });
+
+  it("retorna null para itemId que não é UUID", async () => {
+    await expect(
+      getItemBySlugAndId(new FakeItemRepository(makeItem()), new FakeUserRepository(seller), new FakeBidRepository(), "ana-impala", "i-inexistente"),
     ).resolves.toBeNull();
   });
 });
