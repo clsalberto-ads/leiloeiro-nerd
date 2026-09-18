@@ -1,12 +1,13 @@
 import type { ItemRepository } from "@/domain/repositories/item-repository";
 
-// ponytail: sem checagem de ownership — requer findImageById no ItemRepository.
-// hoje a exclusão é guardada pela sessão na server action (Task 5/9); validação em
-// profundidade fica para uma Future task quando houver método de lookup por imagem.
 export async function deleteItemImage(
   itemRepo: ItemRepository,
-  _sellerId: string,
+  userId: string,
   imageId: string,
 ): Promise<void> {
+  const image = await itemRepo.findImageById(imageId);
+  if (!image) throw new Error("Imagem não encontrada");
+  const item = await itemRepo.findById(image.itemId);
+  if (!item || item.sellerId !== userId) throw new Error("Sem permissão");
   await itemRepo.deleteImage(imageId);
 }

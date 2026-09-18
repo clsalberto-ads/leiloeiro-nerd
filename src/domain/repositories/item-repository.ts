@@ -59,6 +59,7 @@ export interface ItemRepository {
   setStatus(id: string, status: ItemStatus): Promise<Item | null>;
   countBids(itemId: string): Promise<number>;
   findImagesByItemId(itemId: string): Promise<ItemImage[]>;
+  findImageById(imageId: string): Promise<ItemImage | null>;
   createImages(itemId: string, urls: string[]): Promise<ItemImage[]>;
   deleteImage(imageId: string): Promise<void>;
 }

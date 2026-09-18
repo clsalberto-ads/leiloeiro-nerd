@@ -44,6 +44,9 @@ class FakeItemRepository implements ItemRepository {
   async findImagesByItemId() {
     return [];
   }
+  async findImageById() {
+    return null;
+  }
   async createImages() {
     return [];
   }

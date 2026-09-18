@@ -106,6 +106,13 @@ export const drizzleItemRepository: ItemRepository = {
     return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
   },
 
+  async findImageById(imageId) {
+    const [row] = await db.select().from(itemImages).where(eq(itemImages.id, imageId)).limit(1);
+    return row
+      ? { id: row.id, itemId: row.itemId, url: row.url, position: row.position, createdAt: row.createdAt }
+      : null;
+  },
+
   async createImages(itemId, urls) {
     const values = urls.map((url, i) => ({ itemId, url, position: i }));
     const rows = await db.insert(itemImages).values(values).returning();

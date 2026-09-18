@@ -44,6 +44,9 @@ class FakeItemRepository implements ItemRepository {
   async findImagesByItemId() {
     return this.images;
   }
+  async findImageById() {
+    return null;
+  }
   create() {
     return Promise.reject(new Error("não usado"));
   }
