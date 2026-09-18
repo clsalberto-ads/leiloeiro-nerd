@@ -1,5 +1,5 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, max } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, itemImages, items } from "@/infrastructure/database/schema";
 import type { CreateItemInput, Item, ItemRepository } from "@/domain/repositories/item-repository";
@@ -114,7 +114,12 @@ export const drizzleItemRepository: ItemRepository = {
   },
 
   async createImages(itemId, urls) {
-    const values = urls.map((url, i) => ({ itemId, url, position: i }));
+    const existing = await db
+      .select({ maxPos: max(itemImages.position) })
+      .from(itemImages)
+      .where(eq(itemImages.itemId, itemId));
+    const start = existing[0]?.maxPos ?? -1;
+    const values = urls.map((url, i) => ({ itemId, url, position: start + 1 + i }));
     const rows = await db.insert(itemImages).values(values).returning();
     return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
   },

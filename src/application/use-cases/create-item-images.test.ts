@@ -2,6 +2,55 @@ import { describe, expect, it } from "vitest";
 import { createItemImages } from "./create-item-images";
 import type { ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
 
+class CumulativeFakeItemRepository implements ItemRepository {
+  positions: number[] = [];
+  async createImages(itemId: string, urls: string[]) {
+    const start = this.positions[this.positions.length - 1] ?? -1;
+    this.positions.push(...urls.map((_, i) => start + 1 + i));
+    const base = this.positions.length - urls.length;
+    return urls.map((url, i) => ({
+      id: `img-${base + i}`,
+      itemId,
+      url,
+      position: base + i,
+      createdAt: new Date(),
+    })) satisfies ItemImage[];
+  }
+  get allPositions() {
+    return this.positions;
+  }
+  create() {
+    return Promise.reject(new Error("não usado"));
+  }
+  update() {
+    return Promise.reject(new Error("não usado"));
+  }
+  findById() {
+    return Promise.reject(new Error("não usado"));
+  }
+  findBySellerId() {
+    return Promise.reject(new Error("não usado"));
+  }
+  delete() {
+    return Promise.reject(new Error("não usado"));
+  }
+  setStatus() {
+    return Promise.reject(new Error("não usado"));
+  }
+  countBids() {
+    return Promise.reject(new Error("não usado"));
+  }
+  findImagesByItemId() {
+    return Promise.reject(new Error("não usado"));
+  }
+  findImageById() {
+    return Promise.reject(new Error("não usado"));
+  }
+  deleteImage() {
+    return Promise.reject(new Error("não usado"));
+  }
+}
+
 class FakeItemRepository implements ItemRepository {
   calls: { itemId: string; urls: string[] }[] = [];
   async createImages(itemId: string, urls: string[]) {
@@ -55,6 +104,14 @@ describe("createItemImages", () => {
       ["/b.jpg", 1],
       ["/c.jpg", 2],
     ]);
+  });
+
+  it("continua as posições após um batch anterior (chamadas aditivas)", async () => {
+    const repo = new CumulativeFakeItemRepository();
+    await createItemImages(repo, "i1", ["/a.jpg", "/b.jpg", "/c.jpg"]);
+    const second = await createItemImages(repo, "i1", ["/d.jpg", "/e.jpg", "/f.jpg"]);
+    expect(repo.allPositions).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(second.map((img) => img.position)).toEqual([3, 4, 5]);
   });
 
   it("repassa o itemId e as urls", async () => {
