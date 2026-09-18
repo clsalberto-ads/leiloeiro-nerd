@@ -41,6 +41,13 @@ class FakeItemRepository implements ItemRepository {
   async countBids() {
     return 0;
   }
+  async findImagesByItemId() {
+    return [];
+  }
+  async createImages() {
+    return [];
+  }
+  async deleteImage() {}
 }
 
 describe("publishItem", () => {

@@ -38,6 +38,14 @@ export interface UpdateItemInput {
   paymentDeadlineDays?: number;
 }
 
+export interface ItemImage {
+  id: string;
+  itemId: string;
+  url: string;
+  position: number;
+  createdAt: Date;
+}
+
 export interface ItemListFilter {
   status?: ItemStatus;
 }
@@ -50,4 +58,7 @@ export interface ItemRepository {
   delete(id: string): Promise<void>;
   setStatus(id: string, status: ItemStatus): Promise<Item | null>;
   countBids(itemId: string): Promise<number>;
+  findImagesByItemId(itemId: string): Promise<ItemImage[]>;
+  createImages(itemId: string, urls: string[]): Promise<ItemImage[]>;
+  deleteImage(imageId: string): Promise<void>;
 }

@@ -1,7 +1,7 @@
 import { type InferSelectModel } from "drizzle-orm";
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
-import { bids, items } from "@/infrastructure/database/schema";
+import { bids, itemImages, items } from "@/infrastructure/database/schema";
 import type { CreateItemInput, Item, ItemRepository } from "@/domain/repositories/item-repository";
 
 type ItemRow = InferSelectModel<typeof items>;
@@ -95,5 +95,24 @@ export const drizzleItemRepository: ItemRepository = {
       .from(bids)
       .where(eq(bids.itemId, itemId));
     return row?.n ?? 0;
+  },
+
+  async findImagesByItemId(itemId) {
+    const rows = await db
+      .select()
+      .from(itemImages)
+      .where(eq(itemImages.itemId, itemId))
+      .orderBy(itemImages.position);
+    return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
+  },
+
+  async createImages(itemId, urls) {
+    const values = urls.map((url, i) => ({ itemId, url, position: i }));
+    const rows = await db.insert(itemImages).values(values).returning();
+    return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
+  },
+
+  async deleteImage(imageId) {
+    await db.delete(itemImages).where(eq(itemImages.id, imageId));
   },
 };
