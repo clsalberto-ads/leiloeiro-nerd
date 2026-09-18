@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ export function LoginForm() {
       <CardContent>
         <form action={action} className="space-y-4">
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-          {state.ok ? <p className="text-sm text-emerald-600"><a className="underline" href="/dashboard">Entrar no painel</a></p> : null}
+          {state.ok ? <p className="text-sm text-emerald-600"><Link className="underline" href="/dashboard">Entrar no painel</Link></p> : null}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
             <Input id="email" name="email" type="email" required />
@@ -30,8 +31,8 @@ export function LoginForm() {
           </div>
           <Button type="submit" disabled={pending}>Entrar</Button>
           <p className="text-sm text-muted-foreground">
-            Não tem conta? <a className="text-primary underline" href="/register">Cadastre-se</a> ·{" "}
-            <a className="text-primary underline" href="/forgot-password">Esqueci a senha</a>
+            Não tem conta? <Link className="text-primary underline" href="/register">Cadastre-se</Link> ·{" "}
+            <Link className="text-primary underline" href="/forgot-password">Esqueci a senha</Link>
           </p>
         </form>
       </CardContent>

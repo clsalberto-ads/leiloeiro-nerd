@@ -1,4 +1,5 @@
 import { getSession } from "@/presentation/actions/auth-actions";
+import Link from "next/link";
 import { listSellerItems } from "@/application/use-cases/list-seller-items";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import type { ItemStatus } from "@/domain/repositories/item-repository";
@@ -35,7 +36,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Meus itens</h1>
-        <a href="/dashboard/items/new" className="text-sm font-medium text-primary underline">+ Novo item</a>
+        <Link href="/dashboard/items/new" className="text-sm font-medium text-primary underline">+ Novo item</Link>
       </div>
       <ItemsList items={items} current={typeof status === "string" && VALID_STATUSES.includes(status as ItemStatus) ? status : "all"} />
     </div>

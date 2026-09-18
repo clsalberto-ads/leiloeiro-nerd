@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { getSession, signOutAction } from "@/presentation/actions/auth-actions";
 
 export default async function DashboardPage() {
@@ -15,9 +16,9 @@ export default async function DashboardPage() {
         Olá, {session?.user.name} · {session?.user.email} · Papel: {session?.user.role}
       </p>
       <p>
-        <a className="text-primary underline" href="/dashboard/settings">Editar perfil</a>
+        <Link className="text-primary underline" href="/dashboard/settings">Editar perfil</Link>
         {" · "}
-        <a className="text-primary underline" href="/dashboard/items">Meus itens</a>
+        <Link className="text-primary underline" href="/dashboard/items">Meus itens</Link>
       </p>
     </div>
   );
