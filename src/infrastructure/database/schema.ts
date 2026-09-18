@@ -22,6 +22,14 @@ export const items = pgTable("items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("items_bid_deadline_status_idx").on(t.bidDeadline, t.status)]);
 
+export const itemImages = pgTable("item_images", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("item_images_item_id_idx").on(t.itemId)]);
+
 export const bids = pgTable("bids", {
   id: uuid("id").primaryKey().defaultRandom(),
   itemId: uuid("item_id").notNull().references(() => items.id),
