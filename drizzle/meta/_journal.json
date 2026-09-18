@@ -15,6 +15,13 @@
       "when": 1789647100334,
       "tag": "0001_brown_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789757812444,
+      "tag": "0002_item_images",
+      "breakpoints": true
     }
   ]
 }
