@@ -62,6 +62,11 @@ export const imageUploadSchema = z.object({
     .refine((f) => Array.from(f).every((file) => file.type.startsWith("image/")), "Apenas imagens"),
 });
 
+export const placeBidSchema = z.object({
+  itemId: z.string().uuid(),
+  amount: z.coerce.number().positive("Lance inválido").refine((v) => v >= 100, "Lance mínimo R$ 1,00"),
+});
+
 export const becomeSellerSchema = z.object({
   slug: z
     .string()
