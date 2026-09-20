@@ -375,6 +375,28 @@ describe("placeBid", () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it("não falha o lance se notifRepo.create der erro (best effort)", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const throwingNotifRepo: NotificationRepository = {
+      async create() {
+        throw new Error("notificação falhou");
+      },
+    };
+    const itemRepo = new FakeItemRepository();
+    const bidRepo = new FakeBidRepository([existingHighBid]);
+    const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller, bidder2: outbidUser });
+    const resend: ResendClient = {
+      emails: { send: vi.fn().mockResolvedValue({}) },
+    };
+
+    const result = await placeBid(itemRepo, bidRepo, userRepo, throwingNotifRepo, resend, "bidder1", "item1", 6500);
+
+    expect(result.bid.amount).toBe(6500);
+    expect(result.outbidUserId).toBe("bidder2");
+    expect(consoleErrorSpy).toHaveBeenCalledWith("[Resend] falha ao enviar outbid:", expect.any(Error));
+    consoleErrorSpy.mockRestore();
+  });
+
   it("não envia outbid notification quando o próprio usuário supera seu próprio lance", async () => {
     const existingOwnBid: Bid = { ...existingHighBid, bidderId: "bidder1", bidderName: "João" };
     const itemRepo = new FakeItemRepository();

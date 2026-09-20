@@ -43,13 +43,13 @@ export async function placeBid(
   let outbidUserId: string | undefined;
   if (highestBid && highestBid.bidderId !== bidderId) {
     outbidUserId = highestBid.bidderId;
-    await notifRepo.create({
-      userId: outbidUserId,
-      type: "outbid",
-      title: "Lance superado",
-      content: `Seu lance de R$ ${formatReais(highestBid.amount)} em ${item.title} foi superado por R$ ${formatReais(amount)}`,
-    });
     try {
+      await notifRepo.create({
+        userId: outbidUserId,
+        type: "outbid",
+        title: "Lance superado",
+        content: `Seu lance de R$ ${formatReais(highestBid.amount)} em ${item.title} foi superado por R$ ${formatReais(amount)}`,
+      });
       const outbidUser = await userRepo.findById(outbidUserId);
       const seller = await userRepo.findById(item.sellerId);
       if (outbidUser?.email && seller?.slug) {
