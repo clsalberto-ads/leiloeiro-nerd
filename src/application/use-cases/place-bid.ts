@@ -2,6 +2,7 @@ import type { BidRepository } from "@/domain/repositories/bid-repository";
 import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
+import { renderOutbidEmail } from "@/lib/email-templates";
 
 export interface ResendClient {
   emails: {
@@ -57,7 +58,13 @@ export async function placeBid(
           from: "Leiloeiro Nerd <noreply@leiloeironerd.com>",
           to: outbidUser.email,
           subject: "Seu lance foi superado!",
-          html: `<p>Seu lance de R$ ${formatReais(highestBid.amount)} em <strong>${item.title}</strong> foi superado por <strong>R$ ${formatReais(amount)}</strong>.</p><p><a href="${process.env.NEXT_PUBLIC_APP_URL}/${seller.slug}/${item.id}">Dar novo lance</a></p>`,
+          html: renderOutbidEmail({
+            bidderName: outbidUser.name,
+            itemTitle: item.title,
+            oldAmount: highestBid.amount,
+            newAmount: amount,
+            itemUrl: `${process.env.NEXT_PUBLIC_APP_URL}/${seller.slug}/${item.id}`,
+          }),
         });
       }
     } catch (e) {
