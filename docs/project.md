@@ -358,9 +358,9 @@ src/
 - [x] Upload de imagens (UploadThing)
 - [x] Página de vitrine do leiloeiro (`/{slug}`)
 - [x] Página de detalhe do item (`/{slug}/{itemId}`)
-- [ ] Sistema de lances com validações
-- [ ] Notificação de lance superado (Resend)
-- [ ] Componente de countdown para `bidDeadline`
+- [x] Sistema de lances com validações
+- [x] Notificação de lance superado (Resend)
+- [x] Componente de countdown para `bidDeadline`
 
 ### 🟠 Fase 3 — Pagamentos e Automação (Semanas 6–8)
 - [ ] Integração Mercado Pago (PIX + Link)
