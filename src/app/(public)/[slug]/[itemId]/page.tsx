@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getItemDetailAction } from "@/presentation/actions/public-actions";
 import { ItemGallery } from "@/components/item-gallery";
 import { BidCountdown } from "@/components/bid-countdown";
-import { BidHistory } from "@/components/bid-history";
+import { BidSection } from "@/components/bid-section";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
           <BidCountdown deadline={item.bidDeadline} />
         </div>
       </div>
-      <BidHistory bids={bids} />
+      <BidSection itemId={item.id} initialBids={bids} minInitialBid={item.minInitialBid} minBidIncrement={item.minBidIncrement} />
     </div>
   );
 }
