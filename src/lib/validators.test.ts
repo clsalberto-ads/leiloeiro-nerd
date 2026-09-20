@@ -4,7 +4,7 @@ import { becomeSellerSchema, imageUploadSchema, itemSchema } from "./validators"
 const img = (size: number) => new File([new ArrayBuffer(size)], "a.jpg", { type: "image/jpeg" });
 
 describe("imageUploadSchema", () => {
-  it("aceita até 10 imagens de até 5MB", () => {
+  it("aceita até 10 imagens de até 8MB", () => {
     expect(imageUploadSchema.safeParse({ images: Array.from({ length: 10 }, () => img(1024)) }).success).toBe(true);
   });
 
@@ -12,8 +12,8 @@ describe("imageUploadSchema", () => {
     expect(imageUploadSchema.safeParse({ images: Array.from({ length: 11 }, () => img(1024)) }).success).toBe(false);
   });
 
-  it("rejeita imagem maior que 5MB", () => {
-    expect(imageUploadSchema.safeParse({ images: [img(5 * 1024 * 1024 + 1)] }).success).toBe(false);
+  it("rejeita imagem maior que 8MB", () => {
+    expect(imageUploadSchema.safeParse({ images: [img(8 * 1024 * 1024 + 1)] }).success).toBe(false);
   });
 
   it("rejeita arquivo que não é imagem", () => {

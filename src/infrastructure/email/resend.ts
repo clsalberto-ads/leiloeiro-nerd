@@ -12,7 +12,7 @@ export async function sendOutbidEmail(
 ) {
   const html = renderOutbidEmail(data);
   return resend.emails.send({
-    from: "Leiloeiro Nerd <noreply@leiloeironerd.com>",
+    from: process.env.RESEND_FROM_EMAIL ?? "Leiloeiro Nerd <noreply@leiloeironerd.com>",
     to,
     subject: "Seu lance foi superado!",
     html,

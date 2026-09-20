@@ -5,7 +5,7 @@ import { z } from "zod";
 const f = createUploadthing();
 
 export const uploadRouter = {
-  itemImages: f({ image: { maxFileSize: "4MB", maxFileCount: 10 } })
+  itemImages: f({ image: { maxFileSize: "8MB", maxFileCount: 10 } })
     .input(z.object({ itemId: z.string().uuid() }))
     .onUploadComplete(async ({ file }) => {
       console.log("[UploadThing] upload completo:", file.url);

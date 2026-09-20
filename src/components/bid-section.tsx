@@ -32,7 +32,7 @@ export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement
 
   return (
     <div className="space-y-4">
-      <BidForm itemId={itemId} minBid={minBid} />
+      <BidForm key={minBid} itemId={itemId} minBid={minBid} />
       <BidHistory bids={bids} />
     </div>
   );

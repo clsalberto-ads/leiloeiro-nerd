@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Item } from "@/domain/repositories/item-repository";
+import { formatReais } from "@/lib/format-reais";
 
 export function PublicItemCard({
   item,
@@ -27,7 +28,7 @@ export function PublicItemCard({
       )}
       <div className="p-3">
         <h3 className="line-clamp-2 font-medium">{item.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Lance mínimo: R$ {(item.minInitialBid / 100).toFixed(2)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Lance mínimo: R$ {formatReais(item.minInitialBid)}</p>
       </div>
     </Link>
   );

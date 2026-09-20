@@ -1,4 +1,5 @@
 import type { Bid } from "@/domain/repositories/bid-repository";
+import { formatReais } from "@/lib/format-reais";
 
 export function BidHistory({ bids }: { bids: Bid[] }) {
   if (bids.length === 0) {
@@ -19,7 +20,7 @@ export function BidHistory({ bids }: { bids: Bid[] }) {
         {bids.map((bid) => (
           <tr key={bid.id} className="border-b">
             <td className="py-2 pr-4">{bid.rank ?? "–"}</td>
-            <td className="py-2 pr-4">R$ {(bid.amount / 100).toFixed(2)}</td>
+            <td className="py-2 pr-4">R$ {formatReais(bid.amount)}</td>
             <td className="py-2 pr-4">{bid.bidderName}</td>
             <td className="py-2">{new Date(bid.createdAt).toLocaleDateString("pt-BR")}</td>
           </tr>

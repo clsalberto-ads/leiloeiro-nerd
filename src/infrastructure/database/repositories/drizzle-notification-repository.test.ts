@@ -1,99 +1,49 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { drizzleNotificationRepository } from "./drizzle-notification-repository";
+import { describe, it, expect } from "vitest";
+import { mapNotification } from "./drizzle-notification-repository";
+import type { NotificationRow } from "./drizzle-notification-repository";
 
-type Notification = {
-  id: string;
-  userId: string;
-  type: "outbid" | "won" | "payment_due" | "payment_expired" | "payment_confirmed";
-  title: string;
-  content: string;
-  read: boolean;
-  createdAt: Date;
-};
-
-type CreateNotificationInput = {
-  userId: string;
-  type: "outbid" | "won" | "payment_due" | "payment_expired" | "payment_confirmed";
-  title: string;
-  content: string;
-};
-
-function createFakeNotificationRepository() {
-  const store = new Map<string, Notification[]>();
-
+function makeRow(overrides: Partial<NotificationRow> = {}): NotificationRow {
   return {
-    async create(input: CreateNotificationInput): Promise<Notification> {
-      const userNotifications = store.get(input.userId) ?? [];
-
-      const notification: Notification = {
-        id: crypto.randomUUID(),
-        userId: input.userId,
-        type: input.type,
-        title: input.title,
-        content: input.content,
-        read: false,
-        createdAt: new Date(),
-      };
-
-      store.set(input.userId, [...userNotifications, notification]);
-
-      return notification;
-    },
-
-    _reset() {
-      store.clear();
-    },
+    id: "n1",
+    userId: "u1",
+    type: "outbid",
+    title: "Lance superado",
+    content: "Seu lance foi superado.",
+    read: false,
+    createdAt: new Date(),
+    ...overrides,
   };
 }
 
-describe("drizzleNotificationRepository (fake)", () => {
-  let repo: ReturnType<typeof createFakeNotificationRepository>;
-
-  beforeEach(() => {
-    repo = createFakeNotificationRepository();
-  });
-
-  it("create notification returns correct fields", async () => {
-    const notification = await repo.create({
-      userId: "user-1",
-      type: "outbid",
-      title: "You've been outbid!",
-      content: "Someone placed a higher bid on your item.",
+describe("drizzleNotificationRepository", () => {
+  it("mapeia a linha do banco para a entidade Notification como o create faz", () => {
+    const row = makeRow();
+    const notification = mapNotification(row);
+    expect(notification).toEqual({
+      id: row.id,
+      userId: row.userId,
+      type: row.type,
+      title: row.title,
+      content: row.content,
+      read: row.read,
+      createdAt: row.createdAt,
     });
-
-    expect(notification.id).toBeDefined();
-    expect(notification.userId).toBe("user-1");
-    expect(notification.type).toBe("outbid");
-    expect(notification.title).toBe("You've been outbid!");
-    expect(notification.content).toBe("Someone placed a higher bid on your item.");
-    expect(notification.read).toBe(false);
-    expect(notification.createdAt).toBeInstanceOf(Date);
   });
 
-  it("read defaults to false", async () => {
-    const notification = await repo.create({
-      userId: "user-1",
-      type: "won",
-      title: "You won!",
-      content: "Congratulations on winning the auction.",
-    });
-
-    expect(notification.read).toBe(false);
+  it("preserva read como veio do banco (o create grava read=false)", () => {
+    expect(mapNotification(makeRow({ read: false })).read).toBe(false);
   });
 
-  it("create notification with different types", async () => {
-    const types = ["outbid", "won", "payment_due", "payment_expired", "payment_confirmed"] as const;
-
+  it("aceita todos os tipos de notificação do enum", () => {
+    const types: NotificationRow["type"][] = [
+      "outbid",
+      "won",
+      "payment_due",
+      "payment_expired",
+      "payment_confirmed",
+    ];
     for (const type of types) {
-      const notification = await repo.create({
-        userId: "user-1",
-        type,
-        title: `Title for ${type}`,
-        content: `Content for ${type}`,
-      });
-
-      expect(notification.type).toBe(type);
-      expect(notification.read).toBe(false);
+      expect(mapNotification(makeRow({ type })).type).toBe(type);
     }
   });
 });

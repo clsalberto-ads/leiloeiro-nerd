@@ -68,10 +68,10 @@ describe("uploadItemImagesAction", () => {
     expect(mocks.utapi.uploadFiles).not.toHaveBeenCalled();
   });
 
-  it("rejeita arquivo acima de 5MB", async () => {
+  it("rejeita arquivo acima de 8MB", async () => {
     await expect(
-      uploadItemImagesAction(null, filesWith([file(5 * 1024 * 1024 + 1)])),
-    ).resolves.toEqual({ error: "Máximo 5MB por imagem" });
+      uploadItemImagesAction(null, filesWith([file(8 * 1024 * 1024 + 1)])),
+    ).resolves.toEqual({ error: "Máximo 8MB por imagem" });
   });
 
   it("rejeita arquivo que não é imagem", async () => {

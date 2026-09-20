@@ -58,7 +58,7 @@ export const imageUploadSchema = z.object({
       "Lista de imagens inválida",
     )
     .refine((f) => f.length <= 10, "Máximo 10 imagens")
-    .refine((f) => Array.from(f).every((file) => file.size <= 5 * 1024 * 1024), "Máximo 5MB por imagem")
+    .refine((f) => Array.from(f).every((file) => file.size <= 8 * 1024 * 1024), "Máximo 8MB por imagem")
     .refine((f) => Array.from(f).every((file) => file.type.startsWith("image/")), "Apenas imagens"),
 });
 

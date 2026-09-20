@@ -1,6 +1,7 @@
 import type { Bid, BidRepository } from "@/domain/repositories/bid-repository";
 import type { Item, ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
+import { resolveBidderNames } from "./get-item-bids";
 
 export async function getItemBySlugAndId(
   itemRepo: ItemRepository,
@@ -20,5 +21,5 @@ export async function getItemBySlugAndId(
     itemRepo.findImagesByItemId(itemId),
     bidRepo.findByItemId(itemId),
   ]);
-  return { item, images, bids };
+  return { item, images, bids: await resolveBidderNames(bids, userRepo) };
 }

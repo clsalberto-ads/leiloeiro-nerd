@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { placeBid } from "./place-bid";
-import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
+import type { Bid, BidRepository, CreateBidInput, LockedBidItem, BidPlacement } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository, ItemStatus, CreateItemInput, UpdateItemInput, ItemImage, ItemListFilter } from "@/domain/repositories/item-repository";
 import type { UserProfile, UserRepository, UserRole, UpdateProfileInput } from "@/domain/repositories/user-repository";
 import type { NotificationRepository, CreateNotificationInput, Notification, NotificationType } from "@/domain/repositories/notification-repository";
@@ -67,6 +67,16 @@ const existingHighBid: Bid = {
   createdAt: new Date(Date.now() - 3600000),
 };
 
+const lockedBaseItem: LockedBidItem = {
+  id: "item1",
+  title: "Action Figure Rara",
+  sellerId: "seller1",
+  status: "active",
+  bidDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  minInitialBid: 5000,
+  minBidIncrement: 500,
+};
+
 class FakeItemRepository implements ItemRepository {
   item: Item;
   constructor(item: Item = baseItem) {
@@ -110,22 +120,27 @@ class FakeItemRepository implements ItemRepository {
 class FakeBidRepository implements BidRepository {
   bids: Bid[] = [];
   createdBid: Bid | null = null;
-  constructor(bids: Bid[] = []) {
+  lockedItem: LockedBidItem | null;
+  constructor(bids: Bid[] = [], lockedItem: LockedBidItem | null = lockedBaseItem) {
     this.bids = [...bids].sort((a, b) => b.amount - a.amount);
+    this.lockedItem = lockedItem;
   }
   async findByItemId() {
     return this.bids;
   }
-  async createBid(input: CreateBidInput): Promise<Bid> {
+  async placeBid(input: CreateBidInput, validate: (ctx: { item: LockedBidItem | null; highestBid: Bid | undefined }) => void): Promise<BidPlacement> {
+    const highestBid = this.bids[0];
+    validate({ item: this.lockedItem, highestBid });
     const bid: Bid = {
       id: "new-bid",
       ...input,
       bidderName: "João",
-      rank: 1,
+      rank: (highestBid?.rank ?? 0) + 1,
       createdAt: new Date(),
     };
     this.createdBid = bid;
-    return bid;
+    this.bids = [bid, ...this.bids].sort((a, b) => b.amount - a.amount);
+    return { bid, previousHighestBid: highestBid ?? null };
   }
 }
 

@@ -1,5 +1,5 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, count, desc, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, max, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, itemImages, items } from "@/infrastructure/database/schema";
 import type { CreateItemInput, Item, ItemRepository } from "@/domain/repositories/item-repository";
@@ -114,17 +114,36 @@ export const drizzleItemRepository: ItemRepository = {
   },
 
   async createImages(itemId, urls) {
-    const existing = await db
-      .select({ maxPos: max(itemImages.position) })
-      .from(itemImages)
-      .where(eq(itemImages.itemId, itemId));
-    const start = existing[0]?.maxPos ?? -1;
-    const values = urls.map((url, i) => ({ itemId, url, position: start + 1 + i }));
-    const rows = await db.insert(itemImages).values(values).returning();
-    return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
+    return await db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ maxPos: max(itemImages.position) })
+        .from(itemImages)
+        .where(eq(itemImages.itemId, itemId));
+      const start = existing[0]?.maxPos ?? -1;
+      const values = urls.map((url, i) => ({ itemId, url, position: start + 1 + i }));
+      const rows = await tx.insert(itemImages).values(values).returning();
+      await tx
+        .update(items)
+        .set({
+          imageUrl: sql`(select url from ${itemImages} where ${itemImages.itemId} = ${itemId} order by position asc limit 1)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(items.id, itemId));
+      return rows.map((r) => ({ id: r.id, itemId: r.itemId, url: r.url, position: r.position, createdAt: r.createdAt }));
+    });
   },
 
   async deleteImage(imageId) {
+    const [row] = await db.select().from(itemImages).where(eq(itemImages.id, imageId)).limit(1);
     await db.delete(itemImages).where(eq(itemImages.id, imageId));
+    if (row) {
+      await db
+        .update(items)
+        .set({
+          imageUrl: sql`(select url from ${itemImages} where ${itemImages.itemId} = ${row.itemId} order by position asc limit 1)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(items.id, row.itemId));
+    }
   },
 };

@@ -1,18 +1,19 @@
 "use client";
 import { useActionState, useState } from "react";
 import { placeBidAction } from "@/presentation/actions/bid-actions";
+import { formatReais } from "@/lib/format-reais";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface BidFormProps {
   itemId: string;
-  minBid: number; // centavos
+  minBid: number;
 }
 
 export function BidForm({ itemId, minBid }: BidFormProps) {
   const [state, formAction, pending] = useActionState(placeBidAction, null);
-  const minReais = (minBid / 100).toFixed(2);
+  const minReais = formatReais(minBid);
   const [centavos, setCentavos] = useState(minBid);
 
   return (

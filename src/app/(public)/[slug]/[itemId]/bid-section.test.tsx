@@ -37,15 +37,15 @@ describe("BidSection", () => {
   it("renderiza formulário com lance mínimo inicial quando não há lances", () => {
     const html = render("i1", [], 10000, 500);
     expect(html).toContain("Dar lance");
-    expect(html).toContain("placeholder=\"Mínimo R$ 100.00\"");
+    expect(html).toContain("placeholder=\"Mínimo R$ 100,00\"");
     expect(html).toContain("Nenhum lance ainda.");
   });
 
   it("renderiza histórico e recalcula mínimo a partir do maior lance", () => {
     const html = render("i1", [makeBid()], 10000, 500);
-    expect(html).toContain("150.00");
+    expect(html).toContain("150,00");
     expect(html).toContain(">Ana<");
-    expect(html).toContain("placeholder=\"Mínimo R$ 155.00\"");
+    expect(html).toContain("placeholder=\"Mínimo R$ 155,00\"");
   });
 
   it("não dispara o polling durante o render inicial (intervalo de 10s)", () => {

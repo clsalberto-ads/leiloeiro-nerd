@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getItemBySlugAndId } from "./get-item-by-slug-and-id";
-import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
+import type { Bid, BidRepository, CreateBidInput, LockedBidItem } from "@/domain/repositories/bid-repository";
 import type { Item, ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
 import type { UserProfile, UserRepository } from "@/domain/repositories/user-repository";
 
@@ -74,9 +74,12 @@ class FakeItemRepository implements ItemRepository {
 }
 
 class FakeUserRepository implements UserRepository {
-  constructor(private user: UserProfile | null) {}
-  async findById() {
-    return this.user;
+  userBy: Record<string, UserProfile | null>;
+  constructor(user: UserProfile | null = null) {
+    this.userBy = user ? { [user.id]: user } : {};
+  }
+  async findById(userId: string) {
+    return this.userBy[userId] ?? null;
   }
   async findBySlug() {
     return null;
@@ -94,7 +97,7 @@ class FakeBidRepository implements BidRepository {
   async findByItemId() {
     return this.bids;
   }
-  async createBid(_input: CreateBidInput): Promise<Bid> {
+  async placeBid(_input: CreateBidInput, _validate: (ctx: { item: LockedBidItem | null; highestBid: Bid | undefined }) => void): Promise<never> {
     throw new Error("não usado");
   }
 }
@@ -117,6 +120,28 @@ describe("getItemBySlugAndId", () => {
     await expect(
       uc(new FakeItemRepository(item, images), new FakeUserRepository(seller), new FakeBidRepository([bid]), "ana-impala", "f083f5e5-f629-4a2b-a443-1e911ccd2f26"),
     ).resolves.toEqual({ item, images, bids: [bid] });
+  });
+
+  it("resolve nomes dos arrematantes no primeiro render (mesmo path do polling)", async () => {
+    const bob: UserProfile = {
+      id: "bob",
+      name: "Bob Silva",
+      email: "bob@ex.com",
+      phone: null,
+      slug: null,
+      address: null,
+      role: "bidder",
+    };
+    const users = new FakeUserRepository(seller);
+    users.userBy["bob"] = bob;
+    const result = await getItemBySlugAndId(
+      new FakeItemRepository(makeItem()),
+      users,
+      new FakeBidRepository([bid]),
+      "ana-impala",
+      "f083f5e5-f629-4a2b-a443-1e911ccd2f26",
+    );
+    expect(result?.bids[0]?.bidderName).toBe("Bob Silva");
   });
 
   it("retorna null quando o slug não corresponde ao seller do item", async () => {

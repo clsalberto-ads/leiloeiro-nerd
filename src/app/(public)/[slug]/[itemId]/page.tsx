@@ -3,6 +3,7 @@ import { getItemDetailAction } from "@/presentation/actions/public-actions";
 import { ItemGallery } from "@/components/item-gallery";
 import { BidCountdown } from "@/components/bid-countdown";
 import { BidSection } from "@/components/bid-section";
+import { formatReais } from "@/lib/format-reais";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
         <h1 className="text-2xl font-bold">{item.title}</h1>
         <p className="text-muted-foreground">{item.description}</p>
         <div className="flex gap-4 text-sm text-muted-foreground">
-          <span>Lance mínimo: R$ {(item.minInitialBid / 100).toFixed(2)}</span>
+          <span>Lance mínimo: R$ {formatReais(item.minInitialBid)}</span>
           <BidCountdown deadline={item.bidDeadline} />
         </div>
       </div>
