@@ -13,7 +13,7 @@ Implementar o sistema de pagamentos e automação do Leiloeiro Nerd: integraçã
 - 3 Cron Jobs BullMQ: `encerrar-leiloes` (5min), `verificar-prazos` (10min), `sincronizar-mp` (15min)
 - Cascata de lances configurável (default 24h, até esgotar lances válidos)
 - Página `/dashboard/payments/[id]`: QR Code, copia-e-cola, link, countdown, polling 10s
-- 5 Templates Resend: `outbid` (já existe), `payment_due`, `payment_confirmed`, `payment_expired`, `next_bidder_called`
+- 5 Templates Resend: `outbid` (já existe), `payment_due`, `payment_confirmed`, `payment_expired`, `next_bidder_called` (enum -> §4)
 - Testes: unit (placeBid, cascata, webhook), integração (webhook approve/expired → cascata), E2E Playwright
 
 ### Excluído (Fase 4)
@@ -61,10 +61,10 @@ Se payment expirado (verificar-prazos cron) → status=expired → CASCATA
 |--------|------|
 | `payment.approved` | Atualiza payment `status=approved`, `updatedAt=now`; dispara `payment_confirmed` email + in-app |
 | `payment.cancelled` | `status=cancelled`; dispara `payment_cancelled` (se aplicável) |
-| `payment.expired` | `status=expired`; dispara cascata (próximo rank) |
+| `payment.expired` | `status=expired`; sincroniza com MP. Cascata **não** é disparada aqui — apenas via cron `verificar-prazos` (evita gatilhos duplicados) |
 
 **Segurança:**
-- Validação assinatura HMAC-SHA256 (`x-signature` header + `x-request-id`)
+- Validação de assinatura via JWT HMAC-SHA256 (HS256) no header `x-signature` — payload do JWT com claims `id` (mpPaymentId) + `timestamp`; verificar correspondência do claim `id` com o id do body/payload, validar assinatura HS256 e expiração do token (replay) antes de processar
 - Idempotência via `mpPaymentId` único (constraint UNIQUE)
 - Rate limit: 10 req/s (MP limit)
 
@@ -72,9 +72,9 @@ Se payment expirado (verificar-prazos cron) → status=expired → CASCATA
 
 | Job | Frequência | Lógica |
 |-----|------------|--------|
-| `encerrar-leiloes` | 5 min | `items` status `active` + `bidDeadline <= now` → `status=closed` + cria `payment` para rank=1 (se houver lances) |
-| `verificar-prazos` | 10 min | `payments` status `pending` + `deadline <= now` → `status=expired` → dispara cascata |
-| `sincronizar-mp` | 15 min | `payments` status `pending` + `createdAt > 1h` → GET `/v1/payments/{id}` MP → sync status |
+| `encerrar-leiloes` | 5 min | `items` status `active` + `bidDeadline <= now` → `status=closed` + cria `payment` de rank=1 (se houver lances). **Não** dispara cascata |
+| `verificar-prazos` | 10 min | **Único gatilho da cascata.** (a) `payments` status `pending` + `deadline <= now` → `status=expired` → dispara cascata (próximo rank, §3.5); (b) `payments` `pending` com `deadline - now <= 24h` → dispara email `payment_due` |
+| `sincronizar-mp` | 15 min | `payments` status `pending` + `createdAt > 1h` → GET `/v1/payments/{id}` MP → sync status. **Não** dispara cascata |
 
 **BullMQ Config:**
 - Redis: `REDIS_URL` (já configurado)
@@ -91,7 +91,7 @@ Se payment expirado (verificar-prazos cron) → status=expired → CASCATA
 3. Busca próximo `Bid` válido: `rank = payment.attemptNumber + 1` (1-indexed), `bidderId` diferente do anterior, sem `payment` existente
 3. Cria novo `Payment` para esse `bidderId`: `attemptNumber = rank`, `deadline = item.paymentDeadlineDays` (configurável, default 24h)
 4. Dispara notificação `next_bidder_called` (email + in-app)
-5. Repete até esgotar lances válidos (sem `Bid` seguinte) → item `status=cancelled`
+5. Repete até esgotar lances válidos (sem `Bid` seguinte) → **status-fim explícito:** item `status=cancelled` — nenhum arrematante validou pagamento; dispara notificação `payment_expired` final (in-app) para o último arrematante acionado
 
 **Configuração por Leilão:**
 - `items.paymentDeadlineDays` (já existe, default 3) → prazo inicial
@@ -118,13 +118,17 @@ Se payment expirado (verificar-prazos cron) → status=expired → CASCATA
 | `payment_expired` | Cron `verificar-prazos` detecta expiração | `bidderName`, `itemTitle`, `amount`, `itemUrl` |
 | `next_bidder_called` | Cascata ativada | `bidderName`, `itemTitle`, `amount`, `deadline`, `paymentUrl` |
 
-**Formato:** HTML pt-BR, valores em R$ com vírgula (`formatReais`), link para `/dashboard/payments/[id]`.
+**Formato:** HTML pt-BR, valores em R$ no padrão pt-BR (`formatReais`): ponto separador de milhar e vírgula decimal, ex.: `R$ 1.234,56` (nunca `1,234.56`), link para `/dashboard/payments/[id]`.
+
+**Exemplo de corpo pt-BR — `next_bidder_called`:**
+> Assunto: "Você foi chamado para pagar o item **{itemTitle}**"
+> "Olá {bidderName}, o arrematante anterior não pagou o item **{itemTitle}** em **R$ {amount}**. Você está na sequência! Acesse {paymentUrl} para pagar até {deadline}."
 
 ### 3.7 Segurança
 
 | Camada | Implementação |
 |--------|---------------|
-| Webhook | Validação HMAC-SHA256 (`x-signature` + `x-request-id`) via `mercadopago` SDK |
+| Webhook | Validação de assinatura via JWT HMAC-SHA256 (HS256) no header `x-signature`: claims `id` (mpPaymentId) + `timestamp`; validar assinatura, expiração do token e correspondência do claim `id` com o payload (`mercadopago` SDK) |
 | Idempotência | `mpPaymentId` UNIQUE + check-exists antes de processar |
 | Transações DB | `createPayment` + `createItemImages` em transação; `placeBid` já corrigido (lock + revalidação) |
 | Rate Limit | MP: 10 req/s global; webhook: 100 req/min por IP (middleware Next) |
