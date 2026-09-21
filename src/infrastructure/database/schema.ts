@@ -45,7 +45,7 @@ export const payments = pgTable("payments", {
   bidderId: text("bidder_id").notNull().references(() => userTable.id),
   bidId: uuid("bid_id").notNull().references(() => bids.id),
   amount: integer("amount").notNull(),
-  mpPaymentId: text("mp_payment_id"),
+  mpPaymentId: text("mp_payment_id").unique(),
   pixQrCode: text("pix_qr_code"),
   pixQrCodeBase64: text("pix_qr_code_base64"),
   paymentLink: text("payment_link"),
