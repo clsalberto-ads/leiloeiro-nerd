@@ -36,6 +36,16 @@ class FakePaymentRepository implements PaymentRepository {
   async findByChainIndex(itemId: string, attemptNumber: number): Promise<Payment | null> {
     return this.payments.find((p) => p.itemId === itemId && p.attemptNumber === attemptNumber) ?? null;
   }
+
+  async markCancelled(id: string): Promise<Payment | null> {
+    const payment = this.payments.find((p) => p.id === id);
+    if (!payment) {
+      return null;
+    }
+    payment.status = "cancelled";
+    payment.updatedAt = new Date("2026-01-01T00:00:00Z");
+    return payment;
+  }
 }
 
 function createPaymentInput(overrides: Partial<CreatePaymentInput> = {}): CreatePaymentInput {
@@ -74,6 +84,22 @@ describe("PaymentRepository", () => {
     });
     expect(payment.attemptNumber).toBe(1);
     expect(repo.payments).toHaveLength(1);
+  });
+
+  it("markCancelled marca o payment como cancelled", async () => {
+    const repo = new FakePaymentRepository();
+    const created = await repo.createPayment(createPaymentInput());
+
+    const updated = await repo.markCancelled(created.id);
+
+    expect(updated?.status).toBe("cancelled");
+    expect(repo.payments[0].status).toBe("cancelled");
+  });
+
+  it("markCancelled devolve null para payment inexistente", async () => {
+    const repo = new FakePaymentRepository();
+
+    expect(await repo.markCancelled("inexistente")).toBeNull();
   });
 
   it("fallback: sem PIX disponível, mantém o paymentLink e status pending", async () => {

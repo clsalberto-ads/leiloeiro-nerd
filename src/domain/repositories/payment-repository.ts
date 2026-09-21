@@ -35,4 +35,5 @@ export interface PaymentRepository {
   findById(id: string): Promise<Payment | null>;
   findByItemId(itemId: string): Promise<Payment[]>;
   findByChainIndex(itemId: string, attemptNumber: number): Promise<Payment | null>;
+  markCancelled(id: string): Promise<Payment | null>;
 }

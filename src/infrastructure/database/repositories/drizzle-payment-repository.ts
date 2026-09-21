@@ -70,4 +70,13 @@ export const drizzlePaymentRepository: PaymentRepository = {
       .where(and(eq(payments.itemId, itemId), eq(payments.attemptNumber, attemptNumber)));
     return row ? mapPayment(row) : null;
   },
+
+  async markCancelled(id: string): Promise<Payment | null> {
+    const [row] = await db
+      .update(payments)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(payments.id, id))
+      .returning();
+    return row ? mapPayment(row) : null;
+  },
 };
