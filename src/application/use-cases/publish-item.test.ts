@@ -75,4 +75,13 @@ describe("publishItem", () => {
     const repo = new FakeItemRepository(baseItem);
     await expect(publishItem(repo, "u2", "i1")).rejects.toThrow("Sem permissão");
   });
+
+  it("rejeita item cujo prazo de lances já passou", async () => {
+    const repo = new FakeItemRepository({
+      ...baseItem,
+      bidDeadline: new Date(Date.now() - 1000),
+    });
+    await expect(publishItem(repo, "u1", "i1")).rejects.toThrow("Prazo de lances já passou");
+    expect(repo.statuses).toEqual([]);
+  });
 });

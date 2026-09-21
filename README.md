@@ -70,9 +70,14 @@ Clean Architecture pragmática em camadas:
 
 - Autenticação: registro, login e recuperação de senha (Better Auth)
 - Dashboard protegido com proxy de guard
-- Atualização de perfil (nome, slug, telefone, endereço) via use case + repositório
-- Worker BullMQ conectado ao Redis (placeholder)
-- Schema Drizzle completo: `user`, `items`, `bids`, `payments`, `notifications`
+- Atualização de perfil (nome, slug, telefone, endereço) e ativação de conta de leiloeiro
+- CRUD de itens com upload de imagens (UploadThing) e galeria
+- Vitrine pública `/{slug}` e página de detalhe `/{slug}/{itemId}` com countdown, histórico e formulário de lance
+- Sistema de lances com validações (status, prazo, incremento mínimo, seller) e notificação "lance superado" (in-app + e-mail Resend)
+- Polling de lances (10s) na página pública do item
+- Schema Drizzle completo: `user`, `items`, `item_images`, `bids`, `payments`, `notifications`
+- Base de pagamentos: `PaymentRepository` (PIX + Payment Link) e constraint UNIQUE em `mp_payment_id` para idempotência do webhook
+- Worker BullMQ conectado ao Redis (placeholder; jobs da Fase 3 pendentes)
 
 ## Autenticação
 

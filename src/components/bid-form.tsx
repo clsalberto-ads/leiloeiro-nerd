@@ -26,7 +26,7 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
           id="amount"
           type="number"
           step="0.01"
-          min={minReais}
+          min={minBid / 100}
           placeholder={`Mínimo R$ ${minReais}`}
           required
           disabled={pending}

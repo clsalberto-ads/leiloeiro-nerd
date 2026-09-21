@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { becomeSellerSchema, imageUploadSchema, itemSchema } from "./validators";
+import { becomeSellerSchema, imageUploadSchema, itemSchema, placeBidSchema } from "./validators";
 
 const img = (size: number) => new File([new ArrayBuffer(size)], "a.jpg", { type: "image/jpeg" });
 
@@ -106,5 +106,22 @@ describe("becomeSellerSchema", () => {
 
   it("rejeita papel inválido", () => {
     expect(becomeSellerSchema.safeParse({ slug: "nerd", role: "admin" }).success).toBe(false);
+  });
+});
+
+describe("placeBidSchema", () => {
+  it("aceita centavos inteiros a partir de R$ 1,00", () => {
+    expect(placeBidSchema.safeParse({ itemId: "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a", amount: 5000 }).success).toBe(true);
+    expect(placeBidSchema.safeParse({ itemId: "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a", amount: 100 }).success).toBe(true);
+  });
+
+  it("rejeita valores fracionários em centavos", () => {
+    expect(
+      placeBidSchema.safeParse({ itemId: "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a", amount: 5000.5 }).success,
+    ).toBe(false);
+  });
+
+  it("rejeita abaixo de R$ 1,00", () => {
+    expect(placeBidSchema.safeParse({ itemId: "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a", amount: 99 }).success).toBe(false);
   });
 });

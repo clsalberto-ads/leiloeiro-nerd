@@ -7,9 +7,12 @@ import type {
   PaymentRepository,
 } from "@/domain/repositories/payment-repository";
 
-type PaymentRow = typeof payments.$inferSelect;
+export type PaymentRow = typeof payments.$inferSelect;
 
-function mapPayment(row: PaymentRow): Payment {
+// ponytail: mapeamento canônico pix — pix_qr_code guarda o payload copia-e-cola
+// (MP `qr_code`), pix_qr_code_base64 guarda a imagem do QR (MP `qr_code_base64`).
+// O contrato domain usa pixCopiaECola para o payload e pixQrCode para a imagem.
+export function mapPayment(row: PaymentRow): Payment {
   return {
     id: row.id,
     itemId: row.itemId,
@@ -17,8 +20,8 @@ function mapPayment(row: PaymentRow): Payment {
     bidId: row.bidId,
     amount: row.amount,
     mpPaymentId: row.mpPaymentId,
-    pixQrCode: row.pixQrCode,
-    pixCopiaECola: row.pixQrCodeBase64,
+    pixQrCode: row.pixQrCodeBase64,
+    pixCopiaECola: row.pixQrCode,
     paymentLink: row.paymentLink,
     status: row.status,
     deadline: row.deadline,
@@ -28,22 +31,26 @@ function mapPayment(row: PaymentRow): Payment {
   };
 }
 
+export function paymentToValues(input: CreatePaymentInput) {
+  return {
+    itemId: input.itemId,
+    bidderId: input.bidderId,
+    bidId: input.bidId,
+    amount: input.amount,
+    mpPaymentId: input.mpPaymentId,
+    pixQrCode: input.pixCopiaECola,
+    pixQrCodeBase64: input.pixQrCode,
+    paymentLink: input.paymentLink,
+    deadline: input.deadline,
+    attemptNumber: input.attemptNumber ?? 1,
+  };
+}
+
 export const drizzlePaymentRepository: PaymentRepository = {
   async createPayment(input: CreatePaymentInput): Promise<Payment> {
     const [row] = await db
       .insert(payments)
-      .values({
-        itemId: input.itemId,
-        bidderId: input.bidderId,
-        bidId: input.bidId,
-        amount: input.amount,
-        mpPaymentId: input.mpPaymentId,
-        pixQrCode: input.pixQrCode,
-        pixQrCodeBase64: input.pixCopiaECola,
-        paymentLink: input.paymentLink,
-        deadline: input.deadline,
-        attemptNumber: input.attemptNumber ?? 1,
-      })
+      .values(paymentToValues(input))
       .returning();
 
     return mapPayment(row!);

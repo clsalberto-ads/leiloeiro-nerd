@@ -7,7 +7,9 @@ export interface Payment {
   bidId: string;
   amount: number;
   mpPaymentId: string | null;
+  /** Imagem do QR Code PIX (ex.: data URL base64 do MP `qr_code_base64`). */
   pixQrCode: string | null;
+  /** Payload copia-e-cola (MP `qr_code`). */
   pixCopiaECola: string | null;
   paymentLink: string | null;
   status: PaymentStatus;
