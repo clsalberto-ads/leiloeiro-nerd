@@ -378,7 +378,7 @@ src/
 - [ ] Testes (unitários + e2e com Playwright)
 - [ ] SEO e Open Graph para páginas de itens
 - [ ] Responsividade e acessibilidade (a11y)
-- [ ] Deploy (Vercel) + configuração de domínio
+- [ ] Deploy (VPS — server Node+PM2, Nginx reverse proxy, domínio + SSL LetsEncrypt)
 - [ ] Monitoramento e logs
 
 ---
