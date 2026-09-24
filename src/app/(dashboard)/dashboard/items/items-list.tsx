@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Item } from "@/domain/repositories/item-repository";
 import { ItemStatusBadge } from "@/components/item-status-badge";
+import { BidCountdown } from "@/components/bid-countdown";
 import { formatReais } from "@/lib/format-reais";
 import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
 
@@ -49,6 +50,7 @@ export function ItemsList({ items, current }: { items: Item[]; current: string }
                 </div>
                 <ItemStatusBadge status={item.status} />
               </div>
+              {item.status === "active" ? <BidCountdown deadline={item.bidDeadline} /> : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 {item.status === "draft" ? (
                   <>
