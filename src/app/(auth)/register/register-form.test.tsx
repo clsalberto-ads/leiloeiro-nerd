@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 vi.mock("@/presentation/actions/auth-actions", () => ({ signUpAction: vi.fn() }));
 
 import { RegisterForm } from "./register-form";
+import { signUpSchema } from "@/lib/validators";
+
+// ponytail: o resolver e testado direto porque o repo roda em node puro (sem jsdom/RTL) e o useActionState nao injeta state no renderToString; subir para asserção de UI (mensagem no Field) exige ambiente DOM.
+const NO_FIELDS = { fields: {}, shouldUseNativeValidation: false };
 
 const FIELDS = [
   { id: "name", label: "Nome / Nick" },
@@ -45,9 +50,29 @@ describe("RegisterForm", () => {
   it("marca os inputs com o estado do Field e não mostra erro antes de enviar", () => {
     const html = renderToString(<RegisterForm />);
     for (const field of FIELDS) {
-      // render props do Field atravessando ui/input.tsx -> base-ui Input
       expect(tagOf(html, field.id)).toContain('aria-invalid="false"');
     }
     expect(html).not.toContain('role="alert"');
+  });
+});
+
+describe("signUpSchema (contrato de validação do form)", () => {
+  it("entrega ao Field a mensagem pt-BR do campo inválido, e nada nos demais", async () => {
+    const result = await zodResolver(signUpSchema)(
+      { name: "a", email: "a@b.com", password: "12345678" },
+      undefined,
+      NO_FIELDS,
+    );
+    expect(Object.keys(result.errors)).toEqual(["name"]);
+    expect(result.errors).toMatchObject({ name: { message: "Nome muito curto" } });
+  });
+
+  it("não produz erro para entrada válida", async () => {
+    const result = await zodResolver(signUpSchema)(
+      { name: "Ana Silva", email: "ana@ex.com", password: "senha12345" },
+      undefined,
+      NO_FIELDS,
+    );
+    expect(result.errors).toEqual({});
   });
 });

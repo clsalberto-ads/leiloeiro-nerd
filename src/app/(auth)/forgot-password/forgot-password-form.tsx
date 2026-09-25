@@ -15,8 +15,11 @@ type ForgotPasswordInput = z.input<typeof forgotPasswordSchema>;
 
 export function ForgotPasswordForm() {
   const [state, action, pending] = useActionState(forgotPasswordAction, { ok: false } as { ok?: boolean; error?: string });
-  // ponytail: "onTouched" e nao "onBlur" porque reValidateMode so vale com isSubmitted (nunca true sem handleSubmit); revalidar a cada tecla e a unica forma de limpar o erro sem novo blur.
-  const form = useForm<ForgotPasswordInput>({ resolver: zodResolver(forgotPasswordSchema), mode: "onTouched" });
+  const form = useForm<ForgotPasswordInput>({
+    resolver: zodResolver(forgotPasswordSchema),
+    // ponytail: mode onTouched — ver rationale em item-form.tsx
+    mode: "onTouched",
+  });
   const { errors } = form.formState;
 
   return (
@@ -28,7 +31,7 @@ export function ForgotPasswordForm() {
       <CardContent>
         {/* ponytail: sem gate no submit — a forgotPasswordAction segue validando com o forgotPasswordSchema; trocar por handleSubmit só se o form sair do server action. */}
         <form action={action} className="space-y-4">
-          {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+          {state.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
           {state.ok ? <p className="text-sm text-emerald-600">Enviamos as instruções para seu e-mail.</p> : null}
           <Field id="email" label="E-mail" error={errors.email?.message}>
             {(p) => <Input {...p} {...form.register("email")} type="email" required />}

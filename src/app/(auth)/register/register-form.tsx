@@ -16,8 +16,11 @@ type SignUpInput = z.input<typeof signUpSchema>;
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState(signUpAction, { ok: false } as { ok?: boolean; error?: string });
-  // ponytail: "onTouched" e nao "onBlur" porque reValidateMode so vale com isSubmitted (nunca true sem handleSubmit); revalidar a cada tecla e a unica forma de limpar o erro sem novo blur.
-  const form = useForm<SignUpInput>({ resolver: zodResolver(signUpSchema), mode: "onTouched" });
+  const form = useForm<SignUpInput>({
+    resolver: zodResolver(signUpSchema),
+    // ponytail: mode onTouched — ver rationale em item-form.tsx
+    mode: "onTouched",
+  });
   const { errors } = form.formState;
 
   return (
@@ -29,7 +32,7 @@ export function RegisterForm() {
       <CardContent>
         {/* ponytail: sem gate no submit — a signUpAction segue validando com o signUpSchema; trocar por handleSubmit só se o form sair do server action. */}
         <form action={action} className="space-y-4">
-          {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+          {state.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
           {state.ok ? <p className="text-sm text-emerald-600"><Link className="underline" href="/dashboard">Conta criada — entrar no painel</Link></p> : null}
           <Field id="name" label="Nome / Nick" error={errors.name?.message}>
             {(p) => <Input {...p} {...form.register("name")} required />}

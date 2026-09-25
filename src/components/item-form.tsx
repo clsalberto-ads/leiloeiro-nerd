@@ -75,7 +75,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
       ) : null}
       {/* ponytail: sem gate no submit — a action segue valitando com o itemSchema; trocar por handleSubmit só se o form sair do server action. */}
       <form action={formAction} className="space-y-4">
-        {state && "error" in state && state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+        {state && "error" in state && state.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
         {locked ? <p className="text-sm text-amber-600">Item publicado — edição bloqueada.</p> : null}
         {/* ponytail: imageUrls fica fora do RHF (input hidden controlado por React); a validação continua no servidor. */}
         <input type="hidden" name="imageUrls" value={JSON.stringify(urls)} />
