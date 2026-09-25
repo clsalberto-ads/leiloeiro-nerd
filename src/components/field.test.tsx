@@ -9,6 +9,7 @@ describe("Field", () => {
         {(p) => <input {...p} name="title" />}
       </Field>,
     );
+    expect(html).toContain('for="title"');
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain('aria-describedby="title-error"');
     expect(html).toContain('id="title-error"');
