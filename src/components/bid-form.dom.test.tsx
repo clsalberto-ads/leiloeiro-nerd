@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/presentation/actions/bid-actions", () => ({ placeBidAction: vi.fn() }));
 
 import { fireEvent, render, screen, waitFor } from "@/test/dom-render";
+import { placeBidSchema } from "@/lib/validators";
 import { BidForm } from "./bid-form";
 
 const ITEM_ID = "3f6c1f6e-1d5a-4f1e-9b6a-2f0b1c3d4e5f";
@@ -91,6 +92,19 @@ describe("BidForm — erro de campo no DOM real", () => {
     await waitFor(() => expect(alertText()).toBe("Lance inválido"));
   });
 
+  // ponytail: `minBid` de 100 e o piso que o `itemSchema` ainda permite a um
+  // item novo. Este e o teste que fecha a mutacao do piso do servidor: se o
+  // `MIN_BID_CENTAVOS` subir, o cliente passa a exigir o novo piso AQUI (R$ 2,00
+  // vira erro) em vez de aceitar um lance que a action vai rejeitar.
+  it("aceita lance acima do piso do item com o item no minimo legal", async () => {
+    render(<BidForm itemId={ITEM_ID} minBid={100} />);
+
+    await typeAndBlur("2");
+
+    await waitFor(() => expect(alertText()).toBe(null));
+    expect(field().getAttribute("aria-invalid")).toBe("false");
+  });
+
   it("converte o valor digitado em reais para centavos no campo hidden", async () => {
     render(<BidForm itemId={ITEM_ID} minBid={MIN_BID} />);
 
@@ -104,6 +118,10 @@ describe("BidForm — erro de campo no DOM real", () => {
   // ponytail: o teste do FormData e a defesa final do contrato do payload. Se
   // alguem devolver `name="amount"` ao input visivel, o servidor recebe o
   // FormData com dois `amount` e `formToObject` fica com o ultimo.
+  // O `safeParse` e o que fecha o contrato: nao basta o HTML ter as chaves
+  // certas, o payload tem de passar pelo MESMO schema da action. O
+  // `amountReais` extra e inofensivo porque o `z.object` do placeBidSchema
+  // descarta chave desconhecida (strip) — a action so le `itemId` e `amount`.
   it("manda o FormData com amount em centavos e o itemId, e nada de amount em reais", async () => {
     render(<BidForm itemId={ITEM_ID} minBid={MIN_BID} />);
 
@@ -112,5 +130,6 @@ describe("BidForm — erro de campo no DOM real", () => {
     const data = new FormData(form());
     expect(data.getAll("amount")).toEqual(["7550"]);
     expect(data.get("itemId")).toBe(ITEM_ID);
+    expect(placeBidSchema.safeParse(Object.fromEntries(data.entries())).success).toBe(true);
   });
 });

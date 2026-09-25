@@ -1,11 +1,11 @@
 "use client";
-import { useActionState, useMemo } from "react";
+import { useActionState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { placeBidAction } from "@/presentation/actions/bid-actions";
 import { formatReais } from "@/lib/format-reais";
-import { placeBidSchema } from "@/lib/validators";
+import { bidFormSchema } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
@@ -15,22 +15,6 @@ interface BidFormProps {
   minBid: number;
 }
 
-// ponytail: o `amount` do placeBidSchema (do servidor) e o payload em CENTAVOS
-// (`.int()` + piso de 100) — quem converte reais -> centavos e este componente,
-// nao o zod. O campo visivel e em reais e o piso dele e o `minBid` do item, o
-// mesmo que o atributo `min` ja impunha; por isso o schema do form pega so o
-// `itemId` do servidor e declara o `amount` em reais. `zodResolver(placeBidSchema)`
-// direto no campo visivel acusaria "Lance mínimo R$ 1,00" em qualquer lance
-// valido abaixo de R$ 100.
-function bidFormSchema(minBid: number) {
-  return placeBidSchema.pick({ itemId: true }).extend({
-    amountReais: z
-      .number({ message: "Lance inválido" })
-      .positive("Lance inválido")
-      .min(minBid / 100, `Lance mínimo R$ ${formatReais(minBid)}`),
-  });
-}
-
 // Sem coerce/transform/default no schema do form: o input usa `valueAsNumber`,
 // logo `z.input` e `z.output` coincidem e o useForm de uma generic basta.
 type BidFormValues = z.input<ReturnType<typeof bidFormSchema>>;
@@ -38,9 +22,12 @@ type BidFormValues = z.input<ReturnType<typeof bidFormSchema>>;
 export function BidForm({ itemId, minBid }: BidFormProps) {
   const [state, formAction, pending] = useActionState(placeBidAction, null);
   const minReais = formatReais(minBid);
-  const schema = useMemo(() => bidFormSchema(minBid), [minBid]);
   const form = useForm<BidFormValues>({
-    resolver: zodResolver(schema),
+    // ponytail: sem `useMemo` no schema/resolver, como nos outros forms
+    // (item-form.tsx:49 e os de auth) — o memo anterior envolvia o schema mas
+    // nao o `zodResolver`, que era reconstruido a cada render mesmo assim, e o
+    // RHF le `resolver` de `control._options`, que ele refresca a cada render.
+    resolver: zodResolver(bidFormSchema(minBid)),
     // ponytail: "onTouched" e nao "onBlur" — rationale em item-form.tsx; sem
     // handleSubmit o erro de um "onBlur" ficaria stale ate o proximo blur.
     mode: "onTouched",
@@ -67,7 +54,9 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
             // porque o `onChange` do RHF le o `name` do proprio input do DOM: o
             // `name="amount"` do payload e o hidden em centavos logo abaixo e os
             // dois nao podem colidir. O `amountReais` extra no FormData e
-            // descartado pelo placeBidSchema da action.
+            // inofensivo por construcao: o `z.object` do placeBidSchema
+            // descarta chave desconhecida (strip) e a action so le `itemId` e
+            // `amount` — e nao por acaso.
             <Input
               {...p}
               {...form.register("amountReais", { valueAsNumber: true })}

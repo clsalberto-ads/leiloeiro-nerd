@@ -17,13 +17,20 @@ import { becomeSellerSchema } from "@/lib/validators";
 type BecomeSellerInput = z.input<typeof becomeSellerSchema>;
 type BecomeSellerOutput = z.output<typeof becomeSellerSchema>;
 
+// ponytail: o padrao do papel mora numa unica constante, mas precisa dos dois
+// props: o `defaultValues` alimenta o resolver (que ve `role` no input do RHF)
+// e o `defaultValue` e o que o DOM/SSR renderiza marcado como `selected` —
+// qualquer um dos dois sozinho ou nao valida ou nao marca a opcao. Como os dois
+// leem daqui, mudar o padrao quebra o teste estatico que fixa o `selected`.
+const DEFAULT_ROLE: BecomeSellerInput["role"] = "seller";
+
 export function BecomeSellerForm() {
   const [state, action, pending] = useActionState(becomeSellerAction, null as { error?: string; ok?: boolean } | null);
   const form = useForm<BecomeSellerInput, unknown, BecomeSellerOutput>({
     resolver: zodResolver(becomeSellerSchema),
     // ponytail: mode onTouched — ver rationale em item-form.tsx
     mode: "onTouched",
-    defaultValues: { slug: "", role: "seller" },
+    defaultValues: { slug: "", role: DEFAULT_ROLE },
   });
   const { errors } = form.formState;
   // ponytail: `useWatch` e nao `form.watch()` porque o lint de react-hooks marca o
@@ -58,7 +65,7 @@ export function BecomeSellerForm() {
             <select
               {...p}
               {...form.register("role")}
-              defaultValue="seller"
+              defaultValue={DEFAULT_ROLE}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 aria-invalid:border-destructive"
             >
               <option value="seller">Leiloeiro</option>

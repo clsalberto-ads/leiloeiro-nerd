@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { createSlug } from "@/domain/value-objects/slug";
+import { formatReais } from "@/lib/format-reais";
 
-const reaisToCents = (v: number) => Math.round(v * 100);
+// ponytail: UNIDADE. O dominio, o payload da action e o `minBid` do item sao
+// sempre em CENTAVOS; so o campo visivel do form de lance e em REAIS. Este
+// divisor e a unica ponte entre as duas — o `reaisToCents` vai p/ cima dele e o
+// `bidFormSchema` divide por ele, em vez de reescrever o piso como literal.
+const CENTAVOS_POR_REAL = 100;
+
+const reaisToCents = (v: number) => Math.round(v * CENTAVOS_POR_REAL);
 
 export const signUpSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
@@ -62,10 +69,39 @@ export const imageUploadSchema = z.object({
     .refine((f) => Array.from(f).every((file) => file.type.startsWith("image/")), "Apenas imagens"),
 });
 
+// ponytail: o piso canonico do lance, em CENTAVOS, mora aqui e e lido pelo
+// `placeBidSchema` e pelo `bidFormSchema` (que so divide por CENTAVOS_POR_REAL).
+// Nenhum dos dois pode reescrever o numero; a tabela de paridade em
+// validators.test.ts e o que quebra se os dois divergirem.
+export const MIN_BID_CENTAVOS = 100;
+
+const LANCE_INVALIDO = "Lance inválido";
+
 export const placeBidSchema = z.object({
   itemId: z.string().uuid(),
-  amount: z.coerce.number().positive("Lance inválido").int("Lance inválido").refine((v) => v >= 100, "Lance mínimo R$ 1,00"),
+  amount: z.coerce.number().positive(LANCE_INVALIDO).int(LANCE_INVALIDO).refine((v) => v >= MIN_BID_CENTAVOS, `Lance mínimo R$ ${formatReais(MIN_BID_CENTAVOS)}`),
 });
+
+/**
+ * Schema do campo visivel do form de lance: `itemId` vem do servidor (pick) e
+ * `amountReais` e o que o usuario digita, em REAIS. O piso e o `minBid` do item
+ * (em centavos) convertido pelo mesmo divisor do servidor, e nunca abaixo do
+ * `MIN_BID_CENTAVOS` — assim um item com `minInitialBid` de R$ 1,00 nao pode
+ * deixar passar um lance que a action vai rejeitar.
+ */
+export function bidFormSchema(minBid: number) {
+  const pisoCentavos = Math.max(minBid, MIN_BID_CENTAVOS);
+  return placeBidSchema.pick({ itemId: true }).extend({
+    amountReais: z
+      .number({ message: LANCE_INVALIDO })
+      .positive(LANCE_INVALIDO)
+      // o `amount` do payload e em centavos: o lance em reais precisa sobreviver
+      // a ida e volta (reais -> centavos -> reais). E o mesmo "centavos
+      // inteiros" que o `placeBidSchema` exige, sem depender do `step` do input.
+      .refine((v) => reaisToCents(v) / CENTAVOS_POR_REAL === v, LANCE_INVALIDO)
+      .min(pisoCentavos / CENTAVOS_POR_REAL, `Lance mínimo R$ ${formatReais(pisoCentavos)}`),
+  });
+}
 
 export const becomeSellerSchema = z.object({
   slug: z
