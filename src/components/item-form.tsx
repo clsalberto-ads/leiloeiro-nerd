@@ -70,7 +70,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
             <Input id="images" name="images" type="file" accept="image/*" multiple disabled={uploadPending} />
             <Button type="submit" disabled={uploadPending}>{uploadPending ? "Enviando…" : "Enviar"}</Button>
           </div>
-          {uploadState?.error ? <p className="text-sm text-destructive">{uploadState.error}</p> : null}
+          {uploadState?.error ? <p role="alert" className="text-sm text-destructive">{uploadState.error}</p> : null}
         </form>
       ) : null}
       {/* ponytail: sem gate no submit — a action segue valitando com o itemSchema; trocar por handleSubmit só se o form sair do server action. */}
