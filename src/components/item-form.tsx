@@ -47,7 +47,8 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
 
   const form = useForm<ItemInput, unknown, ItemOutput>({
     resolver: zodResolver(itemSchema),
-    mode: "onBlur",
+    // ponytail: "onTouched" e nao "onBlur" porque reValidateMode so vale com isSubmitted (nunca true sem handleSubmit); revalidar a cada tecla e a unica forma de limpar o erro sem novo blur.
+    mode: "onTouched",
     defaultValues: {
       title: item?.title ?? "",
       description: item?.description ?? "",
@@ -125,7 +126,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
                 maxLength={5000}
                 rows={4}
                 disabled={locked}
-                className="rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive"
               />
             )}
           </Field>
@@ -138,7 +139,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
               defaultValue={item?.type ?? "product"}
               required
               disabled={locked}
-              className="rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              className="rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 aria-invalid:border-destructive"
             >
               <option value="product">Produto</option>
               <option value="service">Serviço</option>
