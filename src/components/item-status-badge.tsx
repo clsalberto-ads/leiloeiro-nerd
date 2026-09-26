@@ -1,4 +1,5 @@
 import type { ItemStatus } from "@/domain/repositories/item-repository";
+import { Badge } from "@/components/ui/badge";
 
 const LABELS: Record<ItemStatus, string> = {
   draft: "Rascunho",
@@ -19,9 +20,5 @@ const CLASSES: Record<ItemStatus, string> = {
 };
 
 export function ItemStatusBadge({ status }: { status: ItemStatus }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${CLASSES[status]}`}>
-      {LABELS[status]}
-    </span>
-  );
+  return <Badge className={CLASSES[status]}>{LABELS[status]}</Badge>;
 }
