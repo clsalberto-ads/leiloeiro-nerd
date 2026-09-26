@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+import { renderToString } from "react-dom/server";
+import { DataTable, type DataTableColumn } from "./data-table";
+import type { EmptyStateAction } from "./empty-state";
+
+interface Linha {
+  id: string;
+  titulo: string;
+}
+
+const COLUNAS: DataTableColumn<Linha>[] = [
+  { id: "titulo", header: "Título", accessorFn: (l) => l.titulo, cell: (l) => l.titulo },
+];
+
+// ponytail: este arquivo e NOVO de proposito. O `data-table.test.tsx` e o
+// `data-table.dom.test.tsx` ja existentes fixam o contrato antigo do estado vazio
+// (a `emptyMessage` aparecendo como texto da celula), e um arquivo separado
+// deixa esses dois intocados — o estado vazio novo nao precisa reescrever o
+// historico de ninguem para ser provado.
+//
+// ponytail: a celula e recortada do HTML em vez de contar `<svg` no documento
+// inteiro, porque a tabela tem outros icones: o botao de ordenacao do cabecalho
+// tambem e um `lucide`. Contar no documento todo tornaria a asercao do icone do
+// estado vazio dependente de quantas colunas ordenaveis a tabela tem.
+//
+// ponytail: o `col[Ss]pan` aceita as duas grafias porque elas sao de mundos
+// diferentes: o renderizador de servidor escreve `colSpan` como foi escrito no
+// JSX, e so o parser do HTML baixa para `colspan` — que e por isso que o
+// `data-table.dom.test.tsx` consegue usar `[colspan="2"]` num `querySelector` e
+// nao num `renderToString`.
+function celulaVazia(html: string): string {
+  const celula = html.match(/<td[^>]*col[Ss]pan="\d+"[^>]*>[\s\S]*?<\/td>/);
+  expect(celula, "célula de estado vazio não encontrada no HTML da tabela").not.toBeNull();
+  return celula?.[0] ?? "";
+}
+
+function tabelaVazia(props: { emptyAction?: EmptyStateAction } = {}): string {
+  return renderToString(<DataTable columns={COLUNAS} data={[]} emptyMessage="Nada encontrado" {...props} />);
+}
+
+describe("DataTable — o estado vazio", () => {
+  // ponytail: o `emptyMessage` continua sendo o texto, sem uma palavra a mais. O
+  // `data-table.dom.test.tsx` compara o `textContent` da celula com a string
+  // EXATA ("Nada encontrado"), e qualquer caractere novo nesse texto — um icone
+  // com `title`, um "&nbsp;" — quebraria aquelas asercoes. O icone entra com
+  // `aria-hidden` e sem texto, entao some do `textContent` e o contrato antigo
+  // continua valendo sem ser reescrito.
+  it("mantém a mensagem exata e acrescenta o ícone sem texto", () => {
+    const celula = celulaVazia(tabelaVazia());
+
+    expect(celula).toContain("Nada encontrado");
+    expect(celula).toContain("<svg");
+    expect(celula).toMatch(/<svg[^>]*aria-hidden="true"/);
+  });
+
+  // ponytail: `data-slot="empty-state"` e a prova de composicao. A celula da
+  // tabela NAO tem um cartao proprio com o mesmo formato do `EmptyState` da
+  // vitrine: se um dia alguem consertar o visual do estado vazio num lugar e o
+  // outro ficar para tras, este teste para de dizer a verdade.
+  it("compõe o EmptyState em vez de ter um estado vazio próprio", () => {
+    expect(celulaVazia(tabelaVazia())).toContain('data-slot="empty-state"');
+  });
+
+  // ponytail: a diferenca entre "voce nao tem item nenhum" e "nada casou com este
+  // filtro" mora em quem sabe o que e um filtro — o `DataTable` e generico e nao
+  // sabe. Por isso a tabela recebe um `emptyAction` (para ONDE voltar) e nao uma
+  // segunda string de texto (QUE TEXTO): o texto continua sendo `emptyMessage`, e
+  // o consumidor decide os dois.
+  it("oferece a saída quando recebe emptyAction", () => {
+    const celula = celulaVazia(
+      tabelaVazia({ emptyAction: { label: "Limpar filtros", href: "/dashboard/items" } }),
+    );
+
+    expect(celula).toContain("Limpar filtros");
+    expect(celula).toContain('href="/dashboard/items"');
+  });
+
+  it("não oferece saída quando não recebe emptyAction", () => {
+    expect(celulaVazia(tabelaVazia())).not.toContain("<a");
+  });
+
+  // ponytail: a tabela montada em `renderToString` ainda tem cabecalho e rodape.
+  // O que interessa e o `colspan` da celula vazia: com o valor errado a tabela fica
+  // com um buraco no layout que nenhum aviso accuse, e o rodape continuaria
+  // contando linhas que nao existem.
+  it("atravessa todas as colunas", () => {
+    const celula = celulaVazia(tabelaVazia());
+    expect(celula).toContain(`colSpan="${COLUNAS.length}"`);
+  });
+});

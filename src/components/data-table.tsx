@@ -18,8 +18,9 @@ import type {
   SortingState,
   Updater,
 } from "@tanstack/react-table";
-import { ChevronDownIcon, ChevronsUpDownIcon, ChevronUpIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronsUpDownIcon, ChevronUpIcon, SearchXIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyState, type EmptyStateAction } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -71,6 +72,14 @@ interface DataTablePropsComuns<T> {
   filter?: string;
   filterPlaceholder?: string;
   emptyMessage?: string;
+  // ponytail: `emptyAction` e o "para onde ir quando nao ha linha", e ele existe
+  // como prop SEPARADA (e nao dentro de `emptyMessage`) por um motivo de quem
+  // sabe o que e um filtro. A tabela e generica: nao sabe o que e aba, nem busca,
+  // nem paginacao, entao nao tem como decidir que "nenhum item" e "nenhum item
+  // casou com este filtro" pedem coisas diferentes. O texto segue sendo
+  // `emptyMessage` — uma string, sem mudanca de contrato — e o consumidor da URL
+  // (a `ItemsList`) escolhe os dois. A tabela so sabe mostrar.
+  emptyAction?: EmptyStateAction;
 }
 
 // ponytail: `manualPagination` e `totalCount` sao um par, nao dois opcionais.
@@ -187,6 +196,7 @@ export function DataTable<T>({
   filter,
   filterPlaceholder = "Buscar...",
   emptyMessage = "Nenhum resultado encontrado.",
+  emptyAction,
   manualPagination = false,
   totalCount,
 }: DataTableProps<T>): React.JSX.Element {
@@ -441,8 +451,22 @@ export function DataTable<T>({
         <TableBody>
           {linhas.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                {emptyMessage}
+              {/* ponytail: `p-0` e o que deixa o cartao do `EmptyState` encostar
+                  nas bordas da celula (ele ja tem o proprio `p-10`), e o `p-2` do
+                  `TableCell` seria somado a ele. O `h-24` que estava aqui fixava
+                  uma altura minima para a linha; com o cartao dentro, a altura
+                  ja vem do conteudo. */}
+              <TableCell colSpan={columns.length} className="p-0 align-middle">
+                <EmptyState
+                  title={emptyMessage}
+                  action={emptyAction}
+                  // ponytail: o icone e `aria-hidden` e NAO tem texto, e nao
+                  // enfeite: o `data-table.dom.test.tsx` compara o `textContent`
+                  // da celula vazia com a `emptyMessage` EXATA, entao um icone
+                  // com rotulo lido em voz alta (ou com `<title>` dentro) viraria
+                  // texto e quebraria aquele contrato sem nenhum aviso.
+                  icon={<SearchXIcon aria-hidden="true" className="size-6 text-muted-foreground" />}
+                />
               </TableCell>
             </TableRow>
           ) : (

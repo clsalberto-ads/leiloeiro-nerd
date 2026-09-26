@@ -7,6 +7,7 @@ import { MoreHorizontalIcon } from "lucide-react";
 import type { ItemStatus } from "@/domain/repositories/item-repository";
 import { ROTULO_STATUS, ROTULO_TIPO } from "@/domain/repositories/item-repository";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table";
+import type { EmptyStateAction } from "@/components/empty-state";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { BidCountdown } from "@/components/bid-countdown";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,64 @@ const TABS: { key: string; status: ItemStatus | null; label: string }[] = [
 const FUSO = "America/Sao_Paulo";
 
 const MENSAGEM_VAZIA = "Nenhum item encontrado.";
+const MENSAGEM_SEM_LISTA = "Você ainda não tem itens.";
 const PLACEHOLDER_BUSCA = "Buscar item";
+
+// ponytail: uma tabela vazia tem DOIS motivos, e antes desta decisao os dois
+// diziam a mesma frase. Com busca, aba, ordenacao e paginacao vindas da URL
+// (Task 9), "voce nao tem item nenhum" e "nada casou com este filtro" chegam na
+// mesma celula — e so um deles tem para onde voltar. O texto unico mandava o
+// vendedor que nunca vendeu nada procurar um filtro que ele nao digitou.
+//
+// A decisao mora AQUI, e nao no `DataTable`, porque e esta lista que sabe o que e
+// um filtro (a `vista` inteira mora nela) e a tabela e generica. O que a tabela
+// recebe sao as duas metades ja decididas: `emptyMessage` (o texto, contrato
+// antigo, uma string) e `emptyAction` (para onde ir). Nenhuma das duas muda de
+// tipo, entao nenhum consumidor existente precisou ser reescrito.
+//
+// O "voltar" e um BOTAO que chama `navegar`, e nao um link com o href escrito a
+// mao, por duas razoes que ja valem para a tela inteira: (1) a lista nao deve
+// saber QUE roteador existe — `navegar(vista)` e a costura, e a URL nasce do
+// `hrefDaVista` num lugar so; um `/dashboard/items` escrito dentro do
+// `emptyAction` seria a segunda copia da mesma frase, e as duas divergiriam no
+// dia em que o `hrefDaVista` mudar; (2) o `items-list.abas.test.tsx` (proibido
+// reescrever aqui) le TODOS os links para `/dashboard/items` da pagina como se
+// fossem abas — um link de estado vazio apareceria ali como uma sexta aba.
+//
+// O que o "voltar" DESFAZ e so o filtro — `q`, `status` e a pagina, que sem
+// filtro nao significa nada. A ordenacao e o tamanho da pagina NAO sao
+// desfeitos: o usuario escolheu a coluna e quantas linhas quer ver, e "limpar
+// filtros" nao pode desfazer um clique numa coluna. (As abas zeram tambem a
+// ordenacao, e la e outra decisao: trocar de aba e trocar de visao, nao corrigir
+// uma busca.)
+function estadoVazio(
+  vista: VistaDaTabela,
+  navegar: (vista: VistaDaTabela) => void,
+): {
+  emptyMessage: string;
+  emptyAction?: EmptyStateAction;
+} {
+  const filtrada = vista.q !== "" || vista.status !== null;
+  if (!filtrada) {
+    // ponytail: sem filtro nao ha nada para desfazer, e por isso o estado vazio
+    // NAO tem acao. O "+ Novo item" do titulo da pagina e o caminho para criar, a
+    // duas linhas de distancia — e um CTA aqui seria o mesmo link duas vezes na
+    // tela. O que muda aqui e a FRASE: "voce nao tem nada" e "nada casou com o
+    // que voce procurou" pedem palavras diferentes mesmo sem acao nenhuma.
+    return { emptyMessage: MENSAGEM_SEM_LISTA };
+  }
+  return {
+    emptyMessage: MENSAGEM_VAZIA,
+    emptyAction: {
+      label: "Limpar filtros",
+      onSelect: () => navegar(listaSemFiltro(vista)),
+    },
+  };
+}
+
+function listaSemFiltro(vista: VistaDaTabela): VistaDaTabela {
+  return { ...vista, q: "", status: null, page: PAGINA_PADRAO };
+}
 
 // ponytail: o `<form>` fica FORA do menu e o item do menu e que dispara o
 // `requestSubmit`. Com o form DENTRO do item, o clique fecharia o menu (o base-ui
@@ -360,6 +418,8 @@ export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps)
   const tratarBusca = (q: string) => aplicar({ q, page: PAGINA_PADRAO });
   const tratarPagina = (indice: number) => aplicar({ page: indice + 1 });
 
+  const vazio = estadoVazio(vista, navegar);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -410,7 +470,8 @@ export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps)
         manualPagination
         totalCount={totalCount}
         filterPlaceholder={PLACEHOLDER_BUSCA}
-        emptyMessage={MENSAGEM_VAZIA}
+        emptyMessage={vazio.emptyMessage}
+        emptyAction={vazio.emptyAction}
       />
     </div>
   );
