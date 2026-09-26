@@ -42,4 +42,13 @@ describe("ItemsList", () => {
     renderToString(<ItemsList items={[makeItem()]} current="all" />);
     expect(mocks.BidCountdown.mock.calls[0][0]).toMatchObject({ deadline: expect.any(Date) });
   });
+
+  // ponytail: o `/<th[\s\S]*?Lance mínimo/` e o que segura o "cabeçalho de
+  // coluna" no nome. Um `toContain("Lance mínimo")` sozinho passaria com a lista
+  // antiga em `<li>`, onde o texto aparecia no parágrafo "Lance mínimo: R$ …" —
+  // o teste ficaria verde com a coluna inexistente.
+  it("renderiza Lance mínimo como cabeçalho de coluna", () => {
+    const html = renderToString(<ItemsList items={[makeItem()]} current="all" />);
+    expect(html).toMatch(/<th[\s\S]*?Lance mínimo/);
+  });
 });
