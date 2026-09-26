@@ -18,9 +18,9 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   const filterStatus = typeof status === "string" && VALID_STATUSES.includes(status as ItemStatus)
     ? (status as ItemStatus)
     : undefined;
-  const items = isSeller
+  const { items } = isSeller
     ? await listSellerItems(drizzleItemRepository, session.user.id, filterStatus ? { status: filterStatus } : undefined)
-    : [];
+    : { items: [] };
 
   if (!isSeller) {
     return (
