@@ -1,5 +1,27 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
+// ponytail: NAO existe `TableSkeleton` aqui, e a ausencia e uma decisao, nao uma
+// pendencia. O plano pedia um esqueleto para o dashboard; o lugar dele seria este
+// arquivo, e ele nao foi escrito porque nao teria para que servir: a fronteira
+// `<Suspense>` do dashboard seria decorativa (o `await` da pagina acontece antes
+// do JSX existir, entao nada abaixo suspende e o fallback nunca sai), e a unica
+// forma de torna-la real — descer a consulta para um filho async — quebra o
+// `items/page.test.tsx`, que esta entre os testes protegidos: o
+// `renderToStaticMarkup` dele (linha 206) tem de conter "Console retrô" e um filho
+// async sempre entrega o fallback, e o `achar(elemento, ItensDaUrl)` (linha 104)
+// acha o componente por tipo so andando por `props.children`.
+//
+// O `loading.tsx` do segmento tambem nao serve, e por um motivo diferente: no modo
+// servidor a lista navega com `router.push` a cada busca, e um `loading.tsx`
+// remonta o `DataTable` inteiro a cada tecla depurada — apagando o `query` local e
+// desfazendo o conserto de "busca nao descarta digitacao em voo" (commit
+// `f7f300a`). Alem disso, durante a navegacao o usuario ve hoje a lista antiga, que
+// e mais util que um esqueleto.
+//
+// O upgrade path e o mesmo da vitrine (`[slug]/page.tsx`): filho async, e vir
+// junto com a reescrita do `items/page.test.tsx`, num dia em que esse arquivo
+// puder mudar.
+
 // ponytail: 6 e o numero de cards que o usuario espera numa vitrine: duas fileiras
 // da grade de tres colunas no `lg`. O numero e deste lado de proposito — um
 // esqueleto de 3 cards numa tela que aceita 9, ou de 12 numa que mostra 6, faz a

@@ -1,19 +1,20 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
-// ponytail: a acao tem DUAS formas e a divisao nao e de estilo, e de quem pode
-// executa-la. `href` e um link de verdade, e o que cabe num componente servidor
-// (a vitrine publica, que nao tem callback nenhum). `onSelect` e um botao, e
-// existe porque quem esta DENTRO da tabela ja tem a propria navegacao em maos: no
-// modo servidor a lista de itens manda `navegar(vista)` e nao uma URL escrita a
-// mao (veja a nota no `items-list.tsx`), e um link apontando para
-// `/dashboard/items` seria uma segunda forma de escrever a mesma URL — que e
-// exatamente como as duas passam a divergir quando o `hrefDaVista` muda. A union
-// (e nao dois props opcionais) e o que impede a acao pela metade: `{ label }`
-// sem `href` nem `onSelect` nao compila, em vez de virar um botao que nao faz
-// nada.
-export type EmptyStateAction = { label: string; href: string } | { label: string; onSelect: () => void };
+// ponytail: a acao e SEMPRE um link, e nao um botao com callback, porque o que o
+// cartao oferece aqui e navegacao — e um link entrega as afinidades que um
+// `<button onClick>` nao tem: abrir em nova aba, clique do meio, ctrl-clique,
+// copiar endereco, a URL na barra de status e o rastreamento. Um estado vazio
+// com acao e, na pratica, sempre "voltar para uma URL", e essa URL existe antes
+// de qualquer clique: quem monta o cartao a le de algum lugar e a escreve no
+// `href`.
+//
+// Um `onSelect` como segunda forma da acao custaria o preco disso para nao
+// ganhar nada: a acao de quem esta dentro da tabela (`navegar(vista)`) e
+// equivalente, e ela nao e uma segunda fonte da URL — o `hrefDaVista` vira
+// string num lugar so, e o `hrefDaVista(vistaSemFiltro(vista))` nao e uma segunda
+// copia do endereco, e o mesmo contrato de URL chamado com outra vista.
+export type EmptyStateAction = { label: string; href: string };
 
 interface EmptyStateProps {
   title: string;
@@ -48,19 +49,13 @@ export function EmptyState({ title, description, action, icon }: EmptyStateProps
         <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
       ) : null}
       {action ? (
-        "href" in action ? (
-          <Link href={action.href} className="text-sm font-medium text-primary underline">
-            {action.label}
-          </Link>
-        ) : (
-          // ponytail: o `underline` fixo e o que faz as duas formas da acao
-          // parecerem a mesma acao. O `variant="link"` sozinho sublinha so no
-          // `hover`, e um botao que so sublinha ao passar o mouse nao parece um
-          // link ao lado de um que ja esta sublinhado.
-          <Button type="button" variant="link" size="sm" onClick={action.onSelect} className="underline">
-            {action.label}
-          </Button>
-        )
+        // ponytail: o `underline` fixo e o que faz a acao parecer o que e. Com
+        // `hover:underline` o rotulo so se denuncia como link quando o mouse passa
+        // por cima, e um link que so parece link ao passar por cima e pior que um
+        // botao: promete a affordance sem entregar a pista visual.
+        <Link href={action.href} className="text-sm font-medium text-primary underline">
+          {action.label}
+        </Link>
       ) : null}
     </div>
   );

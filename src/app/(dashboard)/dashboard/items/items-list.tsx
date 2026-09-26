@@ -86,14 +86,16 @@ const PLACEHOLDER_BUSCA = "Buscar item";
 // antigo, uma string) e `emptyAction` (para onde ir). Nenhuma das duas muda de
 // tipo, entao nenhum consumidor existente precisou ser reescrito.
 //
-// O "voltar" e um BOTAO que chama `navegar`, e nao um link com o href escrito a
-// mao, por duas razoes que ja valem para a tela inteira: (1) a lista nao deve
-// saber QUE roteador existe — `navegar(vista)` e a costura, e a URL nasce do
-// `hrefDaVista` num lugar so; um `/dashboard/items` escrito dentro do
-// `emptyAction` seria a segunda copia da mesma frase, e as duas divergiriam no
-// dia em que o `hrefDaVista` mudar; (2) o `items-list.abas.test.tsx` (proibido
-// reescrever aqui) le TODOS os links para `/dashboard/items` da pagina como se
-// fossem abas — um link de estado vazio apareceria ali como uma sexta aba.
+// O "voltar" e um LINK cujo `href` nasce do `hrefDaVista`, e nao um botao que
+// chama `navegar`. Um botao perderia as afinidades que so um link tem — abrir em
+// nova aba, clique do meio, ctrl-clique, copiar endereco, a URL na barra de status,
+// o rastreamento — sem ganhar nada em troca: a propriedade que importa aqui e
+// "a URL e escrita num lugar so", e ela continua valendo, porque quem escreve a
+// URL continua sendo o `hrefDaVista` (aqui chamado com a vista sem filtro, que e
+// a MESMA frase de URL com outra vista — nao uma segunda copia do endereco). A
+// costura `navegar(vista)` continua existindo para o resto da tela, onde o
+// destino depende de um clique e nao de um link: pagina, ordenacao, busca e
+// tamanho.
 //
 // O que o "voltar" DESFAZ e so o filtro — `q`, `status` e a pagina, que sem
 // filtro nao significa nada. A ordenacao e o tamanho da pagina NAO sao
@@ -101,10 +103,7 @@ const PLACEHOLDER_BUSCA = "Buscar item";
 // filtros" nao pode desfazer um clique numa coluna. (As abas zeram tambem a
 // ordenacao, e la e outra decisao: trocar de aba e trocar de visao, nao corrigir
 // uma busca.)
-function estadoVazio(
-  vista: VistaDaTabela,
-  navegar: (vista: VistaDaTabela) => void,
-): {
+function estadoVazio(vista: VistaDaTabela): {
   emptyMessage: string;
   emptyAction?: EmptyStateAction;
 } {
@@ -119,10 +118,7 @@ function estadoVazio(
   }
   return {
     emptyMessage: MENSAGEM_VAZIA,
-    emptyAction: {
-      label: "Limpar filtros",
-      onSelect: () => navegar(listaSemFiltro(vista)),
-    },
+    emptyAction: { label: "Limpar filtros", href: hrefDaVista(listaSemFiltro(vista)) },
   };
 }
 
@@ -418,7 +414,7 @@ export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps)
   const tratarBusca = (q: string) => aplicar({ q, page: PAGINA_PADRAO });
   const tratarPagina = (indice: number) => aplicar({ page: indice + 1 });
 
-  const vazio = estadoVazio(vista, navegar);
+  const vazio = estadoVazio(vista);
 
   return (
     <div className="space-y-4">

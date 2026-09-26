@@ -58,10 +58,14 @@ function props(slug: string): PropsDaPagina {
 
 // ponytail: `renderToPipeableStream` e o renderizador que o Next usa, e e o
 // unico dos tres que distingue "a fronteira despejou o esqueleto" de "a
-// fronteira nunca teve nada para esperar". `renderToStaticMarkup` serve o
-// fallback SEMPRE — mesmo com o filho ja resolvido, como medido nesta suite antes
-// de existir — e `renderToString` aborta para o cliente. Usar os dois para
-// "provar" o streaming daria um teste verde em cima de uma fronteira decorativa.
+// fronteira nunca teve nada para esperar". Medido nesta suite com um filho que
+// suspende: `renderToStaticMarkup` e `renderToString` NENHUM dos dois lanca
+// nada e os dois servem o FALLBACK — o `renderToString` ainda embrulha a
+// fronteira em `<!--$!-->` com um `data-msg` de "switched to client rendering
+// because the server rendering aborted", ou seja, o conteudo simplesmente nao
+// existe no HTML do servidor e a recuperacao (se houver) acontece no cliente.
+// Nos dois, um teste de "o esqueleto aparece" escrito assim passaria na posicao
+// decorativa: seria um teste que nao prova nada.
 function streamar(elemento: ReactElement) {
   const partes: string[] = [];
   const erros: string[] = [];
@@ -84,9 +88,45 @@ function streamar(elemento: ReactElement) {
       onError(erro) {
         erros.push(String(erro));
       },
+      // ponytail: o `onShellError` e o que impede um erro no shell de virar a MESMA
+      // espera silenciosa de "nada suspendeu". Sem ele o `pipe` nunca e chamado, o
+      // fluxo nao produz chunk nenhum e a falha se apresenta como travamento.
+      onShellError(erro) {
+        erros.push(String(erro));
+      },
     });
   });
   return { partes, erros, primeiroFlush, fim };
+}
+
+// ponytail: o prazo existe porque o modo de falha natural desta fronteira e a
+// ESPERA, nao a asercao. Medido: com o `await` da listagem de volta no corpo da
+// pagina (a fronteira na posicao decorativa do plano), o `await VitrinePage(...)`
+// nao resolve enquanto a listagem nao responde — e a listagem so responde DEPOIS
+// do primeiro flush, que so vem DEPOIS do `await VitrinePage(...)`. Sem este
+// prazo o teste morre no timeout de 5s do vitest, que se le como "teste lento" e
+// nao como "a fronteira parou de esperar". O `erros` entra na mensagem porque o
+// outro caminho para o mesmo silencio e um erro no shell.
+const PRAZO_MS = 2000;
+
+async function antesDoPrazo<T>(oQue: string, promessa: Promise<T>, erros: string[] = []): Promise<T> {
+  let relogio!: ReturnType<typeof setTimeout>;
+  const prazo = new Promise<never>((_, rejeita) => {
+    relogio = setTimeout(
+      () =>
+        rejeita(
+          new Error(
+            `a vitrine nao entregou ${oQue} em ${PRAZO_MS}ms${erros.length > 0 ? ` — erros: ${erros.join(" | ")}` : ""}`,
+          ),
+        ),
+      PRAZO_MS,
+    );
+  });
+  try {
+    return await Promise.race([promessa, prazo]);
+  } finally {
+    clearTimeout(relogio);
+  }
 }
 
 // ponytail: o React separa texto estatico de dinamico com `<!-- -->` no HTML do
@@ -117,12 +157,12 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
     let chega!: (valor: Item[]) => void;
     espiao.itens.mockReturnValue(new Promise<Item[]>((resolve) => { chega = resolve; }));
 
-    const elemento = await VitrinePage(props("ana"));
+    const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
     const fluxo = streamar(elemento);
 
-    const primeiro = await fluxo.primeiroFlush;
+    const primeiro = await antesDoPrazo("o primeiro flush", fluxo.primeiroFlush, fluxo.erros);
     chega([item()]);
-    const partes = await fluxo.fim;
+    const partes = await antesDoPrazo("o conteudo", fluxo.fim, fluxo.erros);
 
     expect(fluxo.erros).toEqual([]);
     // ponytail: o titulo fica FORA da fronteira, e e ele que faz o esqueleto
@@ -148,8 +188,8 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
     espiao.vendedor.mockResolvedValue(VENDEDOR);
     espiao.itens.mockResolvedValue([]);
 
-    const elemento = await VitrinePage(props("ana"));
-    const partes = await streamar(elemento).fim;
+    const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
+    const partes = await antesDoPrazo("o fim do fluxo", streamar(elemento).fim);
     const ultimo = partes[partes.length - 1] ?? "";
 
     expect(texto(partes.join(""))).toContain('data-slot="empty-state"');

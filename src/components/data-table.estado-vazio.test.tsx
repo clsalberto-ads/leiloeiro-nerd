@@ -79,6 +79,22 @@ describe("DataTable — o estado vazio", () => {
     expect(celulaVazia(tabelaVazia())).not.toContain("<a");
   });
 
+  // ponytail: as duas classes sao a assinatura visual da celula vazia e nenhuma
+  // delas aparece no `textContent` que os 38 testes protegidos comparam — e por
+  // isso que este `it` existe. `text-muted-foreground` e a cor que a celula tinha
+  // antes do `EmptyState` (o titulo do cartao nao declara cor e herda a da
+  // celula), e `whitespace-normal` e o que despeta o `whitespace-nowrap` do
+  // `TableCell` para uma `description` conseguir enrolar em vez de esticar a
+  // tabela. O regex e ancorado no `<td` de proposito: dentro da celula o icone
+  // tambem e `text-muted-foreground`, e um `toContain` solto passaria com a
+  // classe da celula ausente.
+  it("mantém a mensagem apagada e a célula capaz de quebrar linha", () => {
+    const celula = celulaVazia(tabelaVazia());
+
+    expect(celula).toMatch(/<td[^>]*\btext-muted-foreground\b/);
+    expect(celula).toMatch(/<td[^>]*\bwhitespace-normal\b/);
+  });
+
   // ponytail: a tabela montada em `renderToString` ainda tem cabecalho e rodape.
   // O que interessa e o `colspan` da celula vazia: com o valor errado a tabela fica
   // com um buraco no layout que nenhum aviso accuse, e o rodape continuaria

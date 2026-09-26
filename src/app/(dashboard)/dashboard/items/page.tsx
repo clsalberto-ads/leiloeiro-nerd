@@ -10,6 +10,26 @@ import { BecomeSellerForm } from "@/components/become-seller-form";
 
 export const dynamic = "force-dynamic";
 
+// ponytail: esta pagina NAO tem `<Suspense>` nem `loading.tsx`, e a ausencia e uma
+// decisao medida, nao uma pendencia (o `TableSkeleton` que as duas usariam tambem
+// nao existe — a nota esta em `components/skeletons.tsx`). Envolver o trecho
+// `<ItensDaUrl>` em uma fronteira aqui seria decorativo: o `await` da sessao e o
+// `await` da listagem acontecem no corpo desta pagina, antes de o JSX existir, entao
+// nada abaixo da fronteira suspende e o fallback nunca e despejado.
+//
+// O `loading.tsx` do segmento seria o outro caminho e ele tem um custo que a
+// searches com `router.push` torna real: durante a navegacao o `loading.tsx`
+// desmonta e remonta o `DataTable` inteiro a cada tecla depurada, apagando o
+// `query` local e desfazendo o conserto de "busca nao descarta digitacao em voo"
+// (commit `f7f300a`). Durante a navegacao o usuario ve hoje a lista antiga, que e
+// mais util que um esqueleto.
+//
+// O caminho que sobra e o mesmo da vitrine publica (`[slug]/page.tsx`): descer a
+// listagem para um filho async que suspende, para que a fronteira tenha o que
+// esperar. Ele exige a reescrita do `items/page.test.tsx` (proibido aqui: esta
+// entre os 159) — ver a nota em `components/skeletons.tsx` para as duas assercoes
+// que quebrariam.
+
 // ponytail: a URL e lida no FIM, depois da sessao, e nao logo no primeiro await. A
 // ordem e "se nao ha pagina, nao ha consulta": o `dynamic = "force-dynamic"` acima
 // garante que a leitura e por requisicao, entao nao ha cache de pagina que

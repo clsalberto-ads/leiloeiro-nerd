@@ -451,12 +451,23 @@ export function DataTable<T>({
         <TableBody>
           {linhas.length === 0 ? (
             <TableRow>
-              {/* ponytail: `p-0` e o que deixa o cartao do `EmptyState` encostar
-                  nas bordas da celula (ele ja tem o proprio `p-10`), e o `p-2` do
-                  `TableCell` seria somado a ele. O `h-24` que estava aqui fixava
-                  uma altura minima para a linha; com o cartao dentro, a altura
-                  ja vem do conteudo. */}
-              <TableCell colSpan={columns.length} className="p-0 align-middle">
+              {/* ponytail: as tres classes daqui sao o que impede a celula vazia de
+                  virar um re-skin. (1) `p-0` deixa o cartao do `EmptyState`
+                  encostar nas bordas da celula (ele ja tem o proprio `p-10`), e o
+                  `p-2` do `TableCell` seria somado a ele. (2) `whitespace-normal`
+                  DESPETA o `whitespace-nowrap` do `TableCell` (ui/table.tsx), que e
+                  a unica coisa aqui que impede a linha de quebrar: a `description`
+                  do `EmptyState` e opcional justamente porque a tabela so tem uma
+                  string de texto, e sem esta classe ela nunca quebraria — um texto
+                  longo esticaria a tabela em vez de enrolar. (3)
+                  `text-muted-foreground` e a cor que a celula vazia tinha antes do
+                  `EmptyState`, e ela volta a valer porque o titulo do cartao nao
+                  declara cor propria (so `font-medium`) e herda a da celula; o icone
+                  ja e `text-muted-foreground` e o link da acao e `text-primary`,
+                  entao nenhum dos dois muda. O `h-24` que estava aqui fixava uma
+                  altura minima para a linha; com o cartao dentro, a altura ja vem do
+                  conteudo (e `h-24` e menor que ele). */}
+              <TableCell colSpan={columns.length} className="p-0 align-middle whitespace-normal text-muted-foreground">
                 <EmptyState
                   title={emptyMessage}
                   action={emptyAction}

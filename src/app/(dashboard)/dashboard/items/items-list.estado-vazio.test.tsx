@@ -11,20 +11,27 @@ vi.mock("@/presentation/actions/item-actions", () => ({
   publishItemAction: vi.fn(),
 }));
 
-import { fireEvent, render, screen } from "@/test/dom-render";
+import { render, screen } from "@/test/dom-render";
 import { ItemsList } from "./items-list";
 import { VISTA_PADRAO, type VistaDaTabela } from "./estado-da-tabela";
 
-// ponytail: este arquivo e de DOM (e nao de `renderToString`) por UM motivo: a
-// saida do estado vazio e um BOTAO, e um botao no HTML e indistinguivel de um
-// botao quebrado — o `onClick` nao aparece no servidor. O que o teste precisa
-// afirmar e a VISTA que sai do clique, nao o texto do rotulo. O resto (as duas
-// frases, a ausencia de acao sem filtro) continua sendo leitura de tela, e para
-// isso o DOM e o instrumento certo.
+// ponytail: este arquivo e de DOM (e nao de `renderToString`) por UM motivo: o que
+// o teste precisa afirmar e a AFORDANCIA do controle, e `href` nao sobrevive a um
+// `<button>` — um botao no HTML e indistinguivel de um botao quebrado, e o
+// `onClick` nao aparece no servidor. `getByRole("link")` e a asercao que distingue
+// "isto navega" de "isto finge que navega"; o `href` lido do DOM e o que diz para
+// ONDE. O resto (as duas frases, a ausencia de acao sem filtro) continua sendo
+// leitura de tela, e para isso o DOM e o instrumento certo.
+//
+// O `navegar` e um espiao sem assertiva: com a saida virando link, o que a lista
+// NAO faz e chamar `navegar` para o estado vazio — e o `href` e a prova de que o
+// gesto virou navegacao de verdade.
 function montar(vista: VistaDaTabela) {
-  const navegar = vi.fn();
-  render(<ItemsList items={[]} vista={vista} totalCount={0} navegar={navegar} />);
-  return navegar;
+  render(<ItemsList items={[]} vista={vista} totalCount={0} navegar={vi.fn()} />);
+}
+
+function limpar() {
+  return screen.getByRole("link", { name: "Limpar filtros" });
 }
 
 // ponytail: as DUAS situacoes vem da mesma tela, e por isso que elas nao podem
@@ -43,7 +50,7 @@ describe("ItemsList — os dois estados vazios", () => {
     montar(VISTA_PADRAO);
 
     expect(screen.getByText("Você ainda não tem itens.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Limpar filtros" })).toBeNull();
   });
 
   it("com busca, diz que nada casou e oferece limpar", () => {
@@ -51,7 +58,7 @@ describe("ItemsList — os dois estados vazios", () => {
 
     expect(screen.getByText("Nenhum item encontrado.")).toBeTruthy();
     expect(screen.queryByText("Você ainda não tem itens.")).toBeNull();
-    expect(screen.getByRole("button", { name: "Limpar filtros" })).toBeTruthy();
+    expect(limpar()).toBeTruthy();
   });
 
   // ponytail: a aba e o mesmo filtro pelo outro nome — o usuario nao digitou
@@ -61,21 +68,32 @@ describe("ItemsList — os dois estados vazios", () => {
     montar({ ...VISTA_PADRAO, status: "draft" });
 
     expect(screen.getByText("Nenhum item encontrado.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Limpar filtros" })).toBeTruthy();
+    expect(limpar()).toBeTruthy();
   });
 
-  // ponytail: o `it` que prova o contrato de verdade. O que importa no "voltar" e
-  // a VISTA que sai do clique, e nao a URL: e o `hrefDaVista` (morando em um lugar
-  // so) que vira string. Um `onSelect` que montasse o `/dashboard/items` na mao
-  // passaria num teste de href e deixaria a segunda copia da frase divergir do
-  // `hrefDaVista` no dia em que ele mudar.
+  // ponytail: o `it` que prova o contrato de verdade. O "voltar" e um LINK com um
+  // `href` de verdade, e nao um botao com `onClick`: e o que entrega abrir em nova
+  // aba, clique do meio, ctrl-clique, copiar endereco e a URL na barra de status.
+  // Um `<button>` nao tem nenhum desses, e a diferenca nao e de estilo — e de
+  // controle navegavel. Por isso a asercao e `getByRole("link")` mais o `href`
+  // lido do DOM, e nao o texto do rotulo (que um botao mostraria igual).
+  it("limpar filtros é uma âncora com href, e não um botão", () => {
+    montar({ ...VISTA_PADRAO, q: "nada" });
+
+    expect(limpar().tagName).toBe("A");
+    expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
+    expect(limpar().getAttribute("href")).toBe("/dashboard/items");
+  });
+
+  // ponytail: o que importa no "voltar" e PARA ONDE ele leva, e esse "onde" e a
+  // VISTA sem filtro traduzida pelo `hrefDaVista` (que mora em um lugar so). Um
+  // `/dashboard/items` escrito a mao passaria neste `it` — por isso a segunda
+  // asercao, com a ordenacao e o tamanho preservados, que e exatamente o caso em
+  // que a segunda copia da frase divergiria do `hrefDaVista`.
   it("limpar filtros volta para a lista sem busca, sem aba e na primeira página", () => {
-    const navegar = montar({ ...VISTA_PADRAO, q: "nada", status: "active", page: 3 });
+    montar({ ...VISTA_PADRAO, q: "nada", status: "active", page: 3 });
 
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-
-    expect(navegar).toHaveBeenCalledTimes(1);
-    expect(navegar).toHaveBeenCalledWith({ ...VISTA_PADRAO });
+    expect(limpar().getAttribute("href")).toBe("/dashboard/items");
   });
 
   // ponytail: o filtro tambem muda a PAGINA, e `?page=3&q=nada` e a URL que a
@@ -91,11 +109,9 @@ describe("ItemsList — os dois estados vazios", () => {
       direction: "asc",
       pageSize: 50,
     };
-    const navegar = montar(ordenada);
+    montar(ordenada);
 
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-
-    expect(navegar).toHaveBeenCalledWith({ ...ordenada, q: "", page: 1 });
+    expect(limpar().getAttribute("href")).toBe("/dashboard/items?orderBy=minInitialBid&pageSize=50");
   });
 
   // ponytail: com itens na tela nao ha estado vazio, e nem com a palavra. Este
