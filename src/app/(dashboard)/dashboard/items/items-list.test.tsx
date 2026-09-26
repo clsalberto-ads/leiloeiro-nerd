@@ -51,4 +51,25 @@ describe("ItemsList", () => {
     const html = renderToString(<ItemsList items={[makeItem()]} current="all" />);
     expect(html).toMatch(/<th[\s\S]*?Lance mínimo/);
   });
+
+  // ponytail: a outra metade do fuso, e a que fecha o ciclo da hidratacao: o
+  // `items-list.dom.test.tsx` prova o texto no cliente, este prova o HTML que o
+  // servidor manda. Sao os dois lados do mesmo `toLocaleDateString`, e a
+  // hidratacao so fica sem divergencia se eles concordarem. O instante e o
+  // `2026-10-01T00:00:00Z` do `makeItem` — meia-noite UTC e o pior caso: o dia
+  // do prazo vira o dia anterior em qualquer fuso a oeste de Greenwich. Com o
+  // processo forcado em UTC, um `toLocaleDateString` sem `timeZone` imprimiria
+  // "01/10/2026"; o vendedor que digitou "30/09 22:00" no `item-form` veria o
+  // prazo que cadastrou.
+  it("renderiza o prazo no fuso do produto, e nao no fuso do processo", () => {
+    const fusoOriginal = process.env.TZ;
+    try {
+      process.env.TZ = "UTC";
+      const html = renderToString(<ItemsList items={[makeItem()]} current="all" />);
+      expect(html).toContain("30/09/2026");
+    } finally {
+      if (fusoOriginal === undefined) delete process.env.TZ;
+      else process.env.TZ = fusoOriginal;
+    }
+  });
 });

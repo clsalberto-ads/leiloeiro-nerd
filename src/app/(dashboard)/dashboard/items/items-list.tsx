@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { MoreHorizontalIcon } from "lucide-react";
-import type { Item, ItemType } from "@/domain/repositories/item-repository";
+import type { Item, ItemStatus, ItemType } from "@/domain/repositories/item-repository";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { BidCountdown } from "@/components/bid-countdown";
@@ -40,6 +40,38 @@ const ROTULO_TIPO: Record<ItemType, string> = {
   service: "Serviço",
   piece: "Peça colecionável",
 };
+
+// ponytail: mesma decisao do `ROTULO_TIPO`, agora com o mapa de labels do
+// `item-status-badge.tsx`. Aqui a copia e load-bearing e nao so Conveniencia: o
+// `accessorFn` desta coluna entrega o valor que a busca global casa, entao ele
+// PRECISA ser o texto que o badge mostra. Com o enum ingles ("active") a busca
+// respondia "Nenhum item encontrado." para "Em leilao" — o termo escrito como o
+// usuario le na tela. Os dois mapas duplicados ficam em desacordo em silencio se
+// um rotulo mudar num lado so, entao o `Record<ItemStatus, string>` e o que faz
+// o `tsc` reclamar quando um status novo aparecer: um `ROTULO_STATUS` sem a
+// chave e um `LABELS` sem a chave sao o mesmo buraco, visto de dois angulos.
+const ROTULO_STATUS: Record<ItemStatus, string> = {
+  draft: "Rascunho",
+  active: "Em leilão",
+  closed: "Encerrado",
+  awaiting_payment: "Aguardando pagamento",
+  paid: "Pago",
+  cancelled: "Cancelado",
+};
+
+// ponytail: o fuso do PRODUTO, nao o do processo. A celula e SSR'd e
+// re-renderizada no cliente, entao um servidor em UTC (o padrao de nuvem) e um
+// navegador em Sao Paulo veriam o mesmo instante com textos diferentes — o React
+// acusa divergencia de hidratacao no texto do `<time>` e descarta a arvore do
+// servidor. E o efeito no produto e pior que o aviso: o `item-form` le o
+// `datetime-local` como hora local, entao o vendedor digitando "30/09 22:00"
+// submete `2026-10-01T01:00Z` e a lista mostraria "01/10" num servidor em UTC —
+// um dia depois do prazo que ele acabou de cadastrar. `bid-history.tsx` repete o
+// padrao, mas la o componente e de servidor e nao hidrata: mesmo defeito, sem o
+// risco. A alternativa seria o servidor rodar em Sao Paulo (fuso do processo =
+// fuso do produto); fixar aqui deixa o fuso do produto explicito e igual em
+// qualquer maquina, sem depender de onde o deploy caiu.
+const FUSO = "America/Sao_Paulo";
 
 const MENSAGEM_VAZIA = "Nenhum item encontrado.";
 const PLACEHOLDER_BUSCA = "Buscar item";
@@ -122,8 +154,21 @@ function AcoesDoItem({ item }: { item: Item }) {
 // ordenaria "1.000,00" antes de "50,00" e viraria o calendario de cabeca para
 // baixo. Entao as colunas de dado entregam o valor que ordena certo, e a busca
 // global casa com o que esta gravado e nao com o que esta escrito. Onde o rotulo
-// e da propria coluna (`tipo`) ele e o valor: ali busca e ordenacao falam a
-// mesma lingua.
+// e da propria coluna (`tipo`, `status`) ele e o valor: ali busca e ordenacao
+// falam a mesma lingua, e nao ha trade-off a fazer — a ordem alfabetica do enum
+// ingles nao e um ciclo de vida, e a do rotulo pt-BR nao e, nenhuma das duas e
+// "a ordem" de um status, e uma entrega a busca o que o usuario le.
+//
+// ponytail: DEVIDA (Task 9) — a busca global ainda nao acha "1.234,56", "R$" nem
+// "01/10/2026", porque dinheiro e prazo nao tem como ordenar e casar no mesmo
+// accessor. A correcao estrutural e um segundo valor de busca na coluna, sem
+// mexer no `getSortedRowModel`: (1) `filterValue?: (row: T) => string` no
+// `DataTableColumn`; (2) mapeado no `ColumnDef` em `data-table.tsx`;
+// (3) no `contemSemAcento`, ler
+// `def.filterValue ? def.filterValue(row.original) : row.getValue(columnId)`.
+// Sao ~8 linhas, e `filterValue` continuaria opcional — as colunas de hoje seguem
+// com o `accessorFn` como valor de busca. Atraso deliberado: e uma mudanca no
+// componente generico, e nao numa lista.
 const COLUNAS: DataTableColumn<Item>[] = [
   {
     id: "titulo",
@@ -144,7 +189,7 @@ const COLUNAS: DataTableColumn<Item>[] = [
   {
     id: "status",
     header: "Status",
-    accessorFn: (item) => item.status,
+    accessorFn: (item) => ROTULO_STATUS[item.status],
     cell: (item) => <ItemStatusBadge status={item.status} />,
   },
   {
@@ -159,7 +204,9 @@ const COLUNAS: DataTableColumn<Item>[] = [
     accessorFn: (item) => item.bidDeadline.getTime(),
     cell: (item) => (
       <div className="flex flex-col">
-        <time dateTime={item.bidDeadline.toISOString()}>{item.bidDeadline.toLocaleDateString("pt-BR")}</time>
+        <time dateTime={item.bidDeadline.toISOString()}>
+          {item.bidDeadline.toLocaleDateString("pt-BR", { timeZone: FUSO })}
+        </time>
         {item.status === "active" ? <BidCountdown deadline={item.bidDeadline} /> : null}
       </div>
     ),
@@ -175,6 +222,16 @@ const COLUNAS: DataTableColumn<Item>[] = [
 ];
 
 export interface ItemsListProps {
+  // ponytail: DEVIDA (Task 9) — a lista era componente de servidor, entao
+  // nenhum `Item` era serializado; como cliente, cada item que a pagina passa
+  // agora viaja inteiro no payload do RSC: 12 campos por linha, dos quais as
+  // colunas nao usam 6, e `description` — o texto longo — vai junto sem sair na
+  // tela. A correcao e um DTO montado na propria `page.tsx` (um `map` que
+  // entrega so o que as colunas leem: `id`, `title`, `type`, `status`,
+  // `minInitialBid`, `bidDeadline`) e nao um campo opcional em `Item`: o pin e o
+  // `items: Item[]` desta interface, e mudar isso e mexer no contrato da pagina,
+  // nao no desta lista. A `page.tsx` ainda busca sem limite, o que e o outro
+  // lado do mesmo debito.
   items: Item[];
   current: string;
   // ponytail: `totalCount` presente e o que liga a paginacao no servidor: e ele
@@ -183,8 +240,20 @@ export interface ItemsListProps {
   // propria — sem ele a union nem compila. Quem traz e a pagina, com o total que
   // a query devolveu; enquanto ninguem passa, a lista opera no modo cliente.
   totalCount?: number;
+  // ponytail: `pageIndex` e `onPageChange` nao formam par, e o `DataTable` so
+  // honra os dois no modo servidor. No modo cliente quem manda e o estado interno
+  // dele: passar `onPageChange` sem `totalCount` produz callbacks que a tabela
+  // nao vai cumprir (o indice do pai nao mexe no fatiamento). Quem ligar a
+  // paginacao de verdade passa `totalCount` junto.
   pageIndex?: number;
   onPageChange?: (page: number) => void;
+  // ponytail: `pageSize` e `onPageSizeChange` existem pela mesma razao de
+  // `onPageChange` — e o Select de "linhas por pagina" e um controle do pai no
+  // modo servidor. Sem o repasse, escolher 50 nao avisava ninguem: o
+  // `tratarPagina` ignorava o estado interno e o `onPageSizeChange?.()` era
+  // `undefined`, entao o gatilho voltava a marcar 10 em silencio.
+  pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
   onSortChange?: (sort: DataTableSort | null) => void;
   onFilterChange?: (query: string) => void;
 }
@@ -195,6 +264,8 @@ export function ItemsList({
   totalCount,
   pageIndex,
   onPageChange,
+  pageSize,
+  onPageSizeChange,
   onSortChange,
   onFilterChange,
 }: ItemsListProps) {
@@ -205,12 +276,23 @@ export function ItemsList({
   // consumidor.
   const tabela =
     totalCount === undefined
-      ? { columns: COLUNAS, data: items, pageIndex, onPageChange, onSortChange, onFilterChange }
+      ? {
+          columns: COLUNAS,
+          data: items,
+          pageIndex,
+          pageSize,
+          onPageChange,
+          onPageSizeChange,
+          onSortChange,
+          onFilterChange,
+        }
       : {
           columns: COLUNAS,
           data: items,
           pageIndex,
+          pageSize,
           onPageChange,
+          onPageSizeChange,
           onSortChange,
           onFilterChange,
           manualPagination: true as const,
