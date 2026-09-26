@@ -49,7 +49,8 @@ describe("estado-da-tabela — a URL vazia é a tela padrão", () => {
 describe("estado-da-tabela — o que a URL omite", () => {
   // ponytail: as quatro combinacoes de (ordem, direcao) da coluna padrao. E a
   // tabela que fecha a discussao de "`direction` ausente = asc" vs "a tela =
-  // desc": so a coluna padrao tem a vista padrao e so ela pode ser省略. Um
+  // desc": so a coluna padrao tem a vista padrao, e so dela se pode omitir a
+  // ordenacao. Um
   // `?direction=asc` sem `orderBy` e a tela "dos mais antigos para os mais novos",
   // que ninguem alcanca por clique (a coluna `createdAt` nao tem cabecalho) e que
   // por isso precisa sobreviver a volta pela URL.

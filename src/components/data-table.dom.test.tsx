@@ -816,6 +816,81 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
     expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Item 03");
   });
 
+  // ponytail: o eco e a resposta do pai para o que a TABELA acabou de notificar, e
+  // nao uma novidade. O espelho anterior o tratava como novidade e devolvia a
+  // caixa para tras, apagando a tecla que o usuario deu depois do pedido. A janela
+  // e a do debounce (300ms) mais a do servidor, e por isso que a conexao lenta a
+  // AGRAVA: e a situacao em que o usuario ainda esta digitando quando a resposta
+  // chega.
+  it("nao devolve a caixa para tras quando o pai ecoa o que a tabela ja notificou", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      const props = {
+        columns: COLUNAS,
+        data: LINHAS,
+        manualPagination: true,
+        totalCount: 10,
+        sort: null,
+        onFilterChange,
+      } as const;
+      const { rerender } = render(<DataTable {...props} filter="" />);
+      const busca = screen.getByLabelText("Buscar");
+
+      fireEvent.change(busca, { target: { value: "con" } });
+      await avancarRelogio(300);
+      expect(onFilterChange).toHaveBeenLastCalledWith("con");
+
+      // o usuario continua digitando e so AGORA o servidor responde o "con"
+      fireEvent.change(busca, { target: { value: "cons" } });
+      rerender(<DataTable {...props} filter="con" />);
+
+      expect((busca as HTMLInputElement).value).toBe("cons");
+
+      await avancarRelogio(300);
+      expect(onFilterChange).toHaveBeenLastCalledWith("cons");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ponytail: o outro lado, e ele impede a correcao trocada. A guarda acima so
+  // pode ignorar o prop que a tabela JA notificou; um termo que ela nunca mandou e
+  // a resposta do historico do navegador e tem que repreencher a caixa — inclusive
+  // depois de uma busca da propria tabela, que e o caso em que uma regra do tipo
+  // "a caixa ja foi tocada, entao ignora o pai" pararia de funcionar.
+  it("repreenche a caixa no voltar/avancar mesmo depois de uma busca da propria tabela", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      const props = {
+        columns: COLUNAS,
+        data: LINHAS,
+        manualPagination: true,
+        totalCount: 10,
+        sort: null,
+        onFilterChange,
+      } as const;
+      const { rerender } = render(<DataTable {...props} filter="" />);
+      const busca = screen.getByLabelText("Buscar");
+
+      fireEvent.change(busca, { target: { value: "con" } });
+      await avancarRelogio(300);
+      expect(onFilterChange).toHaveBeenLastCalledWith("con");
+      rerender(<DataTable {...props} filter="con" />);
+
+      // o "voltar": um termo que a tabela nunca notificou
+      rerender(<DataTable {...props} filter="Item 02" />);
+      expect((busca as HTMLInputElement).value).toBe("Item 02");
+
+      // e o "voltar" nao pode virar eco de volta para a URL
+      await avancarRelogio(300);
+      expect(onFilterChange).toHaveBeenLastCalledWith("con");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // ponytail: os dois testes juntos fecham o laco do historico do navegador. O
   // termo que CHEGA do pai nao pode ser re-notificado ao pai: um back/forward
   // escrevendo de volta o valor que acabou de ler da URL seria um eco, e com

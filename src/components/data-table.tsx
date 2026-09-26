@@ -105,16 +105,16 @@ export type DataTableProps<T> =
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
 const DEBOUNCE_BUSCA_MS = 300;
-// ponytail: o `10` desta lista e o MESMO numero que `TAMANHO_DE_PAGINA_PADRAO` em
-// `estado-da-tabela.ts` (a camada da URL), e a duplicacao e forcada pelo limite do
-// App Router: com `manualPagination` quem calcula o `OFFSET` e o servidor, e ele nao
-// alcanca um modulo `"use client"` — o `pageSize` ausente da URL precisa virar numero
-// antes de virar query. Derivar um do outro nao e opcao nas duas direcoes: este
-// componente generico nao importa de `src/app/(dashboard)/...` (a dependencia aponta
-// para o outro lado), e a URL nao pode descobrir o padrao lendo o componente que ela
-// manda configurar. O preco e um numero em dois lugares; a mitigacao e este par de
-// notas apontando uma para a outra, e o `pageSize` que a URL manda e o mesmo que o
-// `Select` desta lista oferece.
+// ponytail: o `10` do `pageSize = 10` do DEFAULT DESTE COMPONENTE e o MESMO numero
+// que `TAMANHO_DE_PAGINA_PADRAO` em `estado-da-tabela.ts` (a camada da URL), e a
+// duplicacao e forcada pelo limite do App Router: com `manualPagination` quem
+// calcula o `OFFSET` e o servidor, e ele nao alcanca um modulo `"use client"` — o
+// `pageSize` ausente da URL precisa virar numero antes de virar query. Derivar um do
+// outro nao e opcao nas duas direcoes: este componente generico nao importa de
+// `src/app/(dashboard)/...` (a dependencia aponta para o outro lado), e a URL nao
+// pode descobrir o padrao lendo o componente que ela manda configurar. O preco e um
+// numero em dois lugares; a mitigacao e este par de notas apontando uma para a
+// outra, e o `pageSize` que a URL manda e o mesmo que o `Select` desta lista oferece.
 const TAMANHOS_DE_PAGINA = [5, 10, 20, 50] as const;
 const ROTULO_BUSCA = "Buscar";
 const ROTULO_TAMANHO = "Linhas por página";
@@ -232,10 +232,18 @@ export function DataTable<T>({
   // historico (voltar/avancar) ficaria 300ms na caixa como se fosse digitado e
   // dispararia um `onFilterChange` de volta — a tela escrevendo na URL o valor que
   // acabou de ler dela.
+  //
+  // E o que NAO entra e o valor que a propria tabela acabou de notificar
+  // (`filtroNotificado.current`): esse e o ECO do pai, nao novidade dele, e
+  // escreve-lo de volta na caixa apagaria a tecla que o usuario deu depois do
+  // pedido. A janela e a do debounce mais a do servidor — e por isso que o defeito
+  // piora em conexao lenta, que e a situacao em que o usuario ainda esta digitando
+  // quando a resposta chega. Termo que a tabela NUNCA notificou (o "voltar") segue
+  // repreenchendo a caixa: e o que a prop e, e o que o usuario ve na URL.
   const filtroEspelhado = useRef(filter);
   if (filter !== filtroEspelhado.current) {
     filtroEspelhado.current = filter;
-    if (filter !== undefined) {
+    if (filter !== undefined && filter !== filtroNotificado.current) {
       filtroNotificado.current = filter;
       setQuery(filter);
       setFiltro(filter);

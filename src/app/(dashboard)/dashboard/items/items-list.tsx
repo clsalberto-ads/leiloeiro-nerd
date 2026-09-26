@@ -148,17 +148,21 @@ function AcoesDoItem({ item }: { item: ItemDaTabela }) {
 // (`minInitialBid`) e prazo (`getTime()`) ordenam certo como numero e nao casam
 // com o texto que o usuario le; o inverso ("R$ 1.234,56", "01/10/2026")
 // ordenaria "1.000,00" antes de "50,00" e viraria o calendario de cabeca para
-// baixo. Entao as colunas de dado entregam o valor que ordena certo, e a busca casa
-// com o que esta gravado e nao com o que esta escrito.
+// baixo. Entao as colunas de dado entregam o valor que ordena certo.
 //
 // Onde o rotulo e da propria coluna (`tipo`, `status`) o accessorFn entrega
-// `ROTULO_TIPO`/`ROTULO_STATUS` — e aqui a busca volta a casar com o texto
-// escrito, porque a COPIA sumiu: o `q` do servidor casa com o rotulo do
-// dominio e o `accessorFn` do cliente le o mesmo mapa, entao os dois lados dizem a
-// mesma coisa por construcao em vez de por coincidencia. Era exatamente a
-// identidade que o `accessorFn` tinha de sustentar sozinho, com o enum ingles
-// ("active") como valor: a busca respondia "Nenhum item encontrado." para "Em
-// leilao", o termo escrito como o usuario le.
+// `ROTULO_TIPO`/`ROTULO_STATUS`, e o `q` do servidor casa com o rotulo do
+// dominio: os dois lados dizem a mesma coisa por construcao em vez de por
+// coincidencia. Era exatamente a identidade que o `accessorFn` tinha de sustentar
+// sozinho, com o enum ingles ("active") como valor: a busca respondia "Nenhum item
+// encontrado." para "Em leilao", o termo escrito como o usuario le.
+//
+// ponytail: neste arquivo o `accessorFn` nao e lido por NENHUM caminho de leitura
+// — a lista e so servidor, e o `DataTable` roda com `manualFiltering` e
+// `manualSorting` ligadas, entao nem a busca nem a ordenacao do cliente passam por
+// ele. Passar mesmo assim e o que mantem as colunas honestas se o modo virar: um
+// `accessorFn` que so existe no ramo cliente morreria junto com ele, e a coluna
+// voltaria a ser so texto (que e o que ordenaria "1.000,00" antes de "50,00").
 //
 // ponytail: `tipo` e `status` sao `sortable: false` por um motivo que ja estava
 // escrito acima e so agora fecha: a ordem alfabetica do enum ingles nao e um
@@ -171,8 +175,7 @@ function AcoesDoItem({ item }: { item: ItemDaTabela }) {
 // `createdAt desc`: a seta animaria, a URL mudaria e a tabela voltaria na ordem
 // antiga. E um `sortable: true` aqui seria mentira nos dois sentidos, entao o
 // desligamento e explicito e nao herdado da ausencia de `accessorFn` (que as
-// colunas de dado nao podem usar, porque elas PRECISAM do `accessorFn` para a
-// busca).
+// colunas de dado NAO tem: elas o carregam pelo motivo do paragrafo acima).
 //
 // ponytail: DEVIDA (Task 9) — a busca ainda nao acha "1.234,56", "R$" nem
 // "01/10/2026", porque dinheiro e prazo nao tem como ordenar e casar no mesmo
@@ -304,9 +307,11 @@ export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps)
     if (agendado.current) return;
     agendado.current = true;
     // ponytail: a base e capturada no GESTO, e nao lida no microtask. A vista que o
-    // usuario corrigiu e a que ele estava vendo; se a prop mudasse no caminho (nao
-    // acontece — o microtask roda antes do proximo render), a mudanca cairia sobre
-    // uma tela que ninguem pediu para corrigir.
+    // usuario corrigiu e a que ele estava vendo; o microtask nao tem como ler outra,
+    // porque `vista` e um `const` do render que CRIOU este `aplicar` — a closure o
+    // carrega por valor, e nao por prop. Ler `vista` la dentro daria o mesmo
+    // resultado, entao a escolha e de legibleza (o `const base` nomeia o que a
+    // mudanca vai ser aplicada sobre) e nao decorrecao.
     const base = vista;
     queueMicrotask(() => {
       agendado.current = false;
