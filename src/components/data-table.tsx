@@ -14,6 +14,7 @@ import type {
   ColumnDef,
   OnChangeFn,
   PaginationState,
+  Row,
   SortingState,
   Updater,
 } from "@tanstack/react-table";
@@ -50,7 +51,7 @@ export interface DataTableSort {
   desc: boolean;
 }
 
-export interface DataTableProps<T> {
+interface DataTablePropsComuns<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   pageSize?: number;
@@ -61,9 +62,18 @@ export interface DataTableProps<T> {
   onPageSizeChange?: (pageSize: number) => void;
   filterPlaceholder?: string;
   emptyMessage?: string;
-  manualPagination?: boolean;
-  totalCount?: number;
 }
+
+// ponytail: `manualPagination` e `totalCount` sao um par, nao dois opcionais.
+// Ligado o modo servidor, sem `totalCount` o `rowCount` fica `undefined`,
+// `getRowCount()` cai no comprimento da pagina, `pageCount` vira 1, os dois
+// botoes travam e o rodape anuncia "de 2" — uma tabela morta que ainda parece
+// viva. A union deixa isso um erro de compilacao no consumidor em vez de um
+// rodape mentindo em producao. A alternativa (so um `console.warn` em dev)
+// seria tarde: o dano e silencioso e so aparece com o servidor de volta.
+export type DataTableProps<T> =
+  | (DataTablePropsComuns<T> & { manualPagination: true; totalCount: number })
+  | (DataTablePropsComuns<T> & { manualPagination?: false; totalCount?: number });
 
 // ponytail: `getIsSorted()` devolve "asc"/"desc"/false e "asc" NAO e um valor
 // valido de `aria-sort` — a ARIA so aceita "none" | "ascending" | "descending" |
@@ -75,6 +85,28 @@ const DEBOUNCE_BUSCA_MS = 300;
 const TAMANHOS_DE_PAGINA = [5, 10, 20, 50] as const;
 const ROTULO_BUSCA = "Buscar";
 const ROTULO_TAMANHO = "Linhas por página";
+const MARCA_COMBINANTE = /\p{Diacritic}/gu;
+
+// ponytail: o filtro global padrao (`includesString`, alcancado por
+// `globalFilterFn: "auto"`) so aplica `toLowerCase`: insensivel a caixa,
+// SENSIVEL a acento. Num produto pt-BR o usuario digita "acao", "Ação" nao
+// aparece e o resultado lido e "nao achou" em vez de "voce nao escreveu o
+// acento". NFD decompoe o caractere em letra + marca combinante, e `Diacritic`
+// cobre o `\p{M}` todo — o mesmo caminho para "ç" e para "ã".
+function semAcento(texto: string): string {
+  return texto.normalize("NFD").replace(MARCA_COMBINANTE, "").toLowerCase();
+}
+
+// ponytail: os DOIS lados sao normalizados, nao so o valor da celula — normalizar
+// um so faria "acao" casar e "Ação" sumir, trocando o defeito de lugar. Celula
+// vazia (`accessorFn` devolvendo `null`/`undefined`) nao casa, que e o
+// comportamento do `includesString` que esta funcao substitui: a busca nao
+// inventa criterio novo, so deixa de penalizar o acento.
+function contemSemAcento<T>(linha: Row<T>, columnId: string, valor: unknown): boolean {
+  const celula = linha.getValue<unknown>(columnId);
+  if (celula === null || celula === undefined) return false;
+  return semAcento(String(celula)).includes(semAcento(String(valor)));
+}
 
 // ponytail: `sortable` e `enableSorting` sao o mesmo interruptor com dois nomes
 // (o contrato lista os dois). Qualquer um dos dois com `false` desliga a
@@ -105,8 +137,8 @@ export function DataTable<T>({
   manualPagination = false,
   totalCount,
 }: DataTableProps<T>): React.JSX.Element {
-  // `query` e o que esta no input (muda a cada tecla); `filtro` e o que foi
-  // efetivamente aplicado a tabela (so depois do debounce).
+  // ponytail: `query` e o que esta no input (muda a cada tecla); `filtro` e o que
+  // foi efetivamente aplicado a tabela (so depois do debounce).
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -126,11 +158,26 @@ export function DataTable<T>({
     recentes.current = { onFilterChange, onPageChange, manualPagination, pageIndex };
   });
 
+  // ponytail: escrever so o `pageSize` deixava o `pageIndex` antigo vivo com o
+  // tamanho novo — `pageIndex=2` com `pageSize=10` sobre 12 linhas e
+  // `slice(20, 30)`: tabela vazia com rodape "21–12 de 12". A conta e a do
+  // `setPageSize` do proprio TanStack (`floor(pageSize_antigo * pageIndex /
+  // pageSize_novo)`), e nao um clamp no maximo, por dois motivos: ela e a MESMA
+  // que o caminho do `Select` usa, entao mudar o tamanho pela UI e mudar a prop
+  // dao a mesma pagina; e ela preserva a primeira linha visivel em vez de pular
+  // para a ultima pagina. Nao da para so chamar `table.setPageSize` porque ele
+  // passa por `onPaginationChange`, que dispararia `onPageSizeChange` de volta
+  // para o pai que acabou de setar a prop.
   useEffect(() => {
     if (manualPagination) return;
-    setPaginaInterna((anterior) =>
-      anterior.pageSize === pageSize ? anterior : { ...anterior, pageSize },
-    );
+    setPaginaInterna((anterior) => {
+      if (anterior.pageSize === pageSize) return anterior;
+      const tamanho = Math.max(1, pageSize);
+      return {
+        pageIndex: Math.floor((anterior.pageSize * anterior.pageIndex) / tamanho),
+        pageSize: tamanho,
+      };
+    });
   }, [manualPagination, pageSize]);
 
   // ponytail: o debounce depende SO de `query`. Se `onFilterChange` viesse do
@@ -194,13 +241,34 @@ export function DataTable<T>({
     [columns],
   );
 
+  // ponytail: `useReactTable` esta na lista de `knownIncompatible` do
+  // `react-hooks` (o mesmo formato do `form.watch()` do RHF): o aviso e de
+  // memoizacao — a regra nao consegue provar que as funcoes devolvidas sao
+  // estaveis — e nao de correcao. Aqui nao ha bug de stale UI: as funcoes
+  // usadas no JSX sao as de `useCallback`/identidade estavel do proprio TanStack
+  // e o componente nao esta sob React Compiler. Desligar so a regra, com o
+  // motivo, para o proximo revisor nao reabrir a pergunta.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns: defs,
     state: { sorting, globalFilter: filtro, pagination: paginacao },
     onSortingChange: tratarOrdenacao,
     onPaginationChange: tratarPagina,
+    globalFilterFn: contemSemAcento,
+    // ponytail: `manualPagination` sozinho NAO e manual. Sem estes dois o
+    // `getFilteredRowModel` e o `getSortedRowModel` continuam rodando sobre a
+    // pagina que o servidor mandou, e o resultado era uma tabela que menteva em
+    // tres lugares ao mesmo tempo: sumia a pagina (o termo do usuario nao estava
+    // nela), reordenava a pagina antes do servidor responder, e o rodape
+    // continuava dizendo o total do servidor com a contagem na tela. Alternativa
+    // considerada: nem alimentar `filtro`/`sorting` no estado. Descartada porque o
+    // `aria-sort` e o icone do header leem `state.sorting` — sem ele o clique no
+    // header nao daria nenhum sinal de que pegou. Aqui o estado continua alimentado
+    // (a intencao do usuario e visivel) e o que nao roda e o fatiamento local.
     manualPagination,
+    manualFiltering: manualPagination,
+    manualSorting: manualPagination,
     rowCount: manualPagination ? totalCount : undefined,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

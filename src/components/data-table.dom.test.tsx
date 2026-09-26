@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, render, screen, within } from "@/test/dom-render";
-import { DataTable, type DataTableColumn } from "./data-table";
+import { DataTable, type DataTableColumn, type DataTableProps } from "./data-table";
 
 interface Linha {
   id: string;
@@ -17,8 +17,9 @@ const COLUNAS: DataTableColumn<Linha>[] = [
   { id: "acoes", header: "Ações", cell: () => <button type="button">Editar</button> },
 ];
 
-// Desordenadas de proposito: B, C, A. Ascendente comeca em "A" e descendente em
-// "C", entao cada estado da ordenacao e distinguivel dos outros dois.
+// ponytail: desordenadas de proposito: B, C, A. Ascendente comeca em "A" e
+// descendente em "C", entao cada estado da ordenacao e distinguivel dos outros
+// dois.
 const LINHAS: Linha[] = [
   { id: "1", titulo: "B" },
   { id: "2", titulo: "C" },
@@ -29,6 +30,23 @@ const DOZE: Linha[] = Array.from({ length: 12 }, (_, i) => ({
   id: String(i + 1),
   titulo: `Item ${String(i + 1).padStart(2, "0")}`,
 }));
+
+// ponytail: 100 linhas porque a 12 o reposicionamento e o clamp dariam a mesma
+// pagina (a 3 pagina de 5 vira 2 de 10 nas duas leituras) e o teste nao
+// distinguiria as duas. O zero a esquerda ("Item 001") mantem a ordem
+// lexicografica igual a numerica: sem ele "Item 10" ordenaria antes de "Item 2".
+const CEM: Linha[] = Array.from({ length: 100 }, (_, i) => ({
+  id: String(i + 1),
+  titulo: `Item ${String(i + 1).padStart(3, "0")}`,
+}));
+
+// ponytail: acento em "Ação"/"ção" e o que separa a busca que funciona da que nao
+// funciona para quem escreve "acao" num teclado sem cedilha. A coluna de acoes
+// segue sem `accessorFn`, entao ela fica fora da busca global.
+const COM_ACENTO: Linha[] = [
+  { id: "1", titulo: "Ação de megaponte" },
+  { id: "2", titulo: "Bicicleta" },
+];
 
 function cabecalho(nome: string): HTMLElement {
   return screen.getByRole("columnheader", { name: nome });
@@ -60,8 +78,10 @@ function botao(nome: string): HTMLElement {
   return screen.getByRole("button", { name: nome });
 }
 
-// A propriedade `disabled` do botao nativo e o que realmente trava o clique — um
-// `aria-disabled` sozinho deixaria o `onClick` de pe. Os dois sao asseridos.
+// ponytail: a propriedade `disabled` do botao nativo e o que realmente segura o
+// `onClick`; um `aria-disabled` sozinho deixaria o handler de pe. E por isso que
+// este helper le `disabled` e nao o atributo ARIA — nao existe `aria-disabled`
+// neste componente, e um atributo sem efeito seria uma assercao que nunca acusa.
 function estaDesabilitado(botaoEl: HTMLElement): boolean {
   return (botaoEl as HTMLButtonElement).disabled === true;
 }
@@ -219,6 +239,116 @@ describe("DataTable — busca com debounce", () => {
   });
 });
 
+describe("DataTable — busca sem acento", () => {
+  // ponytail: `includesString` do TanStack baixa a caixa mas nao normaliza: e
+  // insensivel a CAIXA e sensivel a ACENTO. Num produto pt-BR o usuario digita
+  // "acao" e "Ação" desaparece da lista, o que e lido como "nao achou" e nao como
+  // "voce esqueceu o acento". O `globalFilterFn` normaliza os dois lados.
+  it("acha 'Ação' quando o usuario digita 'acao' sem acento", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<DataTable columns={COLUNAS} data={COM_ACENTO} />);
+
+      fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "acao" } });
+      await avancarRelogio(300);
+
+      expect(titulos()).toEqual(["Ação de megaponte"]);
+      expect(mensagemDeVazio()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ponytail: o outro lado do contrato. Uma normalizacao aplicada so no valor da
+  // coluna faria "acao" funcionar e "Ação" sumir — o defeito trocado de lugar.
+  it("acha 'Ação' quando o usuario digita 'Ação' com acento", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<DataTable columns={COLUNAS} data={COM_ACENTO} />);
+
+      fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Ação" } });
+      await avancarRelogio(300);
+
+      expect(titulos()).toEqual(["Ação de megaponte"]);
+      expect(mensagemDeVazio()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("DataTable — o debounce sobrevive ao pai", () => {
+  // ponytail: este teste e a trava do desenho por ref. O efeito do debounce
+  // depende SO de `query`; se `onFilterChange` entrasse nas deps, cada arrow nova
+  // do pai reiniciaria o timer e a busca so dispararia quando o pai parasse de
+  // re-renderizar. O avanco e de 300ms no total mas o ULTIMO re-render acontece
+  // aos 250ms, entao o timer nao pode ter sido empurrado: 50ms apos o ultimo
+  // re-render ele ja tem de ter disparado.
+  it("dispara uma unica vez com o pai re-renderizando e passando arrow nova", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      // `comPaiNovo()` cria uma arrow nova a cada chamada — e o que um pai que
+      // escreve `onFilterChange={(q) => ...}` no JSX produz a cada render.
+      const comPaiNovo = () => (
+        <DataTable columns={COLUNAS} data={LINHAS} onFilterChange={(q) => onFilterChange(q)} />
+      );
+      const { rerender } = render(comPaiNovo());
+      const busca = screen.getByLabelText("Buscar");
+
+      fireEvent.change(busca, { target: { value: "a" } });
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      rerender(comPaiNovo());
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      rerender(comPaiNovo());
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      rerender(comPaiNovo());
+
+      await avancarRelogio(50);
+      expect(onFilterChange).toHaveBeenCalledTimes(1);
+      expect(onFilterChange).toHaveBeenCalledWith("a");
+
+      await avancarRelogio(1000);
+      expect(onFilterChange).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ponytail: o outro lado do mesmo desenho — o ref e lido no instante do timer,
+  // e nao capturado no efeito. Com o ref congelado no mount, o timer dispararia
+  // contra a callback que ja foi substituida: o pai de hoje nem saberia que
+  // filtrou. E por isso que o efeito que atualiza o ref roda SEM array de deps.
+  it("chama a callback nova quando o pai troca a identidade no meio do debounce", async () => {
+    vi.useFakeTimers();
+    try {
+      const antes = vi.fn();
+      const depois = vi.fn();
+      const props = { columns: COLUNAS, data: LINHAS };
+      const { rerender } = render(<DataTable {...props} onFilterChange={antes} />);
+
+      fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item" } });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      rerender(<DataTable {...props} onFilterChange={depois} />);
+
+      await avancarRelogio(100);
+      expect(antes).not.toHaveBeenCalled();
+      expect(depois).toHaveBeenCalledTimes(1);
+      expect(depois).toHaveBeenCalledWith("Item");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("DataTable — paginação client-side", () => {
   it("avanca, volta e trava os botoes nos limites", () => {
     const onPageChange = vi.fn();
@@ -273,6 +403,9 @@ describe("DataTable — paginação client-side", () => {
     ]);
   });
 
+  // ponytail: comeca na pagina 2 (0-based) porque e a unica pagina em que "keeps
+  // the current page" e "resets to page 0" sao respostas diferentes. Na pagina 0
+  // as duas produzem a mesma tela, entao o teste passaria com o codigo quebrado.
   it("muda o tamanho de pagina pelo Select e mantem a pagina atual", () => {
     const onPageSizeChange = vi.fn();
     const onPageChange = vi.fn();
@@ -286,26 +419,60 @@ describe("DataTable — paginação client-side", () => {
       />,
     );
 
+    fireEvent.click(botao("Próxima"));
+    fireEvent.click(botao("Próxima"));
+    expect(titulos()).toEqual(["Item 11", "Item 12"]);
+
     fireEvent.click(screen.getByRole("combobox", { name: "Linhas por página" }));
     const opcao = screen.getByRole("option", { name: "10" });
     fireEvent.pointerDown(opcao);
     fireEvent.click(opcao);
 
     expect(onPageSizeChange).toHaveBeenCalledWith(10);
-    expect(titulos()).toEqual([
-      "Item 01",
-      "Item 02",
-      "Item 03",
-      "Item 04",
-      "Item 05",
-      "Item 06",
-      "Item 07",
-      "Item 08",
-      "Item 09",
-      "Item 10",
-    ]);
-    expect(screen.getByText("Mostrando 1–10 de 12 itens")).toBeTruthy();
-    expect(onPageChange).not.toHaveBeenCalled();
+    // ponytail: a janela visivel e preservada em vez de voltar a primeira: a
+    // primeira linha da pagina 2 era "Item 11" (indice 10) e e ela que abre a
+    // nova pagina de 10. E o que o `setPageSize` do TanStack faz, e o que o pai
+    // precisa ver para o prop `pageSize` nao virar letra morta.
+    expect(titulos()).toEqual(["Item 11", "Item 12"]);
+    expect(screen.getByText("Mostrando 11–12 de 12 itens")).toBeTruthy();
+    expect(onPageChange).toHaveBeenLastCalledWith(1);
+  });
+
+  // ponytail: o efeito que espelha a prop `pageSize` precisa mexer no `pageIndex`
+  // junto. Sem isso a prop nova chega com o indice antigo e a tabela fatia um
+  // intervalo que nao existe: `pageIndex=2` com `pageSize=10` sobre 12 linhas e
+  // `slice(20, 30)`, vazio, com o rodape anunciando "21–12 de 12".
+  it("acompanha a prop pageSize sem deixar a pagina fora do intervalo", () => {
+    const props = { columns: COLUNAS, data: DOZE };
+    const { rerender } = render(<DataTable {...props} pageSize={5} />);
+
+    fireEvent.click(botao("Próxima"));
+    fireEvent.click(botao("Próxima"));
+    expect(titulos()).toEqual(["Item 11", "Item 12"]);
+
+    rerender(<DataTable {...props} pageSize={10} />);
+
+    expect(mensagemDeVazio()).toBeNull();
+    expect(titulos()).toEqual(["Item 11", "Item 12"]);
+    expect(screen.getByText("Mostrando 11–12 de 12 itens")).toBeTruthy();
+  });
+
+  // ponytail: isto fixa a ESCOLHA entre "reposicionar" e "limitar". Nas 12 linhas
+  // do teste acima os dois dao a mesma pagina; aqui nao. Com 100 linhas, pagina 9
+  // de 5 (indice 45 = "Item 046"), o limite mandaria para a pagina 9 de 10
+  // ("Item 091") e o usuario perderia 45 itens de vista. O reposicionamento
+  // preserva a primeira linha visivel — a mesma aritmetica do `setPageSize`.
+  it("preserva a primeira linha visivel quando a prop pageSize muda", () => {
+    const props = { columns: COLUNAS, data: CEM };
+    const { rerender } = render(<DataTable {...props} pageSize={5} />);
+
+    for (let pagina = 0; pagina < 9; pagina += 1) fireEvent.click(botao("Próxima"));
+    expect(titulos()[0]).toBe("Item 046");
+
+    rerender(<DataTable {...props} pageSize={10} />);
+
+    expect(titulos()[0]).toBe("Item 041");
+    expect(screen.getByText("Mostrando 41–50 de 100 itens")).toBeTruthy();
   });
 });
 
@@ -313,6 +480,15 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
   const PAGINA_DO_SERVIDOR: Linha[] = [
     { id: "31", titulo: "Item 31" },
     { id: "32", titulo: "Item 32" },
+  ];
+
+  // ponytail: "C", "A" e nao "A", "C" de proposito. A pagina do servidor ja veio
+  // numa ordem, e o que o componente nao pode fazer e reordena-la sozinho: no
+  // modo servidor quem ordena e o servidor, e reordenar aqui mostraria um
+  // fragmento ordenado que nao corresponde a nenhum conjunto de dados.
+  const PAGINA_DESORDENADA: Linha[] = [
+    { id: "1", titulo: "C" },
+    { id: "2", titulo: "A" },
   ];
 
   it("renderiza a pagina que o pai mandou, sem fatiá-la de novo", () => {
@@ -426,5 +602,81 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // ponytail: o teste que separa os dois modos. "Item 01" existe no conjunto todo
+  // mas NAO na pagina que o servidor mandou, entao um filtro client-side esvaziaria
+  // a tabela — e o rodape continuaria anunciando 10 itens, porque `getRowCount()`
+  // devolve o `rowCount` (o `totalCount` do pai) sem olhar o filtro. No modo
+  // servidor a tabela nao filtra nada: ela mostra a pagina que chegou e avisa o
+  // pai pelo `onFilterChange`.
+  it("nao refata a pagina do servidor com o termo que o pai vai filtrar", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      render(
+        <DataTable
+          columns={COLUNAS}
+          data={PAGINA_DO_SERVIDOR}
+          manualPagination
+          pageIndex={0}
+          pageSize={2}
+          totalCount={10}
+          onFilterChange={onFilterChange}
+        />,
+      );
+
+      fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item 01" } });
+      await avancarRelogio(300);
+
+      expect(onFilterChange).toHaveBeenCalledWith("Item 01");
+      expect(titulos()).toEqual(["Item 31", "Item 32"]);
+      expect(mensagemDeVazio()).toBeNull();
+      expect(screen.getByText("Mostrando 1–2 de 10 itens")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("nao reordena a pagina do servidor antes de o servidor responder", () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={PAGINA_DESORDENADA}
+        manualPagination
+        pageSize={2}
+        totalCount={2}
+        onSortChange={onSortChange}
+      />,
+    );
+
+    fireEvent.click(within(cabecalho("Título")).getByRole("button", { name: "Título" }));
+
+    expect(onSortChange).toHaveBeenLastCalledWith({ id: "titulo", desc: false });
+    expect(titulos()).toEqual(["C", "A"]);
+    // ponytail: o `aria-sort` reflecte a ordenacao PEDIDA, que o servidor ainda
+    // vai atender. E o sinal de que o clique pegou — sem ele o usuario clica no
+    // header e nao ve nenhuma confirmacao ate a resposta chegar. A lista embaixo
+    // continua sendo a do servidor, que e o que o outro lado desta trava protege.
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("ascending");
+  });
+});
+
+describe("DataTable — o contrato de props", () => {
+  // ponytail: o que esta sob teste aqui e o COMPILADOR, nao o runtime — por isso
+  // que a assercao e trivial e o vermelho vem do `tsc --noEmit` (e nao do
+  // `vitest`, que nao checa tipos). O `@ts-expect-error` acima da declaracao
+  // some sozinho se a union perder o vinculo `manualPagination` -> `totalCount`:
+  // o compilador deixa de reclamar, o comentario vira "unused" e o `tsc` falha.
+  it("proibe manualPagination sem totalCount", () => {
+    // @ts-expect-error `manualPagination` sem `totalCount` renderiza uma tabela morta
+    const propsMortas: DataTableProps<Linha> = {
+      columns: COLUNAS,
+      data: LINHAS,
+      manualPagination: true,
+    };
+
+    expect(propsMortas.manualPagination).toBe(true);
   });
 });
