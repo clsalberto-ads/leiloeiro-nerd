@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,14 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
   const locked = mode === "edit" && item?.status !== "draft";
 
   useEffect(() => {
-    if (state && state.ok) router.push("/dashboard/items");
-  }, [state, router]);
+    if (state && state.ok) {
+      router.push("/dashboard/items");
+      toast.success(mode === "create" ? "Item criado com sucesso!" : "Item atualizado com sucesso!");
+    } else if (state && state.error) {
+      toast.error(state.error);
+    }
+    // ponytail: accessibility constraint (DOM alert must stay) - the toast is visual-only, in-DOM alert for screen readers
+  }, [state, router, mode]);
 
   const uploaded = uploadState?.urls;
   if (uploaded?.length && uploaded !== absorbedUpload) {

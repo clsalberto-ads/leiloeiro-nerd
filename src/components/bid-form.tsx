@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { placeBidAction } from "@/presentation/actions/bid-actions";
 import { formatReais } from "@/lib/format-reais";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,16 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
   const [state, formAction, pending] = useActionState(placeBidAction, null);
   const minReais = formatReais(minBid);
   const [centavos, setCentavos] = useState(minBid);
+
+  useEffect(() => {
+    if (state && state.ok) {
+      toast.success("Lance registrado!");
+      setCentavos(minBid); // Reset bid amount after success
+    } else if (state && state.error) {
+      toast.error(state.error);
+    }
+    // ponytail: accessibility constraint (DOM alert must stay) - the toast is visual-only, in-DOM alert for screen readers
+  }, [state, minBid]);
 
   return (
     <form action={formAction} className="space-y-3">
