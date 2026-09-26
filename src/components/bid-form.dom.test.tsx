@@ -132,4 +132,26 @@ describe("BidForm — erro de campo no DOM real", () => {
     expect(data.get("itemId")).toBe(ITEM_ID);
     expect(placeBidSchema.safeParse(Object.fromEntries(data.entries())).success).toBe(true);
   });
+
+  // ponytail: `75.5` e `123.45` acima sao float-CLEAN no IEEE-754 — `123.45 * 100
+  // === 12345` e `75.5 * 100 === 7550` exatos. O `1.15` deste caso e float-DIRTY:
+  // `1.15 * 100` da `114.99999999999999` em double. Sem o `Math.round` de
+  // bid-form.tsx:43 o hidden vira esse valor, o FormData carrega
+  // `"114.99999999999999"`, e o `.int("Lance inválido")` do placeBidSchema — o
+  // MESMO schema da action — reprova o lance de um usuario que digitou um valor
+  // perfeitamente legitimo. Este e o teste que fecha essa mutacao: apagar o
+  // `Math.round` da producao deixa a suite verde sem ele.
+  // `minBid` de 100 (item de R$ 1,00) e o que torna o cenario real: R$ 1,15 e
+  // um lance VALIDO acima do piso, nao um valor que o min do input rejeitaria.
+  it("arredonda o float sujo do valor digitado em centavos inteiros antes de mandar o FormData", async () => {
+    render(<BidForm itemId={ITEM_ID} minBid={100} />);
+
+    fireEvent.change(field(), { target: { value: "1.15" } });
+
+    expect(hiddenAmount().value).toBe("115");
+
+    const data = new FormData(form());
+    expect(data.getAll("amount")).toEqual(["115"]);
+    expect(placeBidSchema.safeParse(Object.fromEntries(data.entries())).success).toBe(true);
+  });
 });
