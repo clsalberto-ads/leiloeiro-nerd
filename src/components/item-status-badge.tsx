@@ -18,5 +18,5 @@ const CLASSES: Record<ItemStatus, string> = {
 };
 
 export function ItemStatusBadge({ status }: { status: ItemStatus }) {
-  return <Badge className={CLASSES[status]}>{ROTULO_STATUS[status]}</Badge>;
+  return <Badge className={CLASSES[status]} role="status">{ROTULO_STATUS[status]}</Badge>;
 }
