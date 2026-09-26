@@ -144,6 +144,17 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
               <option value="product">Produto</option>
               <option value="service">Serviço</option>
               <option value="piece">Peça colecionável</option>
+              {/* ponytail: as tres `<option>` sao o ultimo lugar onde o rotulo de
+               tipo aparece depois que `ROTULO_TIPO` virou o vocabulario canonico
+               (o badge, a coluna da tabela, a aba e a busca server-side leem o
+               mapa; aqui o texto ainda esta escrito a mao). Elas NAO foram
+               importadas do mapa porque o `<select>` define tambem a ORDEM das
+               opcoes e o `value` gravado, e trocar isso agora mexe no
+               preenchimento do formulario, nao no vocabulario. A divergencia e o
+               mesmo defeito silencioso dos outros: o `<option>` diz "Serviço" e a
+               tabela diz outra coisa. A correcao e
+               `Object.entries(ROTULO_TIPO).map(...)`, e ela depende de uma decisao
+               de produto sobre a ordem. */}
             </select>
           )}
         </Field>

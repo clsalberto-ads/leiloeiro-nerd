@@ -1,6 +1,49 @@
 export type ItemType = "product" | "service" | "piece";
 export type ItemStatus = "draft" | "active" | "closed" | "awaiting_payment" | "paid" | "cancelled";
 
+// ponytail: duas strings de apresentacao moram no dominio, e a decisao de deixar
+// elas aqui foi do usuario, nao minha — a leitura de partida seria "dominio nao
+// tem pt-BR". O que segura a mudanca e o seguinte.
+//
+// O QUE GANHA: uma fonte. Antes desta mudanca o rotulo de status vivia em tres
+// lugares (o `LABELS` do badge, o `ROTULO_STATUS` da lista e a aba "Em leilao" do
+// `TABS`) e o de tipo vivia em mais um, o `ROTULO_TIPO` da lista, que espelhava as
+// `<option>` do `item-form`. Quatro copias nao e uma fonte: sao quatro lugares
+// para divergirem em silencio, e divergir ali tem preco visivel — o badge
+// escrevendo "Cancelado" enquanto a busca e as abas dizem outra coisa. E o segundo
+// ganho e o que fechou a decisao: o `q` da busca server-side CASA com estes
+// rotulos, porque e o que o usuario digita. A busca que o `DataTable` fazia no
+// cliente casava com o rotulo (o `accessorFn` da coluna entregava o texto pt-BR),
+// e foi a Task 8 que consertou isso de proposito; sem o vocabulario aqui, trazer a
+// busca para o servidor desfazia o conserto e o usuario voltava a ler "Nenhum item
+// encontrado." para um termo escrito exatamente como a tela.
+//
+// O QUE CUSTA: o dominio deixa de ser livre de apresentacao. A seta da Clean
+// Architecture que importa para dentro continua valendo — o dominio nao importa de
+// `src/components` nem de `src/app`; o que mudou e o conteudo, nao a direcao —
+// e o que se pagou foi o conteudo. Nao ha `i18n` no projeto: o produto e pt-BR de
+// um jeito so, entao o rotulo nao e traducao, e o NOME do conceito. "Rascunho" e
+// o que um rascunho e, nao a versao em portugues de `draft`. O dia que houver um
+// segundo idioma, sao estes dois mapas que viram tabela por locale.
+//
+// Os dois sao `Record` exaustivos de proposito: um `ItemStatus` novo sem linha
+// aqui quebra o `tsc`, em vez de virar `undefined` renderizado vazio no badge e
+// ausente da busca sem ninguem perceber.
+export const ROTULO_STATUS: Record<ItemStatus, string> = {
+  draft: "Rascunho",
+  active: "Em leilão",
+  closed: "Encerrado",
+  awaiting_payment: "Aguardando pagamento",
+  paid: "Pago",
+  cancelled: "Cancelado",
+};
+
+export const ROTULO_TIPO: Record<ItemType, string> = {
+  product: "Produto",
+  service: "Serviço",
+  piece: "Peça colecionável",
+};
+
 export interface Item {
   id: string;
   sellerId: string;
@@ -103,18 +146,26 @@ export type ItemSortDirection = "asc" | "desc";
 // "Nenhum resultado".
 export interface ItemListFilter {
   status?: ItemStatus;
-  // ponytail: `q` e substring no TITULO, insensivel a caixa e a acento, e nao a
-  // busca global que a tabela fazia no cliente (que casava com toda coluna que
-  // tivesse `accessorFn`: titulo, rotulo de tipo, rotulo de status, o numero cru do
-  // lance e o epoch do prazo). Encolheu de proposito: no modo servidor o
-  // `DataTable` roda com `manualFiltering` e o termo vai para o `WHERE`, e o SQL nao
-  // conhece "Em leilao" (esta gravado "active") nem "R$ 1.234,56" (esta gravado
-  // 123456). O que se perde — e o que a Task 8 acabou de consertar de proposito — e
-  // buscar "Em leilao" ou "Servico". Status continua acessivel pelas abas; tipo nao
-  // tem equivalente na tela. A volta e uma `OR` por coluna no `WHERE` com os rotulos
-  // pt-BR, e os rotulos vivem no componente cliente: e um movimento que depende de
-  // mexer la, nao neste contrato. `q` em branco (ou so com espacos) e ausencia de
-  // busca, porque o `DataTable` avisa a busca vazia ao limpar a caixa.
+  // ponytail: `q` e substring do TITULO e dos rotulos canonicos de status e de
+  // tipo (`ROTULO_STATUS`/`ROTULO_TIPO`, mais acima), insensivel a caixa e a
+  // acento. Ja foi mais estreito — so o titulo — e a Task 8 tinha consertado o
+  // oposto de proposito: a busca do `DataTable` casava com TODA coluna que
+  // tivesse `accessorFn`, e o `accessorFn` das colunas `status` e `tipo` entrega o
+  // rotulo pt-BR. Trazer a busca para o servidor e, sozinha, desfazia o conserto:
+  // o SQL so conhece "active" e "service", e o usuario que digita "Em leilao" ou
+  // "Servico" — os dois termos escritos como estao na tela — recebia "Nenhum item
+  // encontrado." A volta foi o `CASE` de rotulos dentro do `WHERE`.
+  //
+  // O que CONTINUA fora do `q` e dinheiro e prazo formatados ("R$ 1.234,56",
+  // "01/10/2026"): o SQL tem 123456 e um `timestamptz`, e nenhum dos dois e o que
+  // a tela mostra. A receita continua a mesma da Task 9 e esta na receita do
+  // `COLUNAS` em `items-list.tsx` (`filterValue` no `DataTableColumn`, com `q` no
+  // servidor e o valor formatado no cliente por cima). Tabem por escolha: buscar
+  // "50,00" e traz o item de 1.000,00 e traz o de 50,00, e o servidor nao tem como
+  // saber qual dos dois o usuario quis.
+  //
+  // `q` em branco (ou so com espacos) e ausencia de busca, porque o `DataTable`
+  // avisa a busca vazia ao limpar a caixa.
   q?: string;
   orderBy?: ItemOrderBy;
   direction?: ItemSortDirection;

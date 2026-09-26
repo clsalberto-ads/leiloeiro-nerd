@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { MoreHorizontalIcon } from "lucide-react";
-import type { Item, ItemStatus, ItemType } from "@/domain/repositories/item-repository";
+import type { Item, ItemStatus } from "@/domain/repositories/item-repository";
+import { ROTULO_STATUS, ROTULO_TIPO } from "@/domain/repositories/item-repository";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { BidCountdown } from "@/components/bid-countdown";
@@ -22,42 +23,25 @@ const publishItemFormAction: ItemFormAction = publishItemAction.bind(null, null)
 const deleteItemFormAction: ItemFormAction = deleteItemAction.bind(null, null) as unknown as ItemFormAction;
 const cancelItemFormAction: ItemFormAction = cancelItemAction.bind(null, null) as unknown as ItemFormAction;
 
+// ponytail: as abas sao metade vocabulario e metade decisao de produto, e e a
+// divisao que importa. A ORDEM (rascunho, em leilao, encerrado, cancelado) e a
+// triagem do trabalho que falta, e uma escolha da tela e nao do dominio: por isso
+// mora aqui e nao no `ROTULO_STATUS`. O TEXTO de cada aba e o mesmo texto do badge
+// e da coluna, e por isso vem do mapa. `Todos` nao e um status, e por isso e a
+// unica string escrita aqui.
+//
+// A lista de chaves e `satisfies readonly ItemStatus[]` de proposito: uma chave que
+// nao existe no enum e erro de compilacao, e nao uma aba apontando para um
+// `?status=` que a pagina ignora em silencio (a pagina so reconhece os membros que
+// ela valida). E nenhuma aba nasce sozinha quando um status novo entra no enum —
+// essa e uma decisao de produto, e o enum crescer nao pode virar o evento que
+// aumenta a barra de filtros sozinho.
+const ABAS_DE_STATUS = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
+
 const TABS: { key: string; label: string }[] = [
   { key: "all", label: "Todos" },
-  { key: "draft", label: "Rascunho" },
-  { key: "active", label: "Em leilão" },
-  { key: "closed", label: "Encerrado" },
-  { key: "cancelled", label: "Cancelado" },
+  ...ABAS_DE_STATUS.map((status) => ({ key: status, label: ROTULO_STATUS[status] })),
 ];
-
-// ponytail: os rotulos de `ItemType` espelham as `<option>` do `item-form.tsx`.
-// Duplicar o mapa e melhor do que a alternativa — exportar o mapa de la
-// arrastaria um formulario inteiro (com react-hook-form) para o grafo de import
-// desta lista. O `Record<ItemType, string>` e exaustivo: um tipo novo quebra o
-// `tsc` aqui em vez de renderizar uma celula vazia.
-const ROTULO_TIPO: Record<ItemType, string> = {
-  product: "Produto",
-  service: "Serviço",
-  piece: "Peça colecionável",
-};
-
-// ponytail: mesma decisao do `ROTULO_TIPO`, agora com o mapa de labels do
-// `item-status-badge.tsx`. Aqui a copia e load-bearing e nao so Conveniencia: o
-// `accessorFn` desta coluna entrega o valor que a busca global casa, entao ele
-// PRECISA ser o texto que o badge mostra. Com o enum ingles ("active") a busca
-// respondia "Nenhum item encontrado." para "Em leilao" — o termo escrito como o
-// usuario le na tela. Os dois mapas duplicados ficam em desacordo em silencio se
-// um rotulo mudar num lado so, entao o `Record<ItemStatus, string>` e o que faz
-// o `tsc` reclamar quando um status novo aparecer: um `ROTULO_STATUS` sem a
-// chave e um `LABELS` sem a chave sao o mesmo buraco, visto de dois angulos.
-const ROTULO_STATUS: Record<ItemStatus, string> = {
-  draft: "Rascunho",
-  active: "Em leilão",
-  closed: "Encerrado",
-  awaiting_payment: "Aguardando pagamento",
-  paid: "Pago",
-  cancelled: "Cancelado",
-};
 
 // ponytail: o fuso do PRODUTO, nao o do processo. A celula e SSR'd e
 // re-renderizada no cliente, entao um servidor em UTC (o padrao de nuvem) e um
@@ -152,14 +136,22 @@ function AcoesDoItem({ item }: { item: Item }) {
 // (`minInitialBid`) e prazo (`getTime()`) ordenam certo como numero e nao casam
 // com o texto que o usuario le; o inverso ("R$ 1.234,56", "01/10/2026")
 // ordenaria "1.000,00" antes de "50,00" e viraria o calendario de cabeca para
-// baixo. Entao as colunas de dado entregam o valor que ordena certo, e a busca
-// global casa com o que esta gravado e nao com o que esta escrito. Onde o rotulo
-// e da propria coluna (`tipo`, `status`) ele e o valor: ali busca e ordenacao
-// falam a mesma lingua, e nao ha trade-off a fazer — a ordem alfabetica do enum
-// ingles nao e um ciclo de vida, e a do rotulo pt-BR nao e, nenhuma das duas e
-// "a ordem" de um status, e uma entrega a busca o que o usuario le.
+// baixo. Entao as colunas de dado entregam o valor que ordena certo, e a busca casa
+// com o que esta gravado e nao com o que esta escrito.
 //
-// ponytail: DEVIDA (Task 9) — a busca global ainda nao acha "1.234,56", "R$" nem
+// Onde o rotulo e da propria coluna (`tipo`, `status`) oAccessorFn entrega
+// `ROTULO_TIPO`/`ROTULO_STATUS` — e aqui a busca volta a casar com o texto
+// escrito, porque a COPIA sumiu: o `q` do servidor casa com o rotulo do
+// dominio e o `accessorFn` do cliente le o mesmo mapa, entao os dois lados dizem a
+// mesma coisa por construcao em vez de por coincidencia. Era exatamente a
+// identidade que o `accessorFn` tinha de sustentar sozinho, com o enum ingles
+// ("active") como valor: a busca respondia "Nenhum item encontrado." para "Em
+// leilao", o termo escrito como o usuario le. Para `tipo` e `status` continua sem
+// trade-off a fazer na ORDENACAO: a ordem alfabetica do enum ingles nao e um
+// ciclo de vida, e a do rotulo pt-BR nao e, nenhuma das duas e "a ordem" de um
+// status.
+//
+// ponytail: DEVIDA (Task 9) — a busca ainda nao acha "1.234,56", "R$" nem
 // "01/10/2026", porque dinheiro e prazo nao tem como ordenar e casar no mesmo
 // accessor. A correcao estrutural e um segundo valor de busca na coluna, sem
 // mexer no `getSortedRowModel`: (1) `filterValue?: (row: T) => string` no
@@ -168,7 +160,10 @@ function AcoesDoItem({ item }: { item: Item }) {
 // `def.filterValue ? def.filterValue(row.original) : row.getValue(columnId)`.
 // Sao ~8 linhas, e `filterValue` continuaria opcional — as colunas de hoje seguem
 // com o `accessorFn` como valor de busca. Atraso deliberado: e uma mudanca no
-// componente generico, e nao numa lista.
+// componente generico, e nao numa lista. Com a busca no servidor, o `filterValue`
+// so volta a valer se a camada cliente casar o valor formatado POR CIMA do `q` do
+// servidor (sao os dois ramos possiveis do `DataTable` ao mesmo tempo, nao um no
+// lugar do outro) — e essa e uma decisao de produto, nao uma correcao oculta.
 const COLUNAS: DataTableColumn<Item>[] = [
   {
     id: "titulo",

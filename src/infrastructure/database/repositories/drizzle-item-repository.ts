@@ -1,17 +1,19 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, asc, count, desc, eq, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, max, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, itemImages, items } from "@/infrastructure/database/schema";
-import type {
-  CreateItemInput,
-  Item,
-  ItemListFilter,
-  ItemListResult,
-  ItemLister,
-  ItemOrderBy,
-  ItemRepository,
+import {
+  ROTULO_STATUS,
+  ROTULO_TIPO,
+  type CreateItemInput,
+  type Item,
+  type ItemListFilter,
+  type ItemListResult,
+  type ItemLister,
+  type ItemOrderBy,
+  type ItemRepository,
 } from "@/domain/repositories/item-repository";
 
 type ItemRow = InferSelectModel<typeof items>;
@@ -62,10 +64,53 @@ function toItem(row: ItemRow): Item {
 const COMPOSTOS = "áàâãäéèêëíìîïóòôõöúùûüçñý";
 const SIMPLES = "aaaaaeeeeiiiiooooouuuucny";
 
-function buscaPorTitulo(termo: string): SQL {
-  const coluna = sql`translate(lower(${items.title}), ${COMPOSTOS}, ${SIMPLES})`;
-  const agulha = sql`translate(lower(${termo}), ${COMPOSTOS}, ${SIMPLES})`;
-  return sql`strpos(${coluna}, ${agulha}) > 0`;
+// ponytail: a dobra e do MESMO jeito nas tres colunas que o `q` le, e o rotulo
+// precisa dela tanto quanto o titulo — sem dobrar os dois lados, "leilao" nao
+// acharia "Em leilao" e "acao" nao acharia "Ação". Por isso o SQL carrega SEIS
+// tabelas de dobra e nao duas: tres colunas, dois lados cada.
+function dobrar(expressao: SQL): SQL {
+  return sql`translate(lower(${expressao}), ${COMPOSTOS}, ${SIMPLES})`;
+}
+
+// ponytail: o `CASE` e a ponte entre o enum gravado e o rotulo que o usuario le.
+// Sem ele a busca so conhece "active" e "service", e "Em leilao" deixa de achar —
+// que foi exatamente o que a busca no cliente acertava (o `accessorFn` da coluna
+// entregava o rotulo) e o que o modo servidor tinha desfeito.
+//
+// Os rotulos entram como PARAMETRO e sao lidos de `ROTULO_STATUS`/`ROTULO_TIPO`,
+// do dominio: e o que mantem o vocabulario em um lugar so. A alternativa — escrever
+// os rotulos no proprio SQL, ou em um segundo mapa aqui dentro — seria uma segunda
+// fonte, e o defeito dela e silencioso nos dois sentidos: um rotulo trocado no mapa
+// e nao no SQL deixa a busca casando com um texto que ninguem ve, e um rotulo
+// trocado no SQL e nao no mapa faz a busca divergir do badge.
+//
+// A ordem dos `WHEN` e a ordem de DECLARACAO do mapa, que e a ordem em que o
+// vendedor leria a triagem, e nao a alfabetica do enum: no `CASE` a ordem nao muda
+// o resultado (as chaves sao exaustivas e distintas), e escolher uma delas e uma
+// leitura e nao um contrato — o que e contrato e a chave estar colada no rotulo
+// certo, e o `when <chave> then <rotulo>` gera os dois como parametros vizinhos
+// justamente para isso poder ser conferido.
+function rotuloDoEnum<T extends string>(coluna: AnyPgColumn, rotulos: Record<T, string>): SQL {
+  const pares = Object.entries(rotulos) as [T, string][];
+  const bracos = pares.map(([chave, rotulo]) => sql`when ${chave} then ${rotulo}`);
+  return sql`case ${coluna} ${sql.join(bracos, sql` `)} end`;
+}
+
+function contem(texto: SQL, agulha: SQL): SQL {
+  return sql`strpos(${texto}, ${agulha}) > 0`;
+}
+
+// ponytail: `q` le tres colunas, nao uma. A ordem (titulo, status, tipo) nao muda
+// o conjunto devolvido — e um `OR` — mas muda a ordem em que as condicoes sao
+// avaliadas, e por isso a lista comeca pelo texto que o usuario digitou: e a coluna
+// onde a busca tem mais chance de casar.
+function buscaPorRotuloOuTitulo(termo: string): SQL | undefined {
+  const agulha = dobrar(sql`${termo}`);
+  return or(
+    contem(dobrar(sql`${items.title}`), agulha),
+    contem(dobrar(rotuloDoEnum(items.status, ROTULO_STATUS)), agulha),
+    contem(dobrar(rotuloDoEnum(items.type, ROTULO_TIPO)), agulha),
+  );
 }
 
 // ponytail: a coluna de `orderBy` e um `Record` com as MESMAS chaves da union do
@@ -103,7 +148,8 @@ function ordenarItens(filter?: ItemListFilter): SQL[] {
 function predicados(sellerId: string, filter?: ItemListFilter): SQL[] {
   const condicoes: SQL[] = [eq(items.sellerId, sellerId)];
   if (filter?.status) condicoes.push(eq(items.status, filter.status));
-  if (filter?.q) condicoes.push(buscaPorTitulo(filter.q));
+  const busca = filter?.q ? buscaPorRotuloOuTitulo(filter.q) : undefined;
+  if (busca) condicoes.push(busca);
   return condicoes;
 }
 

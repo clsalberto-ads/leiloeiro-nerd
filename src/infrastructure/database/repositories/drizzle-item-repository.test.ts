@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
+import { ROTULO_STATUS, ROTULO_TIPO } from "@/domain/repositories/item-repository";
 import { drizzleItemRepository } from "./drizzle-item-repository";
 
 type Chamada = { metodo: string; args: unknown[] };
@@ -151,7 +152,7 @@ describe("drizzleItemRepository.listBySellerId", () => {
     expect(paramsDe(where, "where")).not.toContain("raro");
   });
 
-  it("a dobra e dos DOIS lados, e o lower vem ANTES do translate", async () => {
+  it("a dobra e de TODOS os lados, e o lower vem ANTES do translate", async () => {
     await drizzleItemRepository.listBySellerId("u1", { q: "acao" });
     const where = consultaDasLinhas();
     const texto = sqlDe(where, "where");
@@ -164,9 +165,57 @@ describe("drizzleItemRepository.listBySellerId", () => {
     expect(texto).not.toContain("lower(translate(");
     expect(texto).not.toContain("ilike");
     expect(texto).not.toContain("like");
-    // o par de tabelas de dobra (minuscula acentuada -> sem acento) aparece duas
-    // vezes: uma para a coluna, outra para o termo
-    expect(params.filter((p) => p === "áàâãäéèêëíìîïóòôõöúùûüçñý")).toHaveLength(2);
+    // A tabela de dobra (minuscula acentuada -> sem acento) e um parametro de cada
+    // `translate`, e cada `strpos` dobra os DOIS lados. Sao tres colunas (titulo,
+    // rotulo de status, rotulo de tipo) e dois lados cada: seis. Sao seis, e nao
+    // dois, porque o rotulo tambem precisa ser dobrado antes de comparar com o termo
+    // — dobrar so o termo faria "leilao" nao achar "Em leilao".
+    expect(params.filter((p) => p === "áàâãäéèêëíìîïóòôõöúùûüçñý")).toHaveLength(6);
+  });
+
+  it("q casa com o titulo E com os rotulos de status e de tipo", async () => {
+    await drizzleItemRepository.listBySellerId("u1", { q: "leilao" });
+    const where = consultaDasLinhas();
+    const texto = sqlDe(where, "where");
+    // O `CASE` e o que traduz o enum gravado no rotulo pt-BR que o usuario le. Sem
+    // ele o SQL so conhece "active" e a busca volta a responder "nenhum item" para um
+    // termo escrito exatamente como esta na tela — que foi o que a busca no cliente
+    // acertava e o modo servidor perdeu.
+    expect(texto).toContain('"items"."title"');
+    expect(texto).toContain('"items"."status"');
+    expect(texto).toContain('"items"."type"');
+    expect(texto).toMatch(/case\s+"items"\."status"/);
+    expect(texto).toMatch(/case\s+"items"\."type"/);
+    // tres `strpos`: um por coluna que o termo pode casar
+    expect(texto.match(/strpos\(/g)).toHaveLength(3);
+  });
+
+  it("os rotulos que o SQL casa sao os do vocabulario canonico, nao copias", async () => {
+    await drizzleItemRepository.listBySellerId("u1", { q: "leilao" });
+    const params = paramsDe(consultaDasLinhas(), "where");
+    // Os rotulos chegam como PARAMETRO, vindos de `ROTULO_STATUS`/`ROTULO_TIPO` do
+    // dominio. E o que prova que o SQL nao tem uma copia do vocabulario: se um rotulo
+    // mudasse so no mapa, o `tsc` continuaria verde e este teste pararia de passar —
+    // a diferenca entre "o texto que o usuario le" e "o texto que o SQL casa" voltaria
+    // sem erro visivel.
+    for (const rotulo of Object.values(ROTULO_STATUS)) expect(params).toContain(rotulo);
+    for (const rotulo of Object.values(ROTULO_TIPO)) expect(params).toContain(rotulo);
+  });
+
+  it("cada rotulo entra no CASE colado na chave do enum que o produz", async () => {
+    await drizzleItemRepository.listBySellerId("u1", { q: "leilao" });
+    const params = paramsDe(consultaDasLinhas(), "where");
+    // `when <chave> then <rotulo>` sao dois parametROS VIZINHOS, entao a posicao do
+    // rotulo diz qual e a chave que o produz. E o que impede o `CASE` de trocar dois
+    // rotulos de lugar (o `tsc` nao acusa: os dois lados continuam sendo `string`), e
+    // o defeito apareceria como "Em leilao" devolvendo os itens de rascunho.
+    for (const mapa of [ROTULO_STATUS, ROTULO_TIPO]) {
+      for (const [chave, rotulo] of Object.entries(mapa)) {
+        const posicao = params.indexOf(rotulo);
+        expect(posicao, `o rotulo ${rotulo} nao virou parametro do CASE`).toBeGreaterThan(0);
+        expect(params[posicao - 1], `a chave ${chave} nao precede o rotulo ${rotulo}`).toBe(chave);
+      }
+    }
   });
 
   it("devolve items da consulta das linhas e total da contagem", async () => {
@@ -181,6 +230,17 @@ describe("drizzleItemRepository.listBySellerId", () => {
 
   it("devolve lista vazia e total zero quando a tabela nao tem o que o filtro pediu", async () => {
     const resultado = await drizzleItemRepository.listBySellerId("u1", { q: "teclado" });
+    expect(resultado.items).toEqual([]);
+    expect(resultado.total).toBe(0);
+  });
+
+  // ponytail: o mesmo "nada achado" com um termo que e um ROTULO. Sem este caso o
+  // `q` que so conhece o titulo passa em tudo que involve rotulo: a consulta volta
+  // vazia e o total zera, o que parece exatamente o comportamento certo e e o
+  // defeito — o usuario le "Nenhum item encontrado." para "Em leilao" digitado na
+  // tela onde dois itens estao com esse status.
+  it("um rotulo que nao casa com nada tambem devolve lista vazia e total zero", async () => {
+    const resultado = await drizzleItemRepository.listBySellerId("u1", { q: ROTULO_TIPO.piece });
     expect(resultado.items).toEqual([]);
     expect(resultado.total).toBe(0);
   });
