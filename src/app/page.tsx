@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ShieldCheck, Sparkles, TrendingUp, Users, ArrowRight, Gavel, Award, Zap } from "lucide-react";
+import { ShieldCheck, Sparkles, ArrowRight, Gavel, Award, Zap } from "lucide-react";
 
 export default function Home() {
   return (

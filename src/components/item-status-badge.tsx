@@ -1,14 +1,13 @@
-import type { ItemStatus } from "@/domain/repositories/item-repository";
+import { ROTULO_STATUS, type ItemStatus } from "@/domain/repositories/item-repository";
+import { Badge } from "@/components/ui/badge";
 
-const LABELS: Record<ItemStatus, string> = {
-  draft: "Rascunho",
-  active: "Em leilão",
-  closed: "Encerrado",
-  awaiting_payment: "Aguardando pagamento",
-  paid: "Pago",
-  cancelled: "Cancelado",
-};
-
+// ponytail: o TEXTO do badge nao mora aqui — e `ROTULO_STATUS`, no dominio, e o
+// mesmo texto que a coluna da tabela, que a aba e que a busca server-side casam.
+// A decisao de o rotulo ser do dominio esta escrita la. O que sobra deste lado e a
+// COR, e e a unica coisa aqui que o dominio nao tem por que saber: `emerald-100`
+// nao nomeia um status, ele decora um. `CLASSES` e `Record<ItemStatus, string>`
+// exaustivo pelo mesmo motivo do mapa la — um status novo sem cor aqui e um status
+// novo sem rotulo ali, e os dois aparecem no mesmo `tsc`.
 const CLASSES: Record<ItemStatus, string> = {
   draft: "bg-muted text-muted-foreground",
   active: "bg-emerald-100 text-emerald-800",
@@ -19,9 +18,5 @@ const CLASSES: Record<ItemStatus, string> = {
 };
 
 export function ItemStatusBadge({ status }: { status: ItemStatus }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${CLASSES[status]}`}>
-      {LABELS[status]}
-    </span>
-  );
+  return <Badge className={CLASSES[status]} role="status">{ROTULO_STATUS[status]}</Badge>;
 }

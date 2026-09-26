@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { becomeSellerSchema, imageUploadSchema, itemSchema, placeBidSchema } from "./validators";
+import { becomeSellerSchema, bidFormSchema, imageUploadSchema, itemSchema, placeBidSchema } from "./validators";
 
 const img = (size: number) => new File([new ArrayBuffer(size)], "a.jpg", { type: "image/jpeg" });
 
@@ -123,5 +123,44 @@ describe("placeBidSchema", () => {
 
   it("rejeita abaixo de R$ 1,00", () => {
     expect(placeBidSchema.safeParse({ itemId: "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a", amount: 99 }).success).toBe(false);
+  });
+});
+
+describe("paridade do lance entre o bidFormSchema (reais) e o placeBidSchema (centavos)", () => {
+  const ITEM_ID = "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a";
+
+  // ponytail: `minBid` e sempre em CENTAVOS, igual ao `amount` do servidor. Os
+  // valores sao literais de proposito: se o `MIN_BID_CENTAVOS` do servidor subir,
+  // a linha de 100 (o piso que o `itemSchema` ainda permite) quebra aqui em vez
+  // de deixar o cliente aceitar um lance que a action vai rejeitar.
+  const MIN_BIDS = [100, 5000, 123456];
+
+  it.each(MIN_BIDS)("minBid %i: o lance correspondente passa nos dois schemas (reais no form, centavos na action)", (minBid) => {
+    const form = bidFormSchema(minBid).safeParse({ itemId: ITEM_ID, amountReais: minBid / 100 });
+    const action = placeBidSchema.safeParse({ itemId: ITEM_ID, amount: Math.round(minBid) });
+    expect({ minBid, form: form.success, action: action.success }).toEqual({ minBid, form: true, action: true });
+  });
+
+  it("rejeita no cliente o lance que o servidor rejeita: abaixo do piso canonico", () => {
+    const abaixo = 99;
+    expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: abaixo / 100 }).success).toBe(false);
+    expect(placeBidSchema.safeParse({ itemId: ITEM_ID, amount: abaixo }).success).toBe(false);
+  });
+
+  // ponytail: um `minBid` de 50 nao existe (o `itemSchema` ja exige R$ 1,00),
+  // mas e o caso que prova o `Math.max`: o cliente tem de acusar o piso do
+  // SERVIDOR e nao o do item, senao aceita R$ 0,50 e a action rejeita.
+  it("usa o piso canonico do servidor quando o minBid do item esta abaixo dele", () => {
+    expect(bidFormSchema(50).safeParse({ itemId: ITEM_ID, amountReais: 1 }).success).toBe(true);
+    const abaixo = bidFormSchema(50).safeParse({ itemId: ITEM_ID, amountReais: 0.5 });
+    expect(abaixo.success).toBe(false);
+    if (!abaixo.success) expect(abaixo.error.issues[0]?.message).toBe("Lance mínimo R$ 1,00");
+  });
+
+  // ponytail: o `amountReais` em mais de 2 casas e o `step="0.01"` do input no
+  // navegador; o refine do schema e o que garante os centavos inteiros sem
+  // depender do navegador.
+  it("rejeita no cliente o lance com mais de 2 casas decimais", () => {
+    expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: 10.123 }).success).toBe(false);
   });
 });
