@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
-import type { Item } from "@/domain/repositories/item-repository";
+import type { ItemDaTabela } from "./item-da-tabela";
 
 const mocks = vi.hoisted(() => ({
   BidCountdown: vi.fn<(props: { deadline: Date }) => null>(),
@@ -17,29 +17,34 @@ vi.mock("@/presentation/actions/item-actions", () => ({
 }));
 
 import { ItemsList } from "./items-list";
+import { VISTA_PADRAO } from "./estado-da-tabela";
 
-function makeItem(overrides: Partial<Item> = {}): Item {
+// ponytail: o item deste arquivo tem os SEIS campos do DTO e nao os doze do
+// `Item`. Renderizar a lista com um `Item` completo nao provaria nada sobre a
+// fronteira de serializacao — o ponto do DTO e que a lista funciona com o
+// minimo, e um item de 12 campos aceito aqui seria o mesmo codigo funcionando
+// com 6.
+function makeItem(overrides: Partial<ItemDaTabela> = {}): ItemDaTabela {
   return {
     id: "i1",
-    sellerId: "u1",
     title: "Console retrô",
-    description: "Console retrô completo com caixa.",
     type: "product",
-    imageUrl: null,
     minInitialBid: 10000,
-    minBidIncrement: 500,
     bidDeadline: new Date("2026-10-01T00:00:00Z"),
-    paymentDeadlineDays: 3,
     status: "active",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
 
+function lista(item: ItemDaTabela): string {
+  return renderToString(
+    <ItemsList items={[item]} vista={VISTA_PADRAO} totalCount={1} navegar={() => {}} />,
+  );
+}
+
 describe("ItemsList", () => {
   it("renderiza BidCountdown com bidDeadline quando o item está ativo", () => {
-    renderToString(<ItemsList items={[makeItem()]} current="all" />);
+    lista(makeItem());
     expect(mocks.BidCountdown.mock.calls[0][0]).toMatchObject({ deadline: expect.any(Date) });
   });
 
@@ -48,8 +53,7 @@ describe("ItemsList", () => {
   // antiga em `<li>`, onde o texto aparecia no parágrafo "Lance mínimo: R$ …" —
   // o teste ficaria verde com a coluna inexistente.
   it("renderiza Lance mínimo como cabeçalho de coluna", () => {
-    const html = renderToString(<ItemsList items={[makeItem()]} current="all" />);
-    expect(html).toMatch(/<th[\s\S]*?Lance mínimo/);
+    expect(lista(makeItem())).toMatch(/<th[\s\S]*?Lance mínimo/);
   });
 
   // ponytail: a outra metade do fuso, e a que fecha o ciclo da hidratacao: o
@@ -65,7 +69,7 @@ describe("ItemsList", () => {
     const fusoOriginal = process.env.TZ;
     try {
       process.env.TZ = "UTC";
-      const html = renderToString(<ItemsList items={[makeItem()]} current="all" />);
+      const html = lista(makeItem());
       expect(html).toContain("30/09/2026");
     } finally {
       if (fusoOriginal === undefined) delete process.env.TZ;

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { MoreHorizontalIcon } from "lucide-react";
-import type { Item, ItemStatus } from "@/domain/repositories/item-repository";
+import type { ItemStatus } from "@/domain/repositories/item-repository";
 import { ROTULO_STATUS, ROTULO_TIPO } from "@/domain/repositories/item-repository";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table";
 import { ItemStatusBadge } from "@/components/item-status-badge";
@@ -17,6 +18,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatReais } from "@/lib/format-reais";
 import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
+import {
+  colunaDaOrdenacao,
+  DIRECAO_DA_VISTA_PADRAO,
+  hrefDaVista,
+  ORDENACAO_PADRAO,
+  ordenacaoDaColuna,
+  PAGINA_PADRAO,
+  type VistaDaTabela,
+} from "./estado-da-tabela";
+import type { ItemDaTabela } from "./item-da-tabela";
 
 type ItemFormAction = (formData: FormData) => void | Promise<void>;
 const publishItemFormAction: ItemFormAction = publishItemAction.bind(null, null) as unknown as ItemFormAction;
@@ -32,15 +43,16 @@ const cancelItemFormAction: ItemFormAction = cancelItemAction.bind(null, null) a
 //
 // A lista de chaves e `satisfies readonly ItemStatus[]` de proposito: uma chave que
 // nao existe no enum e erro de compilacao, e nao uma aba apontando para um
-// `?status=` que a pagina ignora em silencio (a pagina so reconhece os membros que
-// ela valida). E nenhuma aba nasce sozinha quando um status novo entra no enum —
-// essa e uma decisao de produto, e o enum crescer nao pode virar o evento que
-// aumenta a barra de filtros sozinho.
+// `?status=` que a pagina ignora em silencio (o leitor da URL so reconhece os
+// membros do vocabulario, e o vocabulario cresce no mapa de rotulos). E nenhuma aba
+// nasce sozinha quando um status novo entra no enum — essa e uma decisao de
+// produto, e o enum crescer nao pode virar o evento que aumenta a barra de filtros
+// sozinha.
 const ABAS_DE_STATUS = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
 
-const TABS: { key: string; label: string }[] = [
-  { key: "all", label: "Todos" },
-  ...ABAS_DE_STATUS.map((status) => ({ key: status, label: ROTULO_STATUS[status] })),
+const TABS: { key: string; status: ItemStatus | null; label: string }[] = [
+  { key: "all", status: null, label: "Todos" },
+  ...ABAS_DE_STATUS.map((status) => ({ key: status, status, label: ROTULO_STATUS[status] })),
 ];
 
 // ponytail: o fuso do PRODUTO, nao o do processo. A celula e SSR'd e
@@ -72,7 +84,7 @@ const PLACEHOLDER_BUSCA = "Buscar item";
 // evento do JSX: dentro de um array no corpo do componente ela vira "funcao que
 // pode ser chamada durante o render" e o lint acusa. O preco e a repeticao de
 // tres linhas; o ganho e o menu inteiro legivel sem indirection.
-function AcoesDoItem({ item }: { item: Item }) {
+function AcoesDoItem({ item }: { item: ItemDaTabela }) {
   const refPublicar = useRef<HTMLFormElement>(null);
   const refExcluir = useRef<HTMLFormElement>(null);
   const refCancelar = useRef<HTMLFormElement>(null);
@@ -139,17 +151,28 @@ function AcoesDoItem({ item }: { item: Item }) {
 // baixo. Entao as colunas de dado entregam o valor que ordena certo, e a busca casa
 // com o que esta gravado e nao com o que esta escrito.
 //
-// Onde o rotulo e da propria coluna (`tipo`, `status`) oAccessorFn entrega
+// Onde o rotulo e da propria coluna (`tipo`, `status`) o accessorFn entrega
 // `ROTULO_TIPO`/`ROTULO_STATUS` — e aqui a busca volta a casar com o texto
 // escrito, porque a COPIA sumiu: o `q` do servidor casa com o rotulo do
 // dominio e o `accessorFn` do cliente le o mesmo mapa, entao os dois lados dizem a
 // mesma coisa por construcao em vez de por coincidencia. Era exatamente a
 // identidade que o `accessorFn` tinha de sustentar sozinho, com o enum ingles
 // ("active") como valor: a busca respondia "Nenhum item encontrado." para "Em
-// leilao", o termo escrito como o usuario le. Para `tipo` e `status` continua sem
-// trade-off a fazer na ORDENACAO: a ordem alfabetica do enum ingles nao e um
+// leilao", o termo escrito como o usuario le.
+//
+// ponytail: `tipo` e `status` sao `sortable: false` por um motivo que ja estava
+// escrito acima e so agora fecha: a ordem alfabetica do enum ingles nao e um
 // ciclo de vida, e a do rotulo pt-BR nao e, nenhuma das duas e "a ordem" de um
-// status.
+// status. E, diferente do resto das colunas, elas nao TEM como ordenar: a union
+// `ItemOrderBy` do repositorio e `createdAt | title | minInitialBid | bidDeadline`
+// — nao ha `status` nem `type` que o servidor aceite. Uma coluna ordenavel sem
+// `orderBy` correspondente produziria um clique que escreve
+// `?orderBy=status&direction=asc`, que o leitor rejeita e converte de volta para
+// `createdAt desc`: a seta animaria, a URL mudaria e a tabela voltaria na ordem
+// antiga. E um `sortable: true` aqui seria mentira nos dois sentidos, entao o
+// desligamento e explicito e nao herdado da ausencia de `accessorFn` (que as
+// colunas de dado nao podem usar, porque elas PRECISAM do `accessorFn` para a
+// busca).
 //
 // ponytail: DEVIDA (Task 9) — a busca ainda nao acha "1.234,56", "R$" nem
 // "01/10/2026", porque dinheiro e prazo nao tem como ordenar e casar no mesmo
@@ -160,11 +183,11 @@ function AcoesDoItem({ item }: { item: Item }) {
 // `def.filterValue ? def.filterValue(row.original) : row.getValue(columnId)`.
 // Sao ~8 linhas, e `filterValue` continuaria opcional — as colunas de hoje seguem
 // com o `accessorFn` como valor de busca. Atraso deliberado: e uma mudanca no
-// componente generico, e nao numa lista. Com a busca no servidor, o `filterValue`
-// so volta a valer se a camada cliente casar o valor formatado POR CIMA do `q` do
-// servidor (sao os dois ramos possiveis do `DataTable` ao mesmo tempo, nao um no
-// lugar do outro) — e essa e uma decisao de produto, nao uma correcao oculta.
-const COLUNAS: DataTableColumn<Item>[] = [
+// componente generico, e nao numa lista. E agora que a lista e so servidor, a
+// correcao nao e mais "dupla": a busca formatada e do servidor (o `q` do Postgres
+// casa com o valor gravado, nao com o formatado), e o `filterValue` so volta a
+// valer no ramo cliente do `DataTable`, que nenhum consumidor desta tela usa.
+const COLUNAS: DataTableColumn<ItemDaTabela>[] = [
   {
     id: "titulo",
     header: "Título",
@@ -178,12 +201,14 @@ const COLUNAS: DataTableColumn<Item>[] = [
   {
     id: "tipo",
     header: "Tipo",
+    sortable: false,
     accessorFn: (item) => ROTULO_TIPO[item.type],
     cell: (item) => ROTULO_TIPO[item.type],
   },
   {
     id: "status",
     header: "Status",
+    sortable: false,
     accessorFn: (item) => ROTULO_STATUS[item.status],
     cell: (item) => <ItemStatusBadge status={item.status} />,
   },
@@ -217,82 +242,118 @@ const COLUNAS: DataTableColumn<Item>[] = [
 ];
 
 export interface ItemsListProps {
-  // ponytail: DEVIDA (Task 9) — a lista era componente de servidor, entao
-  // nenhum `Item` era serializado; como cliente, cada item que a pagina passa
-  // agora viaja inteiro no payload do RSC: 12 campos por linha, dos quais as
-  // colunas nao usam 6, e `description` — o texto longo — vai junto sem sair na
-  // tela. A correcao e um DTO montado na propria `page.tsx` (um `map` que
-  // entrega so o que as colunas leem: `id`, `title`, `type`, `status`,
-  // `minInitialBid`, `bidDeadline`) e nao um campo opcional em `Item`: o pin e o
-  // `items: Item[]` desta interface, e mudar isso e mexer no contrato da pagina,
-  // nao no desta lista. A `page.tsx` ainda busca sem limite, o que e o outro
-  // lado do mesmo debito.
-  items: Item[];
-  current: string;
-  // ponytail: `totalCount` presente e o que liga a paginacao no servidor: e ele
-  // que escolhe o ramo da union do `DataTable` (`manualPagination: true` exige
-  // `totalCount`). Nao e um "total opcional" que o rodape usaria por conta
-  // propria — sem ele a union nem compila. Quem traz e a pagina, com o total que
-  // a query devolveu; enquanto ninguem passa, a lista opera no modo cliente.
-  totalCount?: number;
-  // ponytail: `pageIndex` e `onPageChange` nao formam par, e o `DataTable` so
-  // honra os dois no modo servidor. No modo cliente quem manda e o estado interno
-  // dele: passar `onPageChange` sem `totalCount` produz callbacks que a tabela
-  // nao vai cumprir (o indice do pai nao mexe no fatiamento). Quem ligar a
-  // paginacao de verdade passa `totalCount` junto.
-  pageIndex?: number;
-  onPageChange?: (page: number) => void;
-  // ponytail: `pageSize` e `onPageSizeChange` existem pela mesma razao de
-  // `onPageChange` — e o Select de "linhas por pagina" e um controle do pai no
-  // modo servidor. Sem o repasse, escolher 50 nao avisava ninguem: o
-  // `tratarPagina` ignorava o estado interno e o `onPageSizeChange?.()` era
-  // `undefined`, entao o gatilho voltava a marcar 10 em silencio.
-  pageSize?: number;
-  onPageSizeChange?: (pageSize: number) => void;
-  onSortChange?: (sort: DataTableSort | null) => void;
-  onFilterChange?: (query: string) => void;
+  // ponytail: o DTO, e nao `Item`. Esta interface era o pin do debito que a parte 1
+  // desta tarefa registrou: como cliente, cada `Item` inteiro viaja no payload do
+  // RSC — 12 campos por linha, 6 deles fora da tela, e `description` (o texto longo)
+  // junto. O DTO (`item-da-tabela.ts`) entrega os seis campos que as colunas leem, e
+  // o teste dele exige exatamente esses seis, entao um campo novo do dominio nao
+  // entra no payload sem o teste reclamar.
+  items: ItemDaTabela[];
+  // ponytail: a tela e CONTROLADA, e a fonte da verdade e a URL. Antes eram cinco
+  // props independentes (`current`, `pageIndex`, `pageSize`, mais os quatro
+  // callbacks) que o pai podia combinar em estados que a URL nao representa:
+  // `pageIndex: 2` com o `pageSize` de outro filtro, `current: "all"` com
+  // `?status=draft` na URL. Uma `VistaDaTabela` e a mesma frase em um objeto so — e
+  // o que faz o link colado e o botao voltar concordarem com a tela.
+  vista: VistaDaTabela;
+  // ponytail: `totalCount` e obrigatorio, e nao opcional, porque a lista e
+  // SERVIDOR. Isso nao e um detalhe de implementacao: e o que impede o modo cliente
+  // do `DataTable` de existir aqui. O ramo cliente existe (o componente e generico e
+  // ele tem teste), mas nesta tela ele seria uma fiction — sem o total do servidor o
+  // rodape mentiria ("Mostrando 1–10 de 10" com 300 itens no banco) e o "proxima"
+  // travaria. O preco da obrigatoriedade e um `totalCount` a mais em cada teste
+  // desta lista, e ele e justo: quem monta a tela tem o total.
+  totalCount: number;
+  // ponytail: `navegar` e uma funcao e nao o `router` porque a lista nao deve
+  // saber QUE roteador existe. E o que mantem os testes de DOM sem `vi.mock` de
+  // `next/navigation`: eles passam um `vi.fn()` e conferem a VISTA que saiu, e nao a
+  // string que o Next receberia. Um `useRouter()` dentro daqui jogaria fora essa
+  // metade dos testes (o `useRouter` do Next 16 lanca fora do App Router) e
+  // obrigaria cada arquivo a saber de mock.
+  navegar: (vista: VistaDaTabela) => void;
 }
 
-export function ItemsList({
-  items,
-  current,
-  totalCount,
-  pageIndex,
-  onPageChange,
-  pageSize,
-  onPageSizeChange,
-  onSortChange,
-  onFilterChange,
-}: ItemsListProps) {
-  // ponytail: as duas montagens do `DataTable` sao o que a union do contrato
-  // exige — no modo servidor `totalCount` e obrigatorio. Escolher o objeto
-  // inteiro (em vez de espalhar um `manualPagination` condicional no JSX) mantem
-  // o par `manualPagination` -> `totalCount` fechando no compilador tambem no
-  // consumidor.
-  const tabela =
-    totalCount === undefined
-      ? {
-          columns: COLUNAS,
-          data: items,
-          pageIndex,
-          pageSize,
-          onPageChange,
-          onPageSizeChange,
-          onSortChange,
-          onFilterChange,
-        }
-      : {
-          columns: COLUNAS,
-          data: items,
-          pageIndex,
-          pageSize,
-          onPageChange,
-          onPageSizeChange,
-          onSortChange,
-          onFilterChange,
-          manualPagination: true as const,
-          totalCount,
-        };
+export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps) {
+  // ponytail: o espelho do pai guarda SO o que ainda nao virou URL, e nao uma copia
+  // da vista. A diferenca nao e estetica: a base de cada mudanca e a PROP `vista`,
+  // lida no proprio gesto, entao nao existe nada para reconciliar durante o render
+  // — e na reconciliacao que a regra `react-hooks/refs` acusa, porque um ref
+  // lido ou escrito no corpo do componente sobrevive a um render descartado
+  // (React 19 concorrente) e passa a valer um estado que nunca foi commitado.
+  //
+  // O `if (destino.current !== vista)` que existia aqui era consequencia de guardar
+  // a copia: sem ele, um clique depois que o pai devolveu a vista nova sairia da
+  // tela antiga. Com a prop como base ele nao tem mais o que sincronizar — e a
+  // garantia de laco tambem fica mais barata, porque `aplicar` so e alcancavel por
+  // gesto do usuario (os quatro callbacks do `DataTable`): nenhuma prop chega ate
+  // ele, entao a tela nunca escreve na URL sozinha, que e o laco que
+  // "prop mudou, entao navega" produziria.
+  //
+  // O ref ainda e necessario (e nao um `useState`) pelo `tratarPagina` do
+  // `DataTable`: ele dispara `onPageChange` e `onPageSizeChange` no mesmo tick
+  // quando o "proxima" tambem estoura o tamanho da pagina (o reposicionamento que a
+  // propria tabela faz ao trocar o tamanho). Duas mudancas, dois `router.push`, e o
+  // segundo venceria a URL. O microtask junta o par em um so e faz a troca de
+  // tamanho custar uma navegacao em vez de duas — e o estado lido no mesmo tick
+  // precisa ser o mais novo, o que `useState` nao garante aqui.
+  const pendentes = useRef<Partial<VistaDaTabela>>({});
+  const agendado = useRef(false);
+
+  const aplicar = (mudanca: Partial<VistaDaTabela>) => {
+    pendentes.current = { ...pendentes.current, ...mudanca };
+    if (agendado.current) return;
+    agendado.current = true;
+    // ponytail: a base e capturada no GESTO, e nao lida no microtask. A vista que o
+    // usuario corrigiu e a que ele estava vendo; se a prop mudasse no caminho (nao
+    // acontece — o microtask roda antes do proximo render), a mudanca cairia sobre
+    // uma tela que ninguem pediu para corrigir.
+    const base = vista;
+    queueMicrotask(() => {
+      agendado.current = false;
+      const destino = { ...base, ...pendentes.current };
+      pendentes.current = {};
+      navegar(destino);
+    });
+  };
+
+  // ponytail: `sort` e a `DataTableSort` que a tabela le, montada DA VISTA e nao
+  // guardada em estado proprio — e por isso que ela e `null` (nenhuma coluna
+  // ordenada) em vez de "createdAt", ja que `createdAt` nao tem coluna na tela.
+  const ordenacao = useMemo<DataTableSort | null>(() => {
+    const coluna = colunaDaOrdenacao(vista.orderBy);
+    return coluna === null ? null : { id: coluna, desc: vista.direction === "desc" };
+  }, [vista.direction, vista.orderBy]);
+
+  const tratarOrdenacao = (sort: DataTableSort | null) => {
+    // ponytail: sort "nulo" e "volte ao padrao", nao "some com a ordenacao". A URL
+    // nao tem como representar "sem ordenacao" — a tela sempre esta ordenada por
+    // alguma coisa, e sem parametro a leitura assume `createdAt desc` — entao o
+    // terceiro clique do ciclo do TanStack (que volta para `[]`) devolve a tela ao
+    // padrao em vez de deixar a seta sumir. Um `?semOrdenacao=1` seria um
+    // parametro que existe so para descrever a ausencia de um padrao.
+    if (sort === null) {
+      aplicar({
+        orderBy: ORDENACAO_PADRAO,
+        direction: DIRECAO_DA_VISTA_PADRAO,
+        page: PAGINA_PADRAO,
+      });
+      return;
+    }
+    const orderBy = ordenacaoDaColuna(sort.id);
+    // ponytail: coluna que nao sabe voltar para `orderBy` e ignorada, e nao
+    // adivinhada. A unica fonte de id invalido seria um consumidor futuro desses
+    // botoes, e nesse caso a URL mentindo (`?orderBy=xxx`, que o leitor troca por
+    // `createdAt desc`) seria pior do que um clique sem efeito.
+    if (orderBy === undefined) return;
+    aplicar({ orderBy, direction: sort.desc ? "desc" : "asc", page: PAGINA_PADRAO });
+  };
+
+  // ponytail: toda mudanca de busca, de ordenacao e de status volta para a pagina
+  // 1. Sem isso, filtrar na pagina 5 mostraria a pagina 5 do resultado novo — que
+  // quase sempre esta vazia — e o usuario leria "nada encontrado" num filtro que
+  // tem itens. A primeira pagina e a unica que existe com certeza.
+  const tratarBusca = (q: string) => aplicar({ q, page: PAGINA_PADRAO });
+  const tratarPagina = (indice: number) => aplicar({ page: indice + 1 });
 
   return (
     <div className="space-y-4">
@@ -300,9 +361,29 @@ export function ItemsList({
         {TABS.map((tab) => (
           <Link
             key={tab.key}
-            href={tab.key === "all" ? "/dashboard/items" : `/dashboard/items?status=${tab.key}`}
+            // ponytail: a aba e um link comum, e nao um `navegar` por callback, por
+            // dois motivos. O primeiro e o prefetch: um `<Link>` traz o RSC quando o
+            // mouse passa, e a aba fica pronta. O segundo e o historico: `navegar` nao
+            // e chamado, entao nao ha `queueMicrotask` no meio e nao se registra duas
+            // entradas iguais para o mesmo destino.
+            //
+            // A aba ZERA busca, ordenacao e pagina, e PRESERVA o tamanho: filtro
+            // "Em leilao" e tamanho 50 sao duas escolhas independentes, e quem le 50 por
+            // pagina nao deveria perder isso so porque clicou numa aba. E "Todos" sem
+            // nenhuma escolha devolve a string vazia — a aba e o estado inicial, entao
+            // ela e o link para `/dashboard/items` sem query.
+            href={hrefDaVista({
+              ...vista,
+              q: "",
+              status: tab.status,
+              orderBy: ORDENACAO_PADRAO,
+              direction: DIRECAO_DA_VISTA_PADRAO,
+              page: PAGINA_PADRAO,
+            })}
             className={`rounded-full px-3 py-1 text-sm font-medium ${
-              current === tab.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              (vista.status ?? "all") === tab.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
             }`}
           >
             {tab.label}
@@ -310,7 +391,46 @@ export function ItemsList({
         ))}
       </div>
 
-      <DataTable {...tabela} filterPlaceholder={PLACEHOLDER_BUSCA} emptyMessage={MENSAGEM_VAZIA} />
+      <DataTable
+        columns={COLUNAS}
+        data={items}
+        pageIndex={vista.page - 1}
+        pageSize={vista.pageSize}
+        sort={ordenacao}
+        filter={vista.q}
+        onPageChange={tratarPagina}
+        onPageSizeChange={(pageSize) => aplicar({ pageSize })}
+        onSortChange={tratarOrdenacao}
+        onFilterChange={tratarBusca}
+        manualPagination
+        totalCount={totalCount}
+        filterPlaceholder={PLACEHOLDER_BUSCA}
+        emptyMessage={MENSAGEM_VAZIA}
+      />
     </div>
+  );
+}
+
+// ponytail: a ligacao com o roteador e uma funcao a parte, e nao um `useRouter()`
+// dentro de `ItemsList`. As duas razoes: (1) o `useRouter` do Next 16 lanca
+// `invariant expected app router to be mounted` fora do App Router, o que
+// obrigaria TODOS os testes desta lista (que rodam num `act` de React puro, sem
+// Next) a carregar um mock de `next/navigation`; (2) mesmo com o mock, o teste
+// teria de conferir `router.push("/dashboard/items?page=2")` em vez de conferir a
+// VISTA que a lista decidiu — e a vista e o contrato, a string e a consequencia
+// dela. Este e o unico lugar do arquivo que sabe de `next`.
+export function ItensDaUrl({
+  items,
+  vista,
+  totalCount,
+}: Omit<ItemsListProps, "navegar">): React.JSX.Element {
+  const router = useRouter();
+  return (
+    <ItemsList
+      items={items}
+      vista={vista}
+      totalCount={totalCount}
+      navegar={(proxima) => router.push(hrefDaVista(proxima))}
+    />
   );
 }

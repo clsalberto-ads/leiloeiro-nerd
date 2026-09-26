@@ -14,6 +14,7 @@ vi.mock("@/presentation/actions/item-actions", () => ({
 }));
 
 import { ItemsList } from "./items-list";
+import { VISTA_PADRAO } from "./estado-da-tabela";
 
 // ponytail: este arquivo existe por causa de uma coisa que um teste nao consegue
 // provar. O rotulo da aba "Em leilao" e o MESMO texto do badge, e um teste que
@@ -28,16 +29,29 @@ import { ItemsList } from "./items-list";
 // rotulo sem abrir um buraco na API do componente so para isto.
 const ABAS_DA_LISTA = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
 
+// ponytail: `navegar` e uma funcao que nao faz nada neste arquivo — a assercao e
+// sobre o `href` do HTML, e nao sobre navegacao. Passar e obrigatorio porque a
+// lista nao aceita mais "modo cliente": quem decide a URL e o pai.
+function listaCom(vista = VISTA_PADRAO): string {
+  return renderToString(
+    <ItemsList items={[]} vista={vista} totalCount={0} navegar={() => {}} />,
+  );
+}
+
+// ponytail: a regex aceita qualquer query depois de `?status=`, e nao so
+// `?status=xxx`. A aba e montada pelo `hrefDaVista`, que pode preservar o
+// `pageSize` escolhido pelo usuario — e um regex que so reconhecesse a forma
+// "limpa" silenciosamente ignoraria a aba na hora de trocar a ordem, com o teste
+// passando e a URL errada na tela. O segundo grupo (`[^"]*`) e o que garante que
+// o href lido e inteiro.
 function abasDoHtml(html: string): { href: string; rotulo: string }[] {
-  const ancoras = [
-    ...html.matchAll(/<a [^>]*href="(\/dashboard\/items(?:\?status=[a-z]+)?)"[^>]*>([^<]*)<\/a>/g),
-  ];
+  const ancoras = [...html.matchAll(/<a [^>]*href="(\/dashboard\/items[^"]*)"[^>]*>([^<]*)<\/a>/g)];
   return ancoras.map(([, href, rotulo]) => ({ href: href!, rotulo: rotulo! }));
 }
 
 describe("ItemsList — as abas de status", () => {
   it("cada aba de status mostra o rotulo canonico, na ordem de ciclo de vida da lista", () => {
-    const abas = abasDoHtml(renderToString(<ItemsList items={[]} current="all" />));
+    const abas = abasDoHtml(listaCom());
 
     expect(abas.map((aba) => aba.rotulo)).toEqual([
       "Todos",
@@ -46,7 +60,7 @@ describe("ItemsList — as abas de status", () => {
   });
 
   it("a aba aponta para o filtro que o servidor entende, e 'Todos' para a lista sem filtro", () => {
-    const abas = abasDoHtml(renderToString(<ItemsList items={[]} current="all" />));
+    const abas = abasDoHtml(listaCom());
 
     expect(abas.map((aba) => aba.href)).toEqual([
       "/dashboard/items",
@@ -60,7 +74,7 @@ describe("ItemsList — as abas de status", () => {
   // NAO cria aba por conta propria, e este teste e o que impede a aba de aparecer
   // sozinha quando alguem adicionar o membro sem querer.
   it("as abas sao um recorte do vocabulario, e nao o vocabulario inteiro", () => {
-    const abas = abasDoHtml(renderToString(<ItemsList items={[]} current="all" />));
+    const abas = abasDoHtml(listaCom());
 
     const mostrados = abas.map((aba) => aba.href.split("status=")[1] ?? "all");
     expect(mostrados).toEqual(["all", ...ABAS_DA_LISTA]);

@@ -158,11 +158,12 @@ export interface ItemListFilter {
   //
   // O que CONTINUA fora do `q` e dinheiro e prazo formatados ("R$ 1.234,56",
   // "01/10/2026"): o SQL tem 123456 e um `timestamptz`, e nenhum dos dois e o que
-  // a tela mostra. A receita continua a mesma da Task 9 e esta na receita do
-  // `COLUNAS` em `items-list.tsx` (`filterValue` no `DataTableColumn`, com `q` no
-  // servidor e o valor formatado no cliente por cima). Tabem por escolha: buscar
-  // "50,00" e traz o item de 1.000,00 e traz o de 50,00, e o servidor nao tem como
-  // saber qual dos dois o usuario quis.
+  // a tela mostra. Tabem por escolha: buscar "50,00" e traz o item de 1.000,00 e
+  // traz o de 50,00, e o servidor nao tem como saber qual dos dois o usuario quis.
+  // A receita continua a mesma da Task 9 e esta na nota do `COLUNAS` em
+  // `items-list.tsx` (`filterValue` no `DataTableColumn`) — mas ela e debito do
+  // RAMO CLIENTE do `DataTable` e nao desta tela: com a lista so servidor, quem
+  // busca e este `WHERE`, e nenhum consumidor de produto usa o ramo cliente.
   //
   // `q` em branco (ou so com espacos) e ausencia de busca, porque o `DataTable`
   // avisa a busca vazia ao limpar a caixa.
