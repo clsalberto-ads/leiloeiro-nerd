@@ -20,7 +20,8 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
   useEffect(() => {
     if (state && state.ok) {
       toast.success("Lance registrado!");
-      setCentavos(minBid); // Reset bid amount after success
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form after successful submission is intentional
+      setCentavos(minBid);
     } else if (state && state.error) {
       toast.error(state.error);
     }
