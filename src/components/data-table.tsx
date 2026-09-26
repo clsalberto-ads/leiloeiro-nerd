@@ -60,6 +60,15 @@ interface DataTablePropsComuns<T> {
   onSortChange?: (sort: DataTableSort | null) => void;
   onFilterChange?: (query: string) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  // ponytail: `sort` e `filter` sao a MESMA informacao que `pageIndex`/`pageSize`,
+  // so que para as outras duas casas da tabela: o que esta aplicado. A diferenca
+  // e que eles sao espelhados no estado local na renderizacao (veja
+  // `ordenacaoEspelhada` e `filtroEspelhado`, abaixo): a tabela guarda a intencao do
+  // usuario, a prop carrega a verdade que o pai leu de algum lugar — a URL, no caso
+  // da lista de itens. Sao opcionais porque no modo cliente nao ha pai: quem ordena e
+  // filtra e a propria tabela, e nenhum dos dois props existe.
+  sort?: DataTableSort | null;
+  filter?: string;
   filterPlaceholder?: string;
   emptyMessage?: string;
 }
@@ -71,8 +80,22 @@ interface DataTablePropsComuns<T> {
 // viva. A union deixa isso um erro de compilacao no consumidor em vez de um
 // rodape mentindo em producao. A alternativa (so um `console.warn` em dev)
 // seria tarde: o dano e silencioso e so aparece com o servidor de volta.
+//
+// ponytail: `sort` e `filter` entram no ramo servidor pelo mesmo motivo, e o
+// defeito e ainda mais insidioso que o do `totalCount`: sem `filter` a busca
+// continua funcionando (o `onFilterChange` existe) e o resultado e o filtro
+// aplicado voltar para "" depois do debounce, apagando o termo que o usuario
+// digitou; sem `sort`, um pai com URL mostra a seta de ordenacao no cabecalho
+// errado — ou seja, a tela mente sobre o que esta ordenado. A union e a mesma
+// defesa: o esquecimento vira erro de compilacao no consumidor, onde e barato,
+// em vez de um diagnostico em producao, onde e caro.
 export type DataTableProps<T> =
-  | (DataTablePropsComuns<T> & { manualPagination: true; totalCount: number })
+  | (DataTablePropsComuns<T> & {
+      manualPagination: true;
+      totalCount: number;
+      sort: DataTableSort | null;
+      filter: string;
+    })
   | (DataTablePropsComuns<T> & { manualPagination?: false; totalCount?: number });
 
 // ponytail: `getIsSorted()` devolve "asc"/"desc"/false e "asc" NAO e um valor
@@ -82,6 +105,16 @@ export type DataTableProps<T> =
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
 const DEBOUNCE_BUSCA_MS = 300;
+// ponytail: o `10` desta lista e o MESMO numero que `TAMANHO_DE_PAGINA_PADRAO` em
+// `estado-da-tabela.ts` (a camada da URL), e a duplicacao e forcada pelo limite do
+// App Router: com `manualPagination` quem calcula o `OFFSET` e o servidor, e ele nao
+// alcanca um modulo `"use client"` — o `pageSize` ausente da URL precisa virar numero
+// antes de virar query. Derivar um do outro nao e opcao nas duas direcoes: este
+// componente generico nao importa de `src/app/(dashboard)/...` (a dependencia aponta
+// para o outro lado), e a URL nao pode descobrir o padrao lendo o componente que ela
+// manda configurar. O preco e um numero em dois lugares; a mitigacao e este par de
+// notas apontando uma para a outra, e o `pageSize` que a URL manda e o mesmo que o
+// `Select` desta lista oferece.
 const TAMANHOS_DE_PAGINA = [5, 10, 20, 50] as const;
 const ROTULO_BUSCA = "Buscar";
 const ROTULO_TAMANHO = "Linhas por página";
@@ -123,6 +156,24 @@ function resolver<T>(updater: Updater<T>, base: T): T {
   return typeof updater === "function" ? (updater as (old: T) => T)(base) : updater;
 }
 
+function deOrdenacao(sort: DataTableSort | null | undefined): SortingState {
+  return sort === null || sort === undefined ? [] : [{ id: sort.id, desc: sort.desc }];
+}
+
+// ponytail: os dois `undefined` contam como iguais, e nao e preciosismo: quem
+// nao controla a ordenacao (`sort` ausente) e quem manda "nenhuma" (`sort: null`)
+// precisam ser a mesma coisa para a tabela, e treatar um como diferente do outro
+// faria a busca por parametro reescrever o estado de um componente que nunca
+// pediu para ser controlado.
+function mesmoSort(
+  um: DataTableSort | null | undefined,
+  outro: DataTableSort | null | undefined,
+): boolean {
+  if (um === null || um === undefined) return outro === null || outro === undefined;
+  if (outro === null || outro === undefined) return false;
+  return um.id === outro.id && um.desc === outro.desc;
+}
+
 export function DataTable<T>({
   columns,
   data,
@@ -132,6 +183,8 @@ export function DataTable<T>({
   onSortChange,
   onFilterChange,
   onPageSizeChange,
+  sort,
+  filter,
   filterPlaceholder = "Buscar...",
   emptyMessage = "Nenhum resultado encontrado.",
   manualPagination = false,
@@ -139,9 +192,9 @@ export function DataTable<T>({
 }: DataTableProps<T>): React.JSX.Element {
   // ponytail: `query` e o que esta no input (muda a cada tecla); `filtro` e o que
   // foi efetivamente aplicado a tabela (so depois do debounce).
-  const [query, setQuery] = useState("");
-  const [filtro, setFiltro] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [query, setQuery] = useState(filter ?? "");
+  const [filtro, setFiltro] = useState(filter ?? "");
+  const [sorting, setSorting] = useState<SortingState>(deOrdenacao(sort));
   // ponytail: estado interno so do modo client-side. No modo servidor (`manualPagination`)
   // a pagina vem de `pageIndex`/`pageSize` e o estado abaixo e ignorado — o
   // contrato e quem manda. `pageSize` entra aqui como valor inicial e volta a valer
@@ -152,7 +205,42 @@ export function DataTable<T>({
   });
 
   const recentes = useRef({ onFilterChange, onPageChange, manualPagination, pageIndex });
-  const filtroNotificado = useRef("");
+  const filtroNotificado = useRef(filter ?? "");
+
+  // ponytail: espelhar a prop no estado local durante a RENDERIZACAO (e nao em
+  // `useEffect`) e o que mantem a tela e a URL em acordo no mesmo quadro. Em efeito
+  // haveria um render com a ordenacao antiga — a seta apontando para o lado
+  // errado, ou a busca vazia enquanto o texto ja esta na caixa — e so no
+  // seguinte eles coincidiriam; num click duplo rapido esse quadro intermediario
+  // e lido pelo usuario.
+  //
+  // A comparacao e POR VALOR, e nao por identidade, e por um motivo de laco: o pai
+  // escreve `{ id, desc }` novo a cada render, entao comparar com `!==` resincroniza
+  // sempre e o `setSorting` com array novo re-renderiza sempre. Alem disso a
+  // comparacao por valor e o que preserva o clique pendente: apos o click, o
+  // `sorting` local e a intencao e o pai so devolve a mesma prop enquanto o
+  // servidor nao respondeu, entao nao ha o que sobrescrever. Quando a resposta
+  // chega com um valor diferente, ela vence.
+  const ordenacaoEspelhada = useRef(sort);
+  if (!mesmoSort(sort, ordenacaoEspelhada.current)) {
+    ordenacaoEspelhada.current = sort;
+    setSorting(deOrdenacao(sort));
+  }
+
+  // ponytail: o mesmo espelho para a busca, e com um passo a mais: marcar o
+  // `filtroNotificado` com o valor que CHEGOU. Sem isso, um termo vindo do
+  // historico (voltar/avancar) ficaria 300ms na caixa como se fosse digitado e
+  // dispararia um `onFilterChange` de volta — a tela escrevendo na URL o valor que
+  // acabou de ler dela.
+  const filtroEspelhado = useRef(filter);
+  if (filter !== filtroEspelhado.current) {
+    filtroEspelhado.current = filter;
+    if (filter !== undefined) {
+      filtroNotificado.current = filter;
+      setQuery(filter);
+      setFiltro(filter);
+    }
+  }
 
   useEffect(() => {
     recentes.current = { onFilterChange, onPageChange, manualPagination, pageIndex };

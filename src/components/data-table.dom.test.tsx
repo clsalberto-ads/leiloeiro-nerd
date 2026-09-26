@@ -501,6 +501,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
         pageIndex={1}
         pageSize={2}
         totalCount={10}
+        sort={null}
+        filter=""
         onPageChange={onPageChange}
       />,
     );
@@ -521,6 +523,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
         pageIndex={1}
         pageSize={2}
         totalCount={10}
+        sort={null}
+        filter=""
         onPageChange={onPageChange}
       />,
     );
@@ -545,6 +549,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
         pageIndex={0}
         pageSize={2}
         totalCount={10}
+        sort={null}
+        filter=""
         onPageChange={onPageChange}
       />,
     );
@@ -565,6 +571,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
         pageIndex={2}
         pageSize={2}
         totalCount={10}
+        sort={null}
+        filter=""
         onPageChange={onPageChange}
         onSortChange={onSortChange}
       />,
@@ -588,6 +596,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
           pageIndex={2}
           pageSize={2}
           totalCount={10}
+          sort={null}
+          filter=""
           onPageChange={onPageChange}
           onFilterChange={onFilterChange}
         />,
@@ -622,6 +632,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
           pageIndex={0}
           pageSize={2}
           totalCount={10}
+          sort={null}
+          filter=""
           onFilterChange={onFilterChange}
         />,
       );
@@ -647,6 +659,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
         manualPagination
         pageSize={2}
         totalCount={2}
+        sort={null}
+        filter=""
         onSortChange={onSortChange}
       />,
     );
@@ -663,6 +677,216 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
   });
 });
 
+// ponytail: a coluna de dinheiro existe aqui e nao na lista de itens porque a
+// lista e so servidor (e la o `accessorFn` nao ordena nada: quem ordena e o SQL).
+// O componente generico ainda tem o ramo cliente, e e nele que o `accessorFn` e
+// ao mesmo tempo o valor que ordena e o que a busca casa — e o par
+// "1.234,56" / "1.000,00" / "50,00" e o dado que quebra o cancelamento de erros:
+// como texto, "1.000,00" < "1.234,56" < "50,00" e a lista comeca em "Mil".
+interface LinhaComValor extends Linha {
+  valor: number;
+}
+
+const COLUNAS_COM_VALOR: DataTableColumn<LinhaComValor>[] = [
+  { id: "titulo", header: "Título", accessorFn: (l) => l.titulo, cell: (l) => l.titulo },
+  { id: "valor", header: "Valor", accessorFn: (l) => l.valor, cell: (l) => `R$ ${l.valor}` },
+];
+
+const DINHEIRO: LinhaComValor[] = [
+  { id: "1", titulo: "Mil", valor: 100000 },
+  { id: "2", titulo: "Duzentos", valor: 123456 },
+  { id: "3", titulo: "Cinquenta", valor: 5000 },
+];
+
+describe("DataTable — ordenação e busca controladas pelo pai", () => {
+  // ponytail: `sort`/`filter` sao props novas e a prova de que elas ESPELHAM o
+  // pai vem do `aria-sort`: a seta do cabecalho e o unico lugar da tela onde o
+  // usuario ve a ordenacao, entao se ela nao acompanhar a prop, a URL e a tela
+  // discordam em silencio.
+  it("mostra a ordenacao que o pai mandou, sem esperar clique", () => {
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={LINHAS}
+        manualPagination
+        totalCount={10}
+        sort={{ id: "titulo", desc: true }}
+        filter=""
+      />,
+    );
+
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("troca a seta quando o pai devolve outra ordenacao", () => {
+    const props = {
+      columns: COLUNAS,
+      data: LINHAS,
+      manualPagination: true,
+      totalCount: 10,
+      filter: "",
+    } as const;
+    const { rerender } = render(<DataTable {...props} sort={{ id: "titulo", desc: true }} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("descending");
+
+    rerender(<DataTable {...props} sort={{ id: "titulo", desc: false }} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("ascending");
+
+    rerender(<DataTable {...props} sort={null} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("none");
+  });
+
+  // ponytail: o espelho e por VALOR, e este e o teste que paga a conta disso. O
+  // pai re-renderiza depois do clique com a MESMA prop que ja mandava (a resposta
+  // do servidor ainda nao chegou) e o espelho nao pode sobrescrever a intencao do
+  // click — se sobrescrevesse, a seta piscaria de volta e o clique pareceria
+  // ignorado. Comparar por identidade (`!==`) quebraria este teste com um laco de
+  // re-render, porque o pai cria `{ id, desc }` novo a cada render.
+  it("preserva o clique pendente enquanto o pai nao devolve outra ordenacao", () => {
+    const props = {
+      columns: COLUNAS,
+      data: LINHAS,
+      manualPagination: true,
+      totalCount: 10,
+      filter: "",
+    } as const;
+    const { rerender } = render(<DataTable {...props} sort={null} />);
+
+    fireEvent.click(within(cabecalho("Título")).getByRole("button", { name: "Título" }));
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("ascending");
+
+    rerender(<DataTable {...props} sort={null} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("ascending");
+  });
+
+  // ponytail: o caso ao LADO do anterior, e o unico em que "comparar por valor" e
+  // "comparar por identidade" discordam. Aqui a prop nao e `null`: e uma ordenacao
+  // de verdade, e o pai re-renderiza com um objeto NOVO de mesmo valor (o
+  // espelho por valor ignora; o por identidade repassaria `sorting` para tras e
+  // apagaria o clique que o usuario acabou de fazer). A diferenca so aparece com
+  // `sort` preenchido porque `null === null` e verdadeiro nos dois criterios — e
+  // por isso que o teste anterior, so com `null`, nao pega essa regressao. Vale a
+  // pena ter os dois: o `null` cobre a primeira visita, este cobre a navegacao de
+  // volta, que e onde o pai tem prop de verdade.
+  it("preserva o clique pendente quando o pai devolve a mesma ordenacao em outro objeto", () => {
+    const props = {
+      columns: COLUNAS,
+      data: LINHAS,
+      manualPagination: true,
+      totalCount: 10,
+      filter: "",
+    } as const;
+    const { rerender } = render(<DataTable {...props} sort={{ id: "titulo", desc: true }} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("descending");
+
+    // ponytail: o ciclo de tres estados faz este clique cair em "sem ordenacao", e
+    // nao em "ascendente" — clicar numa coluna ja descendente avanca no ciclo, e
+    // o proximo estado e o vazio. Serve ainda melhor ao teste: e o clique cujo
+    // resultado o espelho por valor tem difficulty de apagar, porque o espelho por
+    // identidade devolveria a seta para baixo e fingiria que o clique nao aconteceu.
+    fireEvent.click(within(cabecalho("Título")).getByRole("button", { name: "Título" }));
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("none");
+
+    // ponytail: objeto novo, mesmo valor. E o que um pai sem `useMemo` entrega.
+    rerender(<DataTable {...props} sort={{ id: "titulo", desc: true }} />);
+    expect(cabecalho("Título").getAttribute("aria-sort")).toBe("none");
+  });
+
+  it("abre a caixa de busca ja com o termo do pai", () => {
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={LINHAS}
+        manualPagination
+        totalCount={10}
+        sort={null}
+        filter="Item 02"
+      />,
+    );
+
+    expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Item 02");
+  });
+
+  it("acompanha o termo novo que chega do pai", () => {
+    const props = { columns: COLUNAS, data: LINHAS, manualPagination: true, totalCount: 10, sort: null } as const;
+    const { rerender } = render(<DataTable {...props} filter="Item 02" />);
+    expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Item 02");
+
+    rerender(<DataTable {...props} filter="Item 03" />);
+    expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Item 03");
+  });
+
+  // ponytail: os dois testes juntos fecham o laco do historico do navegador. O
+  // termo que CHEGA do pai nao pode ser re-notificado ao pai: um back/forward
+  // escrevendo de volta o valor que acabou de ler da URL seria um eco, e com
+  // `router.push` viraria navegacao em loop.
+  it("nao devolve para o pai o termo que veio dele", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      const props = {
+        columns: COLUNAS,
+        data: LINHAS,
+        manualPagination: true,
+        totalCount: 10,
+        sort: null,
+        onFilterChange,
+      } as const;
+      const { rerender } = render(<DataTable {...props} filter="Item 02" />);
+      await avancarRelogio(300);
+      expect(onFilterChange).not.toHaveBeenCalled();
+
+      rerender(<DataTable {...props} filter="Item 03" />);
+      await avancarRelogio(300);
+      expect(onFilterChange).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("nao dispara a busca ao abrir a tabela com o filtro do pai", async () => {
+    vi.useFakeTimers();
+    try {
+      const onFilterChange = vi.fn();
+      render(
+        <DataTable
+          columns={COLUNAS}
+          data={LINHAS}
+          manualPagination
+          totalCount={10}
+          sort={null}
+          filter="Item"
+          onFilterChange={onFilterChange}
+        />,
+      );
+
+      await avancarRelogio(300);
+      expect(onFilterChange).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ponytail: a coluna de dinheiro, com os dois lados do `accessorFn` no mesmo
+  // lugar — ordena por numero e busca pelo numero. Se o `accessorFn` devolvesse o
+  // texto "R$ 100.000,00", a coluna continuaria ordenando (o `sortingFn` padrao
+  // compara strings) mas em ordem alfabetica — "R$ 100.000,00" antes de
+  // "R$ 123.456,00" antes de "R$ 5.000,00", que e uma ordem que o usuario le
+  // como errada. E o primeiro clique desce (`getAutoSortDir` do TanStack desce
+  // para numero e sobe para texto), entao as duas direcoes aparecem.
+  it("ordena a coluna de dinheiro por numero, e nao pelo texto formatado", () => {
+    render(<DataTable columns={COLUNAS_COM_VALOR} data={DINHEIRO} />);
+    const colunaValor = () =>
+      linhasDoCorpo().map((linha) => within(linha).getAllByRole("cell")[0]?.textContent ?? "");
+
+    fireEvent.click(within(cabecalho("Valor")).getByRole("button", { name: "Valor" }));
+    expect(colunaValor()).toEqual(["Duzentos", "Mil", "Cinquenta"]);
+
+    fireEvent.click(within(cabecalho("Valor")).getByRole("button", { name: "Valor" }));
+    expect(colunaValor()).toEqual(["Cinquenta", "Mil", "Duzentos"]);
+  });
+});
+
 describe("DataTable — o contrato de props", () => {
   // ponytail: o que esta sob teste aqui e o COMPILADOR, nao o runtime — por isso
   // que a assercao e trivial e o vermelho vem do `tsc --noEmit` (e nao do
@@ -675,8 +899,28 @@ describe("DataTable — o contrato de props", () => {
       columns: COLUNAS,
       data: LINHAS,
       manualPagination: true,
+      sort: null,
+      filter: "",
     };
 
     expect(propsMortas.manualPagination).toBe(true);
+  });
+
+  // ponytail: `sort` e `filter` no ramo servidor nao sao exigencia estetica. Sem
+  // `filter`, a busca continua no `onFilterChange` e o filtro APLICADO volta para
+  // "" depois do debounce, apagando o termo do usuario; sem `sort`, a seta
+  // announce um cabecalho que o pai nao pediu. Os dois sao o tipo de defeito que
+  // so aparece com o servidor de volta, entao o esquecimento tem de ser erro de
+  // compilacao.
+  it("proibe manualPagination sem sort e sem filter", () => {
+    // @ts-expect-error no modo servidor, `sort` e `filter` fazem parte do contrato
+    const propsSemOrdenacao: DataTableProps<Linha> = {
+      columns: COLUNAS,
+      data: LINHAS,
+      manualPagination: true,
+      totalCount: 10,
+    };
+
+    expect(propsSemOrdenacao.manualPagination).toBe(true);
   });
 });
