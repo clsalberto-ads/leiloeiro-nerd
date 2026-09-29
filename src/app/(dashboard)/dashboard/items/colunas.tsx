@@ -80,9 +80,8 @@ function AcoesDoItem({ item }: { item: ItemDaTabela }) {
       ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon-sm" aria-label={`Ações de ${item.title}`} />}
+          render={<button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" aria-label={`Ações de ${item.title}`}><MoreHorizontalIcon aria-hidden="true" /></button>}
         >
-          <MoreHorizontalIcon aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {podePublicar ? (
