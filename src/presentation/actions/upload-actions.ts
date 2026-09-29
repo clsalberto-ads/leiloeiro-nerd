@@ -5,6 +5,7 @@ import { deleteItemImage } from "@/application/use-cases/delete-item-image";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { utapi } from "@/infrastructure/upload/uploadthing";
 import { imageUploadSchema } from "@/lib/validators";
+import { mensagemDeErro } from "@/lib/erro-de-action";
 
 export type UploadActionResult = { urls?: string[]; error?: string };
 
@@ -14,6 +15,15 @@ export async function uploadItemImagesAction(
 ): Promise<UploadActionResult> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado" };
+  // ponytail: o gate de papel. A action checava SO a sessao, mas a imagem aqui
+  // so existe para um item — e `createItem` ja exige `seller`/`both`. Um
+  // comprador registrado (que e o caso mais comum, e a conta mais facil de
+  // criar) podia chamar a action quantas vezes quisesse, 10 x 8MB por chamada,
+  // sem nunca anexar o resultado a nada: so queimando a cota paga de
+  // armazenamento do projeto. A sessao sozinha nao e um suficiente aqui.
+  if (session.user.role !== "seller" && session.user.role !== "both") {
+    return { error: "Apenas leiloeiros podem enviar imagens" };
+  }
   const parsed = imageUploadSchema.safeParse({ images: formData.getAll("images") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Imagens inválidas" };
   try {
@@ -22,7 +32,7 @@ export async function uploadItemImagesAction(
     if (urls.length === 0) return { error: "Não foi possível enviar as imagens." };
     return { urls };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Não foi possível enviar as imagens." };
+    return { error: mensagemDeErro(err, "Não foi possível enviar as imagens.") };
   }
 }
 
@@ -37,6 +47,6 @@ export async function deleteItemImageAction(
     await deleteItemImage(drizzleItemRepository, session.user.id, imageId);
     return { ok: true };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Não foi possível excluir a imagem." };
+    return { error: mensagemDeErro(err, "Não foi possível excluir a imagem.") };
   }
 }

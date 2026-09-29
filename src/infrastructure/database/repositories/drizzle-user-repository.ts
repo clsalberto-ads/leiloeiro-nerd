@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import type { UserProfile, UserRepository } from "@/domain/repositories/user-repository";
@@ -39,6 +39,17 @@ export const drizzleUserRepository: UserRepository = {
       .limit(1);
     if (!row) return null;
     return { ...row, role: row.role as UserProfile["role"] };
+  },
+
+  async findByIds(ids) {
+    // `inArray` com lista vazia e `IN ()` no Postgres, que e erro de sintaxe —
+    // o `length === 0` devolve antes de chegar la.
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select({ id: userTable.id, name: userTable.name, email: userTable.email, phone: userTable.phone, slug: userTable.slug, address: userTable.address, role: userTable.role })
+      .from(userTable)
+      .where(inArray(userTable.id, ids));
+    return rows.map((row) => ({ ...row, role: row.role as UserProfile["role"] }));
   },
 
   async updateRole(userId, role, slug) {

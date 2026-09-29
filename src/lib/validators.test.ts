@@ -164,3 +164,45 @@ describe("paridade do lance entre o bidFormSchema (reais) e o placeBidSchema (ce
     expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: 10.123 }).success).toBe(false);
   });
 });
+
+// ponytail: o teto de dinheiro nao e um detalhe de robustez, e a fronteira que
+// impede o `err.message` do Postgres de chegar ao usuario. Toda coluna de
+// dinheiro e `integer` (int4) e o int4 para em 2_147_483_647; sem o `.max`, um
+// `amount: 5000000000` passava pelo schema (que so tinha piso), passava pela
+// revalidacao dentro da transacao, e morria no INSERT com `22003 integer out
+// of range` — erro que a action devolvia cru, levando o SQL do insert e os
+// parametros para a tela. Estes testes existem para travar o `.max` nos DOIS
+// lados: o payload do servidor (`placeBidSchema`, em centavos) e o campo do
+// form (`bidFormSchema`, em reais). Um teto so no cliente deixaria o buraco
+// aberto por POST direto.
+describe("teto de dinheiro (limite do int4)", () => {
+  const ITEM_ID = "3f6c1f6e-1d5a-4f1e-9b6a-2f0b1c3d4e5f";
+
+  it("rejeita no servidor um lance acima do teto do int4, em centavos", () => {
+    // 2.000.000.001 centavos — o menor valor que estoura o teto
+    const estoura = placeBidSchema.safeParse({ itemId: ITEM_ID, amount: 2_000_000_001 });
+    expect(estoura.success).toBe(false);
+    // e o limite exato ainda passa, para o `.max` nao estar curto demais
+    expect(placeBidSchema.safeParse({ itemId: ITEM_ID, amount: 2_000_000_000 }).success).toBe(true);
+  });
+
+  it("rejeita no cliente o mesmo lance, em reais", () => {
+    const estoura = bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: 20_000_000.01 });
+    expect(estoura.success).toBe(false);
+    expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: 20_000_000 }).success).toBe(true);
+  });
+
+  it("rejeita no itemSchema valores de dinheiro acima do teto", () => {
+    const base = {
+      title: "Action Figure rara",
+      description: "Colecionável lacrado em estojo.",
+      type: "product",
+      minInitialBid: "50.00",
+      minBidIncrement: "5.00",
+      bidDeadline: new Date(Date.now() + 86_400_000).toISOString(),
+    };
+    expect(itemSchema.safeParse({ ...base, minInitialBid: "20000000.01" }).success).toBe(false);
+    expect(itemSchema.safeParse({ ...base, minBidIncrement: "20000000.01" }).success).toBe(false);
+    expect(itemSchema.safeParse({ ...base, minInitialBid: "20000000.00" }).success).toBe(true);
+  });
+});

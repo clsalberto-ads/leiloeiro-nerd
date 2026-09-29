@@ -7,6 +7,10 @@ const sellerRow = { id: "u1", name: "Ana", slug: "ana-impala" };
 class FakeUserRepository implements UserRepository {
   captured: string[] = [];
   constructor(private row: { id: string; name: string; slug: string } | null) {}
+  async findByIds() {
+    return Promise.reject(new Error("não usado"));
+  }
+
   async findBySlug(slug: string) {
     this.captured.push(slug);
     return this.row;

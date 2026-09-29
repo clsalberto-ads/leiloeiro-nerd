@@ -152,6 +152,10 @@ class FakeUserRepository implements UserRepository {
   async findById(userId: string) {
     return this.userBy[userId] ?? null;
   }
+  async findByIds(ids: string[]) {
+    return ids.map((id) => this.userBy[id]).filter((u): u is NonNullable<typeof u> => Boolean(u));
+  }
+
   async findBySlug(_slug: string): Promise<{ id: string; name: string; slug: string } | null> {
     throw new Error("não usado");
   }
@@ -386,7 +390,7 @@ describe("placeBid", () => {
     const result = await placeBid(itemRepo, bidRepo, userRepo, notifRepo, resend, "bidder1", "item1", 6500);
 
     expect(result.bid.amount).toBe(6500);
-    expect(consoleErrorSpy).toHaveBeenCalledWith("[Resend] falha ao enviar outbid:", expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith("[bid] falha ao enviar e-mail de lance superado:", expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 
@@ -408,7 +412,42 @@ describe("placeBid", () => {
 
     expect(result.bid.amount).toBe(6500);
     expect(result.outbidUserId).toBe("bidder2");
-    expect(consoleErrorSpy).toHaveBeenCalledWith("[Resend] falha ao enviar outbid:", expect.any(Error));
+    // ponytail: o log e distinguido do e-mail de proposito. O `try` antigo
+    // cobria `notifRepo.create` E `resend.emails.send` com o mesmo rotulo
+    // "[Resend]", entao uma falha de INSERT em `notifications` mandava quem
+    // fosse de plantao procurar no provedor de e-mail um erro que nunca saiu
+    // dele. Os dois passos sao best effort (o lance ja foi commitado), mas
+    // cada um diz de onde veio.
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[bid] falha ao gravar notificacao de lance superado:",
+      expect.any(Error),
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  // ponytail: o `send` do Resend NAO lanca em erro de API — resolve
+  // `{ data: null, error }` para qualquer status nao-2xx, e so lanca em falha de
+  // rede. Com o `try/catch` sozinho, um dominio nao verificado (403) ou uma API
+  // key rotacionada nao logava NADA: o `catch` nunca rodava e o e-mail de
+  // "seu lance foi superado" sumia em silencio para todo mundo. A notificacao
+  // no banco continuava chegando, o que escondia a falha por completo. Este
+  // e o teste que fecha isso: e o unico caminho em que o `error` volta.
+  it("registra o erro quando o Resend responde com error em vez de lançar", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sendMock = vi.fn().mockResolvedValue({ data: null, error: { message: "Domain not verified" } });
+    const itemRepo = new FakeItemRepository();
+    const bidRepo = new FakeBidRepository([existingHighBid]);
+    const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller, bidder2: outbidUser });
+    const notifRepo = new FakeNotificationRepository();
+    const resend: ResendClient = { emails: { send: sendMock } };
+
+    const result = await placeBid(itemRepo, bidRepo, userRepo, notifRepo, resend, "bidder1", "item1", 6500);
+
+    expect(result.bid.amount).toBe(6500);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[bid] Resend recusou o e-mail de lance superado:",
+      expect.objectContaining({ message: "Domain not verified" }),
+    );
     consoleErrorSpy.mockRestore();
   });
 

@@ -14,7 +14,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     minBidIncrement: 100,
     bidDeadline: new Date(),
     paymentDeadlineDays: 3,
-    status: "active",
+    status: "draft",
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -87,5 +87,20 @@ describe("deleteItemImage", () => {
     const repo = new FakeItemRepository(null);
     await expect(deleteItemImage(repo, "u1", "img-inexistente")).rejects.toThrow("Imagem não encontrada");
     expect(repo.deleted).toEqual([]);
+  });
+
+  // ponytail: a posse sozinha NAO basta. `updateItem` e `deleteItem` ja recusavam
+  // qualquer coisa depois de `draft`; esta use case conferia so o `sellerId`, e
+  // o unico obstaculo entre o vendedor e as fotos de um item ja arrematado era o
+  // `disabled={locked}` do botao — cliente, e a action e um endpoint. Este teste
+  // e o que fecha a porta se o gate de status sair de la.
+  it("recusa apagar imagens de item publicado, mesmo do proprio dono, e não deleta", async () => {
+    for (const status of ["active", "closed", "awaiting_payment", "paid", "cancelled"] as const) {
+      const repo = new FakeItemRepository(makeImage(), makeItem({ sellerId: "u1", status }));
+      await expect(deleteItemImage(repo, "u1", "img1")).rejects.toThrow(
+        "Imagens de item publicado não podem ser excluídas",
+      );
+      expect(repo.deleted).toEqual([]);
+    }
   });
 });

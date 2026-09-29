@@ -21,6 +21,10 @@ class FakeUserRepository implements UserRepository {
   async updateProfile(_: string, input: Record<string, unknown>) {
     return { ...this.user!, ...input } as UserProfile;
   }
+  async findByIds() {
+    return Promise.reject(new Error("não usado"));
+  }
+
   async findBySlug() {
     return null;
   }

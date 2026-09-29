@@ -16,6 +16,15 @@ export async function getItemBySlugAndId(
   if (!item) return null;
   const user = await userRepo.findById(item.sellerId);
   if (!user || user.slug !== slug) return null;
+  // ponytail: o `status` aqui e de PRIVACIDADE, nao de "esta aberto": e o que
+  // mantem `cancelled`/`closed` fora do alcance da vitrine e da pagina de
+  // detalhe. O que falta e o sinal de "aberto", e ele NAO pode ser um segundo
+  // `return null` — nada transiciona `active -> closed` (o unico `setStatus` do
+  // sistema e o `cancelled`; o worker do cron e um stub), entao um item cujo
+  // prazo passou continua `active` para sempre, e devolver `null` aqui faria a
+  // pagina dar 404 num leilao encerrado, escondendo do comprador o lance
+  // vencedor. O prazo desce ate o `BidSection`, que e quem sabe desligar o
+  // formulario; `placeBid` ja recheca deadline e status (linhas 26-27 dele).
   if (item.status !== "active") return null;
   const [images, bids] = await Promise.all([
     itemRepo.findImagesByItemId(itemId),

@@ -10,17 +10,28 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import type { Bid } from "@/domain/repositories/bid-repository";
 
 interface BidFormProps {
   itemId: string;
   minBid: number;
+  /**
+   * Avisa quem segura o historico que um lance acabou de entrar. O
+   * `BidSection` mantem os lances em `useState` e so os atualiza pelo poll de
+   * 10s, entao sem isto o usuario recebia o toast "Lance registrado!" e via a
+   * propria lista sem o lance dele por ate 10 segundos, com o `min` do input
+   * ainda no valor anterior — e um segundo lance imediato era recusado no
+   * cliente. `revalidatePath` na action nao resolve: a page ja esta montada e o
+   * `useState` do cliente nao se ressincroniza de props novas.
+   */
+  onBid?: (bid: Bid) => void;
 }
 
 // Sem coerce/transform/default no schema do form: o input usa `valueAsNumber`,
 // logo `z.input` e `z.output` coincidem e o useForm de uma generic basta.
 type BidFormValues = z.input<ReturnType<typeof bidFormSchema>>;
 
-export function BidForm({ itemId, minBid }: BidFormProps) {
+export function BidForm({ itemId, minBid, onBid }: BidFormProps) {
   const [state, formAction, pending] = useActionState(placeBidAction, null);
   const minReais = formatReais(minBid);
   const form = useForm<BidFormValues>({
@@ -32,7 +43,7 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
     // ponytail: "onTouched" e nao "onBlur" — rationale em item-form.tsx; sem
     // handleSubmit o erro de um "onBlur" ficaria stale ate o proximo blur.
     mode: "onTouched",
-    defaultValues: { itemId, amountReais: minBid / 100 },
+    defaultValues: { itemId },
   });
   const { errors } = form.formState;
   const handleSubmit = form.handleSubmit;
@@ -42,18 +53,23 @@ export function BidForm({ itemId, minBid }: BidFormProps) {
   // `useWatch` e nao `form.watch()` porque o lint de react-hooks marca o
   // `watch` como incompativel com o React Compiler.
   const amountReaisStr = useWatch({ control: form.control, name: "amountReais" });
-  const amountReais = Number.isFinite(Number(amountReaisStr)) ? Number(amountReaisStr) : 0;
+  const amountReais = Number(amountReaisStr);
   const centavos = Number.isFinite(amountReais) ? Math.round(amountReais * 100) : minBid;
 
   useEffect(() => {
     if (state && state.ok) {
       toast.success("Lance registrado!");
+      if (state.bid) onBid?.(state.bid);
       form.reset({ itemId, amountReais: minBid / 100 });
     } else if (state && state.error) {
       toast.error(state.error);
     }
     // ponytail: accessibility constraint (DOM alert must stay) - the toast is visual-only, in-DOM alert for screen readers
-  }, [state, minBid]);
+    // ponytail: `onBid` entra no array porque e o que empurra o lance novo para
+    // o historico do `BidSection`; sem ele aqui, um `onBid` trocado pelo pai nao
+    // re-dispararia o efeito. `form` e `itemId` ja eram exigidos pelo
+    // `form.reset`, e `minBid` pelo `amountReais` do reset.
+  }, [state, minBid, onBid, form, itemId]);
 
   const onSubmit = async (data: BidFormValues) => {
     const formData = new FormData();

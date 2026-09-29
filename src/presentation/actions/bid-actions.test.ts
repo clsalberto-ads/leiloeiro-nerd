@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   placeBid: vi.fn(),
   getItemBids: vi.fn(),
+  findItemById: vi.fn(),
   createResendClient: vi.fn(() => ({})),
 }));
 
@@ -11,7 +12,9 @@ vi.mock("./auth-actions", () => ({ getSession: mocks.getSession }));
 vi.mock("@/application/use-cases/place-bid", () => ({ placeBid: mocks.placeBid }));
 vi.mock("@/application/use-cases/get-item-bids", () => ({ getItemBids: mocks.getItemBids }));
 vi.mock("@/infrastructure/email/resend", () => ({ createResendClient: mocks.createResendClient }));
-vi.mock("@/infrastructure/database/repositories/drizzle-item-repository", () => ({ drizzleItemRepository: {} }));
+vi.mock("@/infrastructure/database/repositories/drizzle-item-repository", () => ({
+  drizzleItemRepository: { findById: mocks.findItemById },
+}));
 vi.mock("@/infrastructure/database/repositories/drizzle-bid-repository", () => ({ drizzleBidRepository: {} }));
 vi.mock("@/infrastructure/database/repositories/drizzle-user-repository", () => ({ drizzleUserRepository: {} }));
 vi.mock("@/infrastructure/database/repositories/drizzle-notification-repository", () => ({
@@ -86,6 +89,8 @@ describe("placeBidAction", () => {
 describe("getItemBidsAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // o default e um item ATIVO: e o unico caso em que o historico e publico.
+    mocks.findItemById.mockResolvedValue({ id: ITEM_ID, status: "active" });
   });
 
   it("funciona sem sessão (polling público da vitrine §8.1)", async () => {
@@ -97,12 +102,61 @@ describe("getItemBidsAction", () => {
   });
 
   it("retorna erro quando itemId está ausente", async () => {
-    await expect(getItemBidsAction(null, new FormData())).resolves.toEqual({ error: "Item ID obrigatório" });
+    await expect(getItemBidsAction(null, new FormData())).resolves.toEqual({ error: "Item ID inválido" });
     expect(mocks.getItemBids).not.toHaveBeenCalled();
   });
 
   it("propaga erro do use case", async () => {
     mocks.getItemBids.mockRejectedValue(new Error("Erro ao buscar lances"));
+    await expect(getItemBidsAction(null, bidForm(ITEM_ID, ""))).resolves.toEqual({
+      error: "Erro ao buscar lances",
+    });
+  });
+
+  // ponytail: a guarda de UUID nao e cosmeticamente defensiva. `bids.item_id` e
+  // `uuid`, entao um `itemId` de outro formato estourava
+  // `invalid input syntax for type uuid` do Postgres DENTRO do catch, que
+  // devolvia `err.message` cru para um chamador anonimo. Um POST a mao
+  // reachava isso em qualquer pagina publica da aplicacao.
+  it("recusa itemId fora do formato uuid sem tocar no banco", async () => {
+    for (const ruim of ["x", "1; DROP TABLE bids", "../../etc/passwd", "0b61e95c-2be1-4d38-8f74"]) {
+      await expect(getItemBidsAction(null, bidForm(ruim, ""))).resolves.toEqual({ error: "Item ID inválido" });
+    }
+    expect(mocks.getItemBids).not.toHaveBeenCalled();
+    expect(mocks.findItemById).not.toHaveBeenCalled();
+  });
+
+  // ponytail: este endpoint e publico por design, mas "publico" nao pode virar
+  // "qualquer item". Antes do gate, um chamador anonimo iterava UUIDs e lia o
+  // historico completo — COM o nome do arrematante resolvido — de itens
+  // `cancelled` e `closed`, que o site nao expoe em lugar nenhum (a vitrine so
+  // lista ativos e a pagina de detalhe so abre ativos).
+  it("nao revela lances de item que nao esta ativo", async () => {
+    for (const status of ["cancelled", "closed", "awaiting_payment", "paid", "draft"]) {
+      mocks.findItemById.mockResolvedValue({ id: ITEM_ID, status });
+      await expect(getItemBidsAction(null, bidForm(ITEM_ID, ""))).resolves.toEqual({
+        error: "Lances indisponíveis",
+      });
+    }
+    expect(mocks.getItemBids).not.toHaveBeenCalled();
+  });
+
+  it("nao revela lances de item inexistente", async () => {
+    mocks.findItemById.mockResolvedValue(null);
+    await expect(getItemBidsAction(null, bidForm(ITEM_ID, ""))).resolves.toEqual({
+      error: "Lances indisponíveis",
+    });
+    expect(mocks.getItemBids).not.toHaveBeenCalled();
+  });
+
+  // ponytail: o `err.message` de um driver NAO volta para o cliente (o
+  // `Failed query: ... params: ...` do pg e o `ECONNREFUSED host:port` sao
+  // respectively inuteis e uma dica de topologia). O `getItemBids` do use case
+  // continua devolvendo a sua propria mensagem, que e a que o teste acima fixa.
+  it("nao devolve a mensagem do driver quando a consulta falha", async () => {
+    mocks.findItemById.mockRejectedValue(
+      Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
+    );
     await expect(getItemBidsAction(null, bidForm(ITEM_ID, ""))).resolves.toEqual({
       error: "Erro ao buscar lances",
     });

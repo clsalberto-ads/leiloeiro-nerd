@@ -67,11 +67,17 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* ponytail: categóricas, e nao mais as cinco cinzas que a base neutral
+     entregava. As cinco eram `oklch(L 0 0)` — mesma matiz, só mudando a
+     luminosidade — entao um grafico de "itens por status" saia com cinco tons
+     de cinza e nenhuma distinção real entre as categorias. Estes 5 tons sao
+     usados no máximo 5 séries por grafico; a ordem é da mais saturada para a
+     mais contida, que é a que melhor sobrevive a fundo branco. */
+  --chart-1: oklch(0.55 0.16 255);   /* azul */
+  --chart-2: oklch(0.62 0.15 155);   /* verde */
+  --chart-3: oklch(0.68 0.16 60);    /* âmbar */
+  --chart-4: oklch(0.58 0.17 300);   /* violeta */
+  --chart-5: oklch(0.58 0.15 20);    /* vermelho */
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -102,11 +108,16 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* ponytail: as MESMAS cinco matizes do claro, com a luminosidade trocada
+     para o fundo escuro. Reusar a cor do claro aqui é o erro clássico: ela foi
+     escolhida contra branco e some (ou vibra) contra quase-preto. A ordem dos
+     matizes é idêntica de propósito — o gráfico não muda de identidade ao
+     alternar o tema, só de contraste. */
+  --chart-1: oklch(0.7 0.15 255);
+  --chart-2: oklch(0.72 0.14 155);
+  --chart-3: oklch(0.76 0.15 60);
+  --chart-4: oklch(0.72 0.15 300);
+  --chart-5: oklch(0.7 0.16 20);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

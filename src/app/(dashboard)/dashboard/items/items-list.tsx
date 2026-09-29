@@ -1,24 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontalIcon } from "lucide-react";
-import type { ItemStatus } from "@/domain/repositories/item-repository";
-import { ROTULO_STATUS, ROTULO_TIPO } from "@/domain/repositories/item-repository";
-import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table";
+import { DataTable, type DataTableSort } from "@/components/data-table";
 import type { EmptyStateAction } from "@/components/empty-state";
-import { ItemStatusBadge } from "@/components/item-status-badge";
-import { BidCountdown } from "@/components/bid-countdown";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { formatReais } from "@/lib/format-reais";
-import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
+import { AbasDeStatus } from "./abas-de-status";
+import { COLUNAS } from "./colunas";
 import {
   colunaDaOrdenacao,
   DIRECAO_DA_VISTA_PADRAO,
@@ -30,54 +17,30 @@ import {
 } from "./estado-da-tabela";
 import type { ItemDaTabela } from "./item-da-tabela";
 
-type ItemFormAction = (formData: FormData) => void | Promise<void>;
-const publishItemFormAction: ItemFormAction = publishItemAction.bind(null, null) as unknown as ItemFormAction;
-const deleteItemFormAction: ItemFormAction = deleteItemAction.bind(null, null) as unknown as ItemFormAction;
-const cancelItemFormAction: ItemFormAction = cancelItemAction.bind(null, null) as unknown as ItemFormAction;
-
-// ponytail: as abas sao metade vocabulario e metade decisao de produto, e e a
-// divisao que importa. A ORDEM (rascunho, em leilao, encerrado, cancelado) e a
-// triagem do trabalho que falta, e uma escolha da tela e nao do dominio: por isso
-// mora aqui e nao no `ROTULO_STATUS`. O TEXTO de cada aba e o mesmo texto do badge
-// e da coluna, e por isso vem do mapa. `Todos` nao e um status, e por isso e a
-// unica string escrita aqui.
+// ponytail: este arquivo e a TABELA, e so a tabela. O que ele carrega agora e o
+// que responde "como o `DataTable` controlado vira uma URL": o agrupamento das
+// mudancas no microtask, a traducao entre `DataTableSort` e `orderBy`/`direction`
+// da URL, e a ligacao com o `useRouter`.
 //
-// A lista de chaves e `satisfies readonly ItemStatus[]` de proposito: uma chave que
-// nao existe no enum e erro de compilacao, e nao uma aba apontando para um
-// `?status=` que a pagina ignora em silencio (o leitor da URL so reconhece os
-// membros do vocabulario, e o vocabulario cresce no mapa de rotulos). E nenhuma aba
-// nasce sozinha quando um status novo entra no enum — essa e uma decisao de
-// produto, e o enum crescer nao pode virar o evento que aumenta a barra de filtros
-// sozinha.
-const ABAS_DE_STATUS = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
-
-const TABS: { key: string; status: ItemStatus | null; label: string }[] = [
-  { key: "all", status: null, label: "Todos" },
-  ...ABAS_DE_STATUS.map((status) => ({ key: status, status, label: ROTULO_STATUS[status] })),
-];
-
-// ponytail: o fuso do PRODUTO, nao o do processo. A celula e SSR'd e
-// re-renderizada no cliente, entao um servidor em UTC (o padrao de nuvem) e um
-// navegador em Sao Paulo veriam o mesmo instante com textos diferentes — o React
-// acusa divergencia de hidratacao no texto do `<time>` e descarta a arvore do
-// servidor. E o efeito no produto e pior que o aviso: o `item-form` le o
-// `datetime-local` como hora local, entao o vendedor digitando "30/09 22:00"
-// submete `2026-10-01T01:00Z` e a lista mostraria "01/10" num servidor em UTC —
-// um dia depois do prazo que ele acabou de cadastrar. `bid-history.tsx` repete o
-// padrao, mas la o componente e de servidor e nao hidrata: mesmo defeito, sem o
-// risco. A alternativa seria o servidor rodar em Sao Paulo (fuso do processo =
-// fuso do produto); fixar aqui deixa o fuso do produto explicito e igual em
-// qualquer maquina, sem depender de onde o deploy caiu.
-const FUSO = "America/Sao_Paulo";
+// As tres coisas que ele carregava e nao belonged to here foram para o lugar que
+// o guia de data-table do shadcn indica: as COLUNAS (com as row actions dentro)
+// para `colunas.tsx`, e as ABAS para `abas-de-status.tsx`. O vocabulario das abas
+// e as colunas sao as duas metades de "o que a tela mostra"; este arquivo e a
+// metade de "o que a tela faz quando o usuario mexe".
+//
+// O `estadoVazio` ficou aqui, e nao virou modulo proprio: sao 20 linhas com um
+// uso, e `items-list.estado-vazio.test.tsx` ja cobre as duas metades pelo
+// componente renderizado. Extrair um arquivo para isso seria um arquivo a mais
+// sem teste a mais.
 
 const MENSAGEM_VAZIA = "Nenhum item encontrado.";
 const MENSAGEM_SEM_LISTA = "Você ainda não tem itens.";
 const PLACEHOLDER_BUSCA = "Buscar item";
 
 // ponytail: uma tabela vazia tem DOIS motivos, e antes desta decisao os dois
-// diziam a mesma frase. Com busca, aba, ordenacao e paginacao vindas da URL
-// (Task 9), "voce nao tem item nenhum" e "nada casou com este filtro" chegam na
-// mesma celula — e so um deles tem para onde voltar. O texto unico mandava o
+// diziam a mesma frase. Com busca, aba, ordenacao e paginacao vindas da URL,
+// "voce nao tem item nenhum" e "nada casou com este filtro" chegam na mesma
+// celula — e so um deles tem para onde voltar. O texto unico mandava o
 // vendedor que nunca vendeu nada procurar um filtro que ele nao digitou.
 //
 // A decisao mora AQUI, e nao no `DataTable`, porque e esta lista que sabe o que e
@@ -125,178 +88,6 @@ function estadoVazio(vista: VistaDaTabela): {
 function listaSemFiltro(vista: VistaDaTabela): VistaDaTabela {
   return { ...vista, q: "", status: null, page: PAGINA_PADRAO };
 }
-
-// ponytail: o `<form>` fica FORA do menu e o item do menu e que dispara o
-// `requestSubmit`. Com o form DENTRO do item, o clique fecharia o menu (o base-ui
-// fecha no click) e desmancharia o proprio form antes de o navegador executar o
-// submit do botao — a acao viraria um item de menu que nao faz nada. Aqui o form
-// fica montado na celula e o `onClick` do item o submete.
-//
-// ponytail: as tres acoes estao escritas uma a uma, e nao num array de dados com
-// a ref dentro. A regra `react-hooks/refs` (a analise de refs do compilador) so
-// aceita uma arrow que le `ref.current` quando ela nasce direto num prop de
-// evento do JSX: dentro de um array no corpo do componente ela vira "funcao que
-// pode ser chamada durante o render" e o lint acusa. O preco e a repeticao de
-// tres linhas; o ganho e o menu inteiro legivel sem indirection.
-function AcoesDoItem({ item }: { item: ItemDaTabela }) {
-  const refPublicar = useRef<HTMLFormElement>(null);
-  const refExcluir = useRef<HTMLFormElement>(null);
-  const refCancelar = useRef<HTMLFormElement>(null);
-
-  // ponytail: quem pode o quê e a mesma regra da lista antiga em `<li>`: rascunho
-  // publica e exclui; em leilao e encerrado, cancela. Item pago, aguardando
-  // pagamento ou cancelado nao tem acao nenhuma — e sem acao o gatilho some,
-  // porque um menu vazio e um beco sem saida.
-  const podePublicar = item.status === "draft";
-  const podeExcluir = item.status === "draft";
-  const podeCancelar = item.status === "active" || item.status === "closed";
-  if (!podePublicar && !podeExcluir && !podeCancelar) return null;
-
-  return (
-    <>
-      {podePublicar ? (
-        <form ref={refPublicar} action={publishItemFormAction} hidden>
-          <input type="hidden" name="id" value={item.id} />
-        </form>
-      ) : null}
-      {podeExcluir ? (
-        <form ref={refExcluir} action={deleteItemFormAction} hidden>
-          <input type="hidden" name="id" value={item.id} />
-        </form>
-      ) : null}
-      {podeCancelar ? (
-        <form ref={refCancelar} action={cancelItemFormAction} hidden>
-          <input type="hidden" name="id" value={item.id} />
-        </form>
-      ) : null}
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon-sm" aria-label={`Ações de ${item.title}`} />}
-        >
-          <MoreHorizontalIcon aria-hidden="true" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {podePublicar ? (
-            <DropdownMenuItem onClick={() => refPublicar.current?.requestSubmit()}>
-              Publicar
-            </DropdownMenuItem>
-          ) : null}
-          {podeExcluir ? (
-            <DropdownMenuItem variant="destructive" onClick={() => refExcluir.current?.requestSubmit()}>
-              Excluir
-            </DropdownMenuItem>
-          ) : null}
-          {podeCancelar ? (
-            <DropdownMenuItem variant="destructive" onClick={() => refCancelar.current?.requestSubmit()}>
-              Cancelar
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </>
-  );
-}
-
-// ponytail: o `accessorFn` e, ao mesmo tempo, o valor que a coluna ORDENA e o
-// valor que a busca global CASA — e ele nao pode ser as duas coisas. Dinheiro
-// (`minInitialBid`) e prazo (`getTime()`) ordenam certo como numero e nao casam
-// com o texto que o usuario le; o inverso ("R$ 1.234,56", "01/10/2026")
-// ordenaria "1.000,00" antes de "50,00" e viraria o calendario de cabeca para
-// baixo. Entao as colunas de dado entregam o valor que ordena certo.
-//
-// Onde o rotulo e da propria coluna (`tipo`, `status`) o accessorFn entrega
-// `ROTULO_TIPO`/`ROTULO_STATUS`, e o `q` do servidor casa com o rotulo do
-// dominio: os dois lados dizem a mesma coisa por construcao em vez de por
-// coincidencia. Era exatamente a identidade que o `accessorFn` tinha de sustentar
-// sozinho, com o enum ingles ("active") como valor: a busca respondia "Nenhum item
-// encontrado." para "Em leilao", o termo escrito como o usuario le.
-//
-// ponytail: neste arquivo o `accessorFn` nao e lido por NENHUM caminho de leitura
-// — a lista e so servidor, e o `DataTable` roda com `manualFiltering` e
-// `manualSorting` ligadas, entao nem a busca nem a ordenacao do cliente passam por
-// ele. Passar mesmo assim e o que mantem as colunas honestas se o modo virar: um
-// `accessorFn` que so existe no ramo cliente morreria junto com ele, e a coluna
-// voltaria a ser so texto (que e o que ordenaria "1.000,00" antes de "50,00").
-//
-// ponytail: `tipo` e `status` sao `sortable: false` por um motivo que ja estava
-// escrito acima e so agora fecha: a ordem alfabetica do enum ingles nao e um
-// ciclo de vida, e a do rotulo pt-BR nao e, nenhuma das duas e "a ordem" de um
-// status. E, diferente do resto das colunas, elas nao TEM como ordenar: a union
-// `ItemOrderBy` do repositorio e `createdAt | title | minInitialBid | bidDeadline`
-// — nao ha `status` nem `type` que o servidor aceite. Uma coluna ordenavel sem
-// `orderBy` correspondente produziria um clique que escreve
-// `?orderBy=status&direction=asc`, que o leitor rejeita e converte de volta para
-// `createdAt desc`: a seta animaria, a URL mudaria e a tabela voltaria na ordem
-// antiga. E um `sortable: true` aqui seria mentira nos dois sentidos, entao o
-// desligamento e explicito e nao herdado da ausencia de `accessorFn` (que as
-// colunas de dado NAO tem: elas o carregam pelo motivo do paragrafo acima).
-//
-// ponytail: DEVIDA (Task 9) — a busca ainda nao acha "1.234,56", "R$" nem
-// "01/10/2026", porque dinheiro e prazo nao tem como ordenar e casar no mesmo
-// accessor. A correcao estrutural e um segundo valor de busca na coluna, sem
-// mexer no `getSortedRowModel`: (1) `filterValue?: (row: T) => string` no
-// `DataTableColumn`; (2) mapeado no `ColumnDef` em `data-table.tsx`;
-// (3) no `contemSemAcento`, ler
-// `def.filterValue ? def.filterValue(row.original) : row.getValue(columnId)`.
-// Sao ~8 linhas, e `filterValue` continuaria opcional — as colunas de hoje seguem
-// com o `accessorFn` como valor de busca. Atraso deliberado: e uma mudanca no
-// componente generico, e nao numa lista. E agora que a lista e so servidor, a
-// correcao nao e mais "dupla": a busca formatada e do servidor (o `q` do Postgres
-// casa com o valor gravado, nao com o formatado), e o `filterValue` so volta a
-// valer no ramo cliente do `DataTable`, que nenhum consumidor desta tela usa.
-const COLUNAS: DataTableColumn<ItemDaTabela>[] = [
-  {
-    id: "titulo",
-    header: "Título",
-    accessorFn: (item) => item.title,
-    cell: (item) => (
-      <Link href={`/dashboard/items/${item.id}/edit`} className="font-medium text-primary hover:underline">
-        {item.title}
-      </Link>
-    ),
-  },
-  {
-    id: "tipo",
-    header: "Tipo",
-    sortable: false,
-    accessorFn: (item) => ROTULO_TIPO[item.type],
-    cell: (item) => ROTULO_TIPO[item.type],
-  },
-  {
-    id: "status",
-    header: "Status",
-    sortable: false,
-    accessorFn: (item) => ROTULO_STATUS[item.status],
-    cell: (item) => <ItemStatusBadge status={item.status} />,
-  },
-  {
-    id: "lanceMinimo",
-    header: "Lance mínimo",
-    accessorFn: (item) => item.minInitialBid,
-    cell: (item) => `R$ ${formatReais(item.minInitialBid)}`,
-  },
-  {
-    id: "prazo",
-    header: "Deadline",
-    accessorFn: (item) => item.bidDeadline.getTime(),
-    cell: (item) => (
-      <div className="flex flex-col">
-        <time dateTime={item.bidDeadline.toISOString()}>
-          {item.bidDeadline.toLocaleDateString("pt-BR", { timeZone: FUSO })}
-        </time>
-        {item.status === "active" ? <BidCountdown deadline={item.bidDeadline} /> : null}
-      </div>
-    ),
-  },
-  {
-    // ponytail: a coluna de acoes NAO tem `accessorFn` — e assim que a coluna
-    // fica fora da ordenacao sem precisar de `sortable: false`: sem valor de
-    // acesso nao ha o que comparar, e botao e link nao tem ordem.
-    id: "acoes",
-    header: "Ações",
-    cell: (item) => <AcoesDoItem item={item} />,
-  },
-];
 
 export interface ItemsListProps {
   // ponytail: o DTO, e nao `Item`. Esta interface era o pin do debito que a parte 1
@@ -418,39 +209,7 @@ export function ItemsList({ items, vista, totalCount, navegar }: ItemsListProps)
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.key}
-            // ponytail: a aba e um link comum, e nao um `navegar` por callback, por
-            // dois motivos. O primeiro e o prefetch: um `<Link>` traz o RSC quando o
-            // mouse passa, e a aba fica pronta. O segundo e o historico: `navegar` nao
-            // e chamado, entao nao ha `queueMicrotask` no meio e nao se registra duas
-            // entradas iguais para o mesmo destino.
-            //
-            // A aba ZERA busca, ordenacao e pagina, e PRESERVA o tamanho: filtro
-            // "Em leilao" e tamanho 50 sao duas escolhas independentes, e quem le 50 por
-            // pagina nao deveria perder isso so porque clicou numa aba. E "Todos" sem
-            // nenhuma escolha devolve a string vazia — a aba e o estado inicial, entao
-            // ela e o link para `/dashboard/items` sem query.
-            href={hrefDaVista({
-              ...vista,
-              q: "",
-              status: tab.status,
-              orderBy: ORDENACAO_PADRAO,
-              direction: DIRECAO_DA_VISTA_PADRAO,
-              page: PAGINA_PADRAO,
-            })}
-            className={`rounded-full px-3 py-1 text-sm font-medium ${
-              (vista.status ?? "all") === tab.key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </div>
+      <AbasDeStatus vista={vista} />
 
       <DataTable
         columns={COLUNAS}

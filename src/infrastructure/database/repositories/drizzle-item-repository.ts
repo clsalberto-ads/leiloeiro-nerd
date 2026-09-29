@@ -175,10 +175,17 @@ async function listarPorVendedor(
   // o teste de unidade segura o outro lado dele.
   const where = and(...predicados(sellerId, filter));
   const consulta = db.select().from(items).where(where).orderBy(...ordenarItens(filter));
-  // ponytail: o retorno de `limit()`/`offset()` e descartado de proposito. O drizzle
-  // devolve um builder NOVO, e o `where`/`orderBy` acima ja esta montado — reatribuir
-  // (ou trocar por `const paginada = consulta.limit(n)`) faria a paginacao sumir sem
-  // erro nenhum, que e a forma mais cara de bug de paginacao que existe.
+  // ponytail: o `limit`/`offset` sao aplicados no proprio builder e o retorno
+  // descartado, e a Forma CORRETA de usar — o comentario anterior aqui
+  // afirmava o contrario ("o drizzle devolve um builder NOVO") e foi verificado
+  // contra o installed: `select.js:680-710` faz `this.config.limit = limit` e
+  // `return this`. `const paginada = consulta.limit(n)` seria portanto
+  // equivalente, nao um bug de paginacao sumindo. A diferenca real e outra: o
+  // `Promise.all` abaixo precisa da MESMA instancia (o `where` e o `orderBy`
+  // sao os dois aplicados nela), e reatribuir a variavel para o resultado do
+  // `limit` tornaria o nome `consulta` um objeto diferente do que o `count`
+  // vizinho espera. O teste desta pagina mocka o builder com um chain que
+  // devolve `a si mesmo`, entao ele trava o COMPORTAMENTO, nao a frase.
   const limite = fatiaParaSQL(filter?.limit);
   const deslocamento = fatiaParaSQL(filter?.offset);
   if (limite !== undefined) consulta.limit(limite);
@@ -283,6 +290,17 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
 
   async createImages(itemId, urls) {
     return await db.transaction(async (tx) => {
+      // ponytail: o `FOR UPDATE` na linha do `items` e o que faz esta
+      // transacao valer alguma coisa. O `max(position)` e um agregado: ele nao
+      // trava nada, e `SELECT ... FOR UPDATE` nem e legal sobre agregado, entao
+      // a transacao sozinha nao dava exclusao mútua nenhuma. Duas abas do form
+      // de edicao salvando ao mesmo tempo liam `maxPos = 0` as duas, inseriam
+      // `position = 1` as duas, e o `image_url` (o subquery `order by position
+      // asc limit 1` abaixo, sem desempate) passava a escolher entre dois
+      // arquivos conforme o plano do Postgres. Travar a linha do item e o mesmo
+      // mecanismo que o `placeBid` usa em `drizzle-bid-repository.ts:29`, e
+      // nao cria ciclo: `placeBid` nunca toca `item_images`.
+      await tx.execute(sql`SELECT id FROM ${items} WHERE id = ${itemId} FOR UPDATE`);
       const existing = await tx
         .select({ maxPos: max(itemImages.position) })
         .from(itemImages)
@@ -302,16 +320,25 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
   },
 
   async deleteImage(imageId) {
-    const [row] = await db.select().from(itemImages).where(eq(itemImages.id, imageId)).limit(1);
-    await db.delete(itemImages).where(eq(itemImages.id, imageId));
-    if (row) {
-      await db
-        .update(items)
-        .set({
-          imageUrl: sql`(select url from ${itemImages} where ${itemImages.itemId} = ${row.itemId} order by position asc limit 1)`,
-          updatedAt: new Date(),
-        })
-        .where(eq(items.id, row.itemId));
-    }
+    // ponytail: uma transacao, e nao tres `await` soltos. O `SELECT` do `itemId`
+    // e o dado que o `UPDATE` de `items.image_url` precisa; sem a transacao, uma
+    // conexao perdida entre o `DELETE` e o `UPDATE` deixava
+    // `items.image_url` apontando para uma linha que ja nao existia — a capa do
+    // item sumia da vitrine e da pagina de detalhe, sem como recuperar sem um
+    // `UPDATE` manual. O `SELECT` tambem nao e mais redundante: e a unica forma
+    // de saber de qual item recalcular a capa.
+    await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(itemImages).where(eq(itemImages.id, imageId)).limit(1);
+      await tx.delete(itemImages).where(eq(itemImages.id, imageId));
+      if (row) {
+        await tx
+          .update(items)
+          .set({
+            imageUrl: sql`(select url from ${itemImages} where ${itemImages.itemId} = ${row.itemId} order by position asc limit 1)`,
+            updatedAt: new Date(),
+          })
+          .where(eq(items.id, row.itemId));
+      }
+    });
   },
 };

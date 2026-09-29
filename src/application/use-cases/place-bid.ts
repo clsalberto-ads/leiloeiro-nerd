@@ -50,10 +50,26 @@ export async function placeBid(
         title: "Lance superado",
         content: `Seu lance de R$ ${formatReais(previousHighestBid.amount)} em ${item.title} foi superado por R$ ${formatReais(amount)}`,
       });
-      const outbidUser = await userRepo.findById(outbidUserId);
-      const seller = await userRepo.findById(item.sellerId);
-      if (outbidUser?.email && seller?.slug) {
-        await resend.emails.send({
+    } catch (e) {
+      // ponytail: a notificacao no banco e o que a UI le; o e-mail e o extra.
+      // Falhar num dos dois nao pode desfazer o lance (que ja foi commitado),
+      // entao os dois erros sao registrados e engolidos de proposito — mas o LOG
+      // dizia "[Resend]" para os dois, mandando quem fosse de plantao procurar
+      // no provedor de e-mail uma falha que era do INSERT em `notifications`.
+      console.error("[bid] falha ao gravar notificacao de lance superado:", e);
+    }
+    const outbidUser = await userRepo.findById(outbidUserId);
+    const seller = await userRepo.findById(item.sellerId);
+    if (outbidUser?.email && seller?.slug) {
+      // ponytail: o `?? "http://localhost:3000"` e o mesmo razao do
+      // `RESEND_FROM_EMAIL ??` acima: sem o, um deploy que esqueceu a variavel
+      // mandava um link `undefined/maria-seller/item1` — um CTA morto, no
+      // e-mail que existe so para trazer o arrematante de volta. O
+      // `place-bid.test.ts` nao pegaria: ele casa por `stringContaining`, e
+      // `undefined/maria-seller/item1` tambem contem `/maria-seller/item1`.
+      const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      try {
+        const resposta = await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL ?? "Leiloeiro Nerd <noreply@leiloeironerd.com>",
           to: outbidUser.email,
           subject: "Seu lance foi superado!",
@@ -62,12 +78,23 @@ export async function placeBid(
             itemTitle: item.title,
             oldAmount: previousHighestBid.amount,
             newAmount: amount,
-            itemUrl: `${process.env.NEXT_PUBLIC_APP_URL}/${seller.slug}/${item.id}`,
+            itemUrl: `${base}/${seller.slug}/${item.id}`,
           }),
         });
+        // ponytail: o `send` do Resend NAO lanca em erro de API — ele RETORNA
+        // `{ data: null, error }` para qualquer status nao-2xx, e so lanca em
+        // falha de rede. O `try/catch` sozinho deixava passar, em silencio, o
+        // caso que mais importa: `RESEND_FROM_EMAIL` apontando para um dominio
+        // ainda nao verificado (403), ou a API key rotacionada. A notificacao
+        // no banco continuava chegando, entao a falha nao aparecia em lugar
+        // nenhum. O envelope e `{ data, error }` (o `ResendClient` local e
+        // frouxo de proposito, para nao acoplar o use case ao SDK).
+        if (resposta && typeof resposta === "object" && "error" in resposta && resposta.error) {
+          console.error("[bid] Resend recusou o e-mail de lance superado:", resposta.error);
+        }
+      } catch (e) {
+        console.error("[bid] falha ao enviar e-mail de lance superado:", e);
       }
-    } catch (e) {
-      console.error("[Resend] falha ao enviar outbid:", e);
     }
   }
 

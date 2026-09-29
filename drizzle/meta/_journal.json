@@ -29,6 +29,13 @@
       "when": 1789953450297,
       "tag": "0003_payments_mp_payment_id_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790707613827,
+      "tag": "0004_warm_smasher",
+      "breakpoints": true
     }
   ]
 }

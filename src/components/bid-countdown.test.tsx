@@ -7,11 +7,23 @@ const realDateNow = Date.now;
 vi.spyOn(global.Date, "now").mockReturnValue(new Date("2026-09-20T10:00:00Z").getTime());
 
 describe("BidCountdown", () => {
-  it("anuncia o prazo com aria-live", () => {
+  // ponytail: o teste anterior exigia `aria-live="polite"` e therefore fixava o
+  // defeito. `role="timer"` implica `aria-live="off"`; o `polite` sobrescrevia
+  // e o leitor de tela anunciava o relogio 1x/segundo pelo leilao inteiro. Este
+  // e o teste que trava o NAO-anuncio: o `role="timer"` sozinho ja e o
+  // comportamento correto, e o prazo absoluto continua exposto no `sr-only`.
+  it("não marca a contagem como aria-live (evita anunciar a cada segundo)", () => {
     const deadline = new Date(Date.now() + 3600_000); // 1 hour from now
     const html = renderToString(<BidCountdown deadline={deadline} />);
     expect(html).toContain('role="timer"');
-    expect(html).toContain('aria-live="polite"');
+    expect(html).not.toContain("aria-live");
+  });
+
+  it("não marca 'Encerrado' como aria-live", () => {
+    const deadline = new Date(Date.now() - 3600_000);
+    const html = renderToString(<BidCountdown deadline={deadline} />);
+    expect(html).toContain('role="timer"');
+    expect(html).not.toContain("aria-live");
   });
 
   it("exibe o texto para screen readers com o prazo absoluto", () => {

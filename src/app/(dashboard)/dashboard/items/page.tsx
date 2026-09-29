@@ -7,6 +7,7 @@ import { ItensDaUrl } from "./items-list";
 import { filtroDaVista, interpretarParametros, ultimaPagina, hrefDaVista } from "./estado-da-tabela";
 import { paraItemDaTabela } from "./item-da-tabela";
 import { BecomeSellerForm } from "@/components/become-seller-form";
+import { primeiroValor } from "@/lib/primeiro-valor";
 
 export const dynamic = "force-dynamic";
 
@@ -30,23 +31,10 @@ export const dynamic = "force-dynamic";
 // entre os 159) — ver a nota em `components/skeletons.tsx` para as duas assercoes
 // que quebrariam.
 
-// ponytail: a URL e lida no FIM, depois da sessao, e nao logo no primeiro await. A
-// ordem e "se nao ha pagina, nao ha consulta": o `dynamic = "force-dynamic"` acima
-// garante que a leitura e por requisicao, entao nao ha cache de pagina que
-// justificasse ler antes, e o `BecomeSellerForm` e a tela de quem nao tem lista
-// nenhuma — uma consulta para o userId de um nao-vendedor devolve `total = 0` que
-// so seria jogado fora. O `await searchParams` e obrigatorio (o Next 16 entrega uma
-// PROMESSA) e e o que o compilador cobra daqui.
 //
-// ponytail: `primeiroValor` resolve a unica diferenca entre o `searchParams` do
-// Next (`string | string[] | undefined`) e o `URLSearchParams` do cliente, que e
-// parametro repetido. Repetir `?page=2&page=9` e um link malformado, e a escolha
-// ("o primeiro vence") e a que o `URLSearchParams.get` faz, entao servidor e
-// cliente concordam em vez de divergir so no parametro duplicado.
-function primeiroValor(valor: string | string[] | undefined): string | null {
-  if (Array.isArray(valor)) return valor[0] ?? null;
-  return valor ?? null;
-}
+// `primeiroValor` (o parametro repetido) vem de `@/lib/primeiro-valor`, e nao e
+// uma funcao local: o `?periodo` do dashboard usa a MESMA decisao ("o primeiro
+// vence"), e duas copias divergiriam no primeiro parametro duplicado.
 
 export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/items">) {
   const session = await getSession();

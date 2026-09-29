@@ -27,13 +27,25 @@ export function BidCountdown({ deadline }: { deadline: Date }) {
     return () => clearInterval(id);
   }, [deadline]);
 
-  if (ms <= 0) return <span className="font-medium text-muted-foreground" role="timer" aria-live="polite">Encerrado</span>;
+  if (ms <= 0) return <span className="font-medium text-muted-foreground" role="timer">Encerrado</span>;
 
   const formatted = format(ms);
   const formattedDate = formatAbsolute(deadline);
 
+  // ponytail: SEM `aria-live` aqui, e o `role="timer"` que faz o trabalho. O
+  // `timer` implica `aria-live="off"` na spec de ARIA; o `aria-live="polite"`
+  // que estava nesta span sobrescrevia essa implicacao e fazia o leitor de tela
+  // anunciar "0 d 0 h 2 min 3 s" — uma vez por SEGUNDO, durante a duracao
+  // inteira do leilao. Quem usa leitor de tela nao consegue ler a pagina por
+  // cima disso, que e o oposto do que o atributo pretendia fazer.
+  //
+  // O que o usuario de leitor de tela recebe agora e o prazo ABSOLUTO, no
+  // `sr-only` abaixo: ele navega ate la uma vez e sabe ate quando da. O
+  // upgrade path, se um dia o contagem regressiva precisar ser anunciada, e uma
+  // regiao `aria-live="polite"` SEPARADA que so muda em degraus (1 min, 10 min,
+  // 1 h) em vez de a cada tick — nunca este no texto que muda 1x/segundo.
   return (
-    <span role="timer" aria-live="polite" className="motion-reduce:animate-none">
+    <span role="timer" className="motion-reduce:animate-none">
       {formatted}
       <span className="sr-only">{`Prazo: ${formattedDate}`}</span>
     </span>

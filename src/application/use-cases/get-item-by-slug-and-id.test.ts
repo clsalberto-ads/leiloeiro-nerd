@@ -81,6 +81,10 @@ class FakeUserRepository implements UserRepository {
   async findById(userId: string) {
     return this.userBy[userId] ?? null;
   }
+  async findByIds(ids: string[]) {
+    return ids.map((id) => this.userBy[id]).filter((u): u is NonNullable<typeof u> => Boolean(u));
+  }
+
   async findBySlug() {
     return null;
   }

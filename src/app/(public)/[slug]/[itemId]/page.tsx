@@ -24,7 +24,7 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
           <BidCountdown deadline={item.bidDeadline} />
         </div>
       </div>
-      <BidSection itemId={item.id} initialBids={bids} minInitialBid={item.minInitialBid} minBidIncrement={item.minBidIncrement} />
+      <BidSection itemId={item.id} initialBids={bids} minInitialBid={item.minInitialBid} minBidIncrement={item.minBidIncrement} deadline={item.bidDeadline} />
     </div>
   );
 }

@@ -10,6 +10,17 @@ const CENTAVOS_POR_REAL = 100;
 
 const reaisToCents = (v: number) => Math.round(v * CENTAVOS_POR_REAL);
 
+// ponytail: TETO do dinheiro, em CENTAVOS. Toda coluna de dinheiro e `integer`
+// (int4) no Postgres, e o int4 para em 2_147_483_647. Sem este teto, um
+// `amount: 5000000000` passa pelo `placeBidSchema` (que so tem piso), passa
+// pela revalidacao dentro da transacao, e morre no `INSERT` com `22003 integer
+// out of range` — que a action devolvia ao usuario como `err.message`, ou seja,
+// o SQL do insert e os parametros na tela. O teto fecha a porta na fronteira,
+// que e onde ela deve estar. 2.000.000.000 de centavos = R$ 20.000.000,00: muito
+// acima de qualquer Leilao, e com folga para o teto do int4.
+const MAX_CENTAVOS = 2_000_000_000;
+const DINHEIRO_LIMITE = "Valor acima do máximo permitido";
+
 export const signUpSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
   email: z.string().email("E-mail inválido"),
@@ -34,8 +45,8 @@ export const itemSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres").max(150, "Título muito longo"),
   description: z.string().min(10, "Descrição deve ter no mínimo 10 caracteres").max(5000, "Descrição muito longa"),
   type: z.enum(["product", "service", "piece"], { message: "Tipo inválido" }),
-  minInitialBid: z.coerce.number().positive("Lance mínimo inválido").refine((v) => v >= 1, "Lance mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
-  minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
+  minInitialBid: z.coerce.number().positive("Lance mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Lance mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
+  minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
   bidDeadline: z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),
   paymentDeadlineDays: z.coerce.number().int("Dias de pagamento inválido").min(1, "Mínimo 1 dia para pagamento").max(30, "Máximo 30 dias para pagamento").default(3),
   imageUrls: z
@@ -79,7 +90,7 @@ const LANCE_INVALIDO = "Lance inválido";
 
 export const placeBidSchema = z.object({
   itemId: z.string().uuid(),
-  amount: z.coerce.number().positive(LANCE_INVALIDO).int(LANCE_INVALIDO).refine((v) => v >= MIN_BID_CENTAVOS, `Lance mínimo R$ ${formatReais(MIN_BID_CENTAVOS)}`),
+  amount: z.coerce.number().positive(LANCE_INVALIDO).int(LANCE_INVALIDO).max(MAX_CENTAVOS, DINHEIRO_LIMITE).refine((v) => v >= MIN_BID_CENTAVOS, `Lance mínimo R$ ${formatReais(MIN_BID_CENTAVOS)}`),
 });
 
 /**
@@ -99,6 +110,7 @@ export function bidFormSchema(minBid: number) {
       // a ida e volta (reais -> centavos -> reais). E o mesmo "centavos
       // inteiros" que o `placeBidSchema` exige, sem depender do `step` do input.
       .refine((v) => reaisToCents(v) / CENTAVOS_POR_REAL === v, LANCE_INVALIDO)
+      .max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE)
       .min(pisoCentavos / CENTAVOS_POR_REAL, `Lance mínimo R$ ${formatReais(pisoCentavos)}`),
   });
 }

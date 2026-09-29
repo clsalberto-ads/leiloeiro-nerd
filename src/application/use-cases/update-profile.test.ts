@@ -18,6 +18,10 @@ class FakeUserRepository implements UserRepository {
     this.calls.push(input);
     return { ...baseUser, ...input };
   }
+  async findByIds() {
+    return Promise.reject(new Error("não usado"));
+  }
+
   async findBySlug() {
     return null;
   }

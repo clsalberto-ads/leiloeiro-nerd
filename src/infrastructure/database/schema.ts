@@ -20,7 +20,17 @@ export const items = pgTable("items", {
   status: itemStatusEnum("status").notNull().default("draft"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("items_bid_deadline_status_idx").on(t.bidDeadline, t.status)]);
+// ponytail: `items_seller_id_idx` e o indice da tela principal do app.
+// `listarPorVendedor` filtra por `seller_id` e o unico indice que havia
+// (`bid_deadline, status`) comeca por outra coluna, entao o Postgres nao o
+// aproveita: o dashboard do vendedor — a query mais executada do produto, e
+// re-executada a cada tecla digitada na busca — fazia seq scan + sort da tabela
+// inteira. O `(bid_deadline, status)` continua: ele serve a vitrine e o
+// encerramento, que filtram por outra ordem.
+}, (t) => [
+  index("items_bid_deadline_status_idx").on(t.bidDeadline, t.status),
+  index("items_seller_id_idx").on(t.sellerId),
+]);
 
 export const itemImages = pgTable("item_images", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -37,7 +47,16 @@ export const bids = pgTable("bids", {
   amount: integer("amount").notNull(),
   rank: integer("rank"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("bids_item_id_idx").on(t.itemId)]);
+// ponytail: `(item_id, amount DESC)`, e nao so `item_id`. Tres leituras ordenam
+// os lances do item por `amount DESC`: `findByItemId` (a tabela do historico),
+// `countBids` e o `highestBid` do `placeBid` — e este ultimo roda DEPOIS do
+// `SELECT ... FOR UPDATE` do item, entao a ordenacao inteira acontece COM O
+// LOCK SEGURADO. Num item com 10.000 lances, cada lance pagava um top-N
+// heapsort de 10.000 linhas dentro de uma fila que o proprio lock ja serializa
+// por completo: o gargalo piorava exatamente na largada, quando todo mundo
+// lanca. Com o indice, vira uma descida. O `bids_item_id_idx` anterior
+// continua, porque `item_id` sozinho tambem e consultado (contagem, FK).
+}, (t) => [index("bids_item_id_idx").on(t.itemId), index("bids_item_id_amount_idx").on(t.itemId, t.amount.desc())]);
 
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),

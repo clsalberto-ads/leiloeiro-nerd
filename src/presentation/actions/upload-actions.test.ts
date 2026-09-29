@@ -30,7 +30,8 @@ function file(size: number, type = "image/jpeg", name = "a.jpg") {
 describe("uploadItemImagesAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSession.mockResolvedValue({ user: { id: "u1" } });
+    // o papel importa: a action so aceita `seller`/`both`
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "seller" } });
   });
 
   it("retorna erro quando não autenticado", async () => {
@@ -89,7 +90,8 @@ describe("uploadItemImagesAction", () => {
 describe("deleteItemImageAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSession.mockResolvedValue({ user: { id: "u1" } });
+    // o papel importa: a action so aceita `seller`/`both`
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "seller" } });
   });
 
   it("retorna erro quando não autenticado", async () => {
@@ -112,5 +114,30 @@ describe("deleteItemImageAction", () => {
     const fd = new FormData();
     fd.set("imageId", "img1");
     await expect(deleteItemImageAction(null, fd)).resolves.toEqual({ error: "Sem permissão" });
+  });
+});
+// ponytail: sessao NAO e papel. A action conferia so `getSession()`, mas a
+// imagem so existe para um item e o `createItem` exige `seller`/`both`. Um
+// comprador registrado — a conta mais facil de criar, e o estado normal de
+// quem esta usando o produto — chamava a action quantas vezes quisesse, 10 x 8MB
+// por chamada, sem nunca anexar o resultado a nada: so queimando a cota paga de
+// armazenamento. Este e o teste que trava o gate de papel.
+describe("uploadItemImagesAction — gate de papel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(["bidder"])("recusa quem nao e leiloeiro (%s) sem chamar o UploadThing", async (role) => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role } });
+    const r = await uploadItemImagesAction(null, filesWith([file(1024)]));
+    expect(r).toEqual({ error: "Apenas leiloeiros podem enviar imagens" });
+    expect(mocks.utapi.uploadFiles).not.toHaveBeenCalled();
+  });
+
+  it.each(["seller", "both"])("aceita quem e %s", async (role) => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role } });
+    mocks.utapi.uploadFiles.mockResolvedValue([{ data: { ufsUrl: "https://ut.ex/a.jpg" }, error: null }]);
+    const r = await uploadItemImagesAction(null, filesWith([file(1024)]));
+    expect(r).toEqual({ urls: ["https://ut.ex/a.jpg"] });
   });
 });
