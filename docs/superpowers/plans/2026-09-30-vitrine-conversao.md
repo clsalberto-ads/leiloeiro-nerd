@@ -147,11 +147,22 @@ node -e "
 const {Client}=require('pg');const fs=require('fs');
 const url=fs.readFileSync('.env','utf8').match(/^DATABASE_URL=(.*)\$/m)[1];
 (async()=>{const c=new Client({connectionString:url});await c.connect();
-const e=await c.query(\"explain select item_id, count(*), max(amount) from bids where item_id in (select id from items) group by item_id\");
-console.log(e.rows.map(r=>r['QUERY PLAN']).join(' | '));await c.end();})();"
+const ids=['ce009dc3-7c77-4033-9339-02f0adbeaabb','dc78548b-8252-4ae0-b0cd-d4840bada13a'];
+const q='explain select item_id, count(*)::int, max(amount) from bids where item_id = any(\$1::uuid[]) group by item_id';
+console.log('padrao: ', (await c.query(q,[ids])).rows.map(r=>r['QUERY PLAN']).join(' | '));
+await c.query('set enable_seqscan = off');
+console.log('forcado:', (await c.query(q,[ids])).rows.map(r=>r['QUERY PLAN']).join(' | '));
+await c.end();})();"
 ```
 
-Expected: `Index Scan using bids_item_id_amount_idx` ou `Index Only Scan` — **não** `Seq Scan on bids`. Um `Seq Scan` aqui significa que a Task 3 vai ler a tabela de lances inteira.
+Expected na segunda linha: `Index Only Scan using bids_item_id_amount_idx` com
+`Index Cond: (item_id = ANY(...))`.
+
+**CUIDADO com a primeira linha:** com a base de desenvolvimento `bids` tem **9 linhas**, e para 9 linhas o
+planner escolhe `Seq Scan` — que e o plano OTIMO e nao um defeito. Por isso o gate usa
+`enable_seqscan = off`, que prova que o indice e utilizavel **sem inserir dado** e sem depender do volume
+da tabela. Se a primeira linha mostrar `Seq Scan` e a segunda mostrar `Index Only Scan`, o indice esta
+correto e a Task 3 pode seguir.
 
 - [ ] **Step 6: Commit**
 
@@ -581,7 +592,9 @@ export function paraEstatisticas(
 // ponytail: uma query, e nao uma por item. O indice `(item_id, amount DESC)`
 // (migracao 0004) faz isto ser INDEX-ONLY: o `GROUP BY item_id` e o `max(amount)`
 // leem as duas colunas do indice, sem tocar no heap. Verificar com `explain` e o
-// que prova que a query nao degradou — `Seq Scan on bids` aqui seria ler a
+// que prova que a query nao degradou. Num banco de 9 linhas o planner escolhe seq scan
+// (e esta certo); o indice e usado quando `bids` cresce — ver Task 0 Step 5, que prova
+// a usabilidade dele com `enable_seqscan = off`.
 // tabela de lances inteira, e `inArray` com a lista toda e o que mantem o plano
 // como index scan.
 export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
