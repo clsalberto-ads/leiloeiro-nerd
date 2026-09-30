@@ -1,5 +1,6 @@
 import type { Bid } from "@/domain/repositories/bid-repository";
 import { formatReais } from "@/lib/format-reais";
+import { FUSO } from "@/lib/fuso";
 
 export function BidHistory({ bids }: { bids: Bid[] }) {
   if (bids.length === 0) {
@@ -30,7 +31,28 @@ export function BidHistory({ bids }: { bids: Bid[] }) {
             <td className="py-2 pr-4">{bid.rank ?? "–"}</td>
             <td className="py-2 pr-4">R$ {formatReais(bid.amount)}</td>
             <td className="py-2 pr-4">{bid.bidderName}</td>
-            <td className="py-2">{new Date(bid.createdAt).toLocaleDateString("pt-BR")}</td>
+            {/* ponytail: `timeZone: FUSO` e obrigatorio, e o `FUSO` vem de
+                `@/lib/fuso` para concordar com a celula de prazo da
+                `items-list.tsx` e com o `date_trunc` do
+                `drizzle-analise-repository.ts` — os tres leem o mesmo instante.
+
+                Sem o argumento o `toLocaleDateString` usa o fuso do PROCESSO, e o
+                resultado depende de onde o codigo rodou: o mesmo lance aparece
+                "30/09" num servidor em Sao Paulo e "01/10" num servidor em UTC
+                (o padrao de nuvem, ou seja, producao). E o pior tipo de bug de
+                fuso: invisible no desenvolvimento, errado em producao.
+
+                Cuidado ao "simplificar" removendo o argumento — ele parece
+                redundante porque a maquina de desenvolvimento roda em
+                America/Fortaleza, que e UTC-3, o mesmo offset de Sao Paulo hoje.
+                Nao e uma coincidencia de fuso que prova o argumento: e a unica
+                razao pela qual o bug passou despercebido aqui. Tirou o
+                `timeZone`, o teste deste arquivo (que forca `TZ=UTC`) falha na
+                hora — e sem o `FUSO`, um teste que roda so nesta maquina
+                continuaria verde com o bug de volta. */}
+            <td className="py-2">
+              {new Date(bid.createdAt).toLocaleDateString("pt-BR", { timeZone: FUSO })}
+            </td>
           </tr>
         ))}
       </tbody>
