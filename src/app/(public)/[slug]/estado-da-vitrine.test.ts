@@ -17,7 +17,7 @@ function escrever(url: string): (nome: string) => string | null {
 }
 
 describe("interpretarVitrine", () => {
-  it("sem parametros devolve a vista padrao: sem busca, terminating primeiro", () => {
+  it("sem parametros devolve a vista padrao: sem busca, termina em breve primeiro", () => {
     expect(interpretarVitrine(escrever("/ana"))).toEqual(VISTA_PADRAO_DA_VITRINE);
     expect(VISTA_PADRAO_DA_VITRINE).toEqual({ q: "", ordenar: "prazo" });
   });
@@ -68,6 +68,9 @@ describe("hrefDaVista", () => {
 // ponytail: o round-trip e o que trava a invariante que o `estado-da-tabela.ts`
 // tambem trava: duas vistas iguais produzem a MESMA string, que e o que faz
 // "copiar e colar o link" funcionar e o botao "voltar" desfazer a coisa certa.
+// `emitir` apara o `q` antes de codificar, entao o endereco ja sai canonico:
+// ler e reescrever nao muda nada, com `q` limpa (os seis casos acima) e com `q`
+// suja (o `describe` seguinte).
 describe("round-trip: ler o que foi escrito devolve a mesma vista", () => {
   const vistas = [
     { q: "", ordenar: "prazo" },
@@ -85,4 +88,18 @@ describe("round-trip: ler o que foi escrito devolve a mesma vista", () => {
       expect(hrefDaVista("ana", interpretarVitrine(escrever(href)))).toBe(href);
     });
   }
+});
+
+// ponytail: `q` suja e o limite honesto da invariante de cima, e ele mostra que a
+// ponta que apara e a ESCRITA: a vista que sai do `hrefDaVista` ja vem sem espaco
+// nas pontas, e por isso que ler e reescrever nao muda o endereco. O que a leitura
+// devolve nunca e a `v` original com espaco — e o `q` que o servidor filtrou.
+describe("round-trip com `q` suja: o `href` ja sai aparado e para em uma passada", () => {
+  it("emite o `q` sem os espacos das pontas e o endereco nao muda mais", () => {
+    const href = hrefDaVista("ana", { q: "  console  ", ordenar: "lance" });
+    expect(href).toBe("/ana?q=console&ordenar=lance");
+
+    expect(interpretarVitrine(escrever(href))).toEqual({ q: "console", ordenar: "lance" });
+    expect(hrefDaVista("ana", interpretarVitrine(escrever(href)))).toBe(href);
+  });
 });

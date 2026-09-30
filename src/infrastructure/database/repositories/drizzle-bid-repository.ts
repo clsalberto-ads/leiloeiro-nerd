@@ -118,12 +118,11 @@ export function paraEstatisticas(
 
 // ponytail: uma query, e nao uma por item. O indice `(item_id, amount DESC)`
 // (migracao 0004) faz isto ser INDEX-ONLY: o `GROUP BY item_id` e o `max(amount)`
-// leem as duas colunas do indice, sem tocar no heap. Verificar com `explain` e o
-// que prova que a query nao degradou. Num banco de 9 linhas o planner escolhe seq scan
-// (e esta certo); o indice e usado quando `bids` cresce — ver Task 0 Step 5, que prova
-// a usabilidade dele com `enable_seqscan = off`.
-// tabela de lances inteira, e `inArray` com a lista toda e o que mantem o plano
-// como index scan.
+// leem as duas colunas do indice, sem tocar no heap. Num banco de 9 linhas o
+// planner escolhe seq scan, e esta certo — a prova de que o indice e usavel vem
+// de um `explain` com `SET enable_seqscan = off`, onde o plano mostra
+// `Index Only Scan using bids_item_id_amount_idx`. E o `inArray` com a lista de
+// ids, e nao a tabela de lances inteira, que mantem o plano em index scan.
 export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
   async deVariosItens(itemIds) {
     if (itemIds.length === 0) return new Map();
