@@ -102,12 +102,21 @@ export const drizzleBidRepository: BidRepository = {
   },
 };
 
-// ponytail: `count(*)` volta `bigint` do Postgres e o `pg` entrega como TEXTO, e
-// `max(amount)` volta `integer`. Por isso o `::int` e o `Number` no `paraEstatisticas`:
-// sem eles, `total` seria a string "3" e `maiorLance > 100` compararia string com
-// numero — que em JS significa `NaN` silencioso virando posicao de ordenacao.
+// ponytail: `total: number | string` e o que torna o `Number()` LOAD-BEARING.
+// `count(*)` volta `bigint` do Postgres e o `pg` entrega `bigint`/`numeric` como
+// TEXTO (o mesmo que o `drizzle-analise-repository.ts` trata com
+// `Number(ativos[0]?.soma ?? 0)`). Com o parametro tipado `number`, a coercia
+// ficava INVISIVEL para o compilador: `sql<number>` afirma ao `tsc` que ja e
+// numero, entao apagar o `Number()` nao dava erro de tipo — e um `maiorLance`
+// string viraria `NaN` silencioso na posicao de ordenacao, sem teste vermelho.
+// Tipando a fronteira como `number | string`, remover a coercia passa a ser erro
+// de compilacao, e o unico `Number` defensivo do arquivo e o que sobrevive.
+//
+// ponytail: `maior` continua `number | null` e NAO foi alargado, porque `max()`
+// de `integer` volta inteiro de verdade — o `Number` no corpo dele e o par do
+// `total`, e nao ha evidencia de que ele algum dia venha texto.
 export function paraEstatisticas(
-  linhas: { itemId: string; total: number; maior: number | null }[],
+  linhas: { itemId: string; total: number | string; maior: number | null }[],
 ): Map<string, EstatisticasDeLance> {
   const mapa = new Map<string, EstatisticasDeLance>();
   for (const linha of linhas) {

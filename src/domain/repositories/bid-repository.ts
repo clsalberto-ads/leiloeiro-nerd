@@ -47,9 +47,15 @@ export interface BidRepository {
 // ponytail: o cancelamento de lance esta previsto na spec e AINDA NAO EXISTE
 // aqui. Quando ele entrar (`cancelBidByItem`), `bids` ganha a semantica de "lance
 // cancelado" e este agregado passa a contar lance cancelado como se fosse lance —
-// sem erro de tipo e sem teste vermelho, porque o filtro e do `SELECT` e nao
-// deste arquivo. E o por de o cancelamento vir com um filtro do proprio `SELECT`,
-// e nao do `GROUP BY`.
+// sem erro de tipo e sem teste vermelho, porque o `SELECT` deste arquivo traz
+// TODOS os lances do item.
+//
+// E por isso que o cancelamento tem de entrar NESTA consulta, e nao numa
+// filtragem depois: um `WHERE` no mesmo SELECT ja exclui a linha antes do
+// `GROUP BY` contar, enquanto um filtro aplicado sobre o `Map` em JS contaria
+// primeiro e descartaria depois — e o numero que a vitrine mostra ja estaria
+// errado antes de qualquer comparacao. Nao e "filtro do SELECT e nao do GROUP BY"
+// (que sao a mesma query): e "filtro antes do agregado, e nao depois".
 export interface EstatisticasDeLance {
   total: number;
   maior: number | null;

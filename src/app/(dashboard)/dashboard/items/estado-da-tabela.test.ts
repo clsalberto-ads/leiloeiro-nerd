@@ -397,3 +397,42 @@ describe("estado-da-tabela — a última página", () => {
     expect(hrefDaVista(com({ page: ultimaPagina(0, 10) }))).toBe(CAMINHO_DA_LISTA);
   });
 });
+
+// ponytail: este `describe` existe por causa de uma frase no `ponytail:` da
+// `codificar` em `estado-da-tabela.ts`, que afirmava `ler(emitir(v)) === emitir(v)`
+// para TODA vista. A equacao e FALSA: com `q` suja, ler volta o valor aparado, que
+// nao e a `VistaDaTabela` original. A propriedade verdadeira e o ponto fixo do
+// HREF — `hrefDaVista(ler(hrefDaVista(v))) === hrefDaVista(v)` — e ela vale porque
+// a NORMALIZACAO e da escrita: o `hrefDaVista` apara o `q` antes de codificar.
+//
+// A frase vivia num comentario, entao o `tsc` nao a via e nenhum teste a negava.
+// E o mesmo defeito que a vitrine corrigiu no modulo irmao; os dois arquivos
+// espelham o mesmo padrao, entao o defeito via junto.
+describe("estado-da-tabela — o ponto fixo do href, com q suja", () => {
+  const vistas: VistaDaTabela[] = [
+    com({ q: "", orderBy: "createdAt", direction: "desc", page: 1, pageSize: 10 }),
+    com({ q: "  console  " }),
+    com({ q: "   " }),
+    com({ q: "  console  ", orderBy: "title", direction: "asc" }),
+    com({ q: "jogo raro", status: "active", page: 3, pageSize: 50 }),
+    com({ q: "  a & b = c  ", orderBy: "minInitialBid", direction: "asc", pageSize: 20 }),
+  ];
+
+  for (const vista of vistas) {
+    it(`reescrever o endereco lido devolve o mesmo endereco: ${JSON.stringify(vista.q)} + ${vista.orderBy}`, () => {
+      const href = hrefDaVista(vista);
+      expect(hrefDaVista(le(`?${consultaDe(vista)}`))).toBe(href);
+    });
+  }
+
+  // ponytail: e a evidencia de que a equacao antiga era falsa, nao um teste de
+  // borda. Com `q` suja, a Vista lida e diferente da Vista emitida — e isso e
+  // esperado, porque a escrita normaliza. O que nao pode diferir e o ENDERECO.
+  it("com q suja a Vista lida difere da emitida, mas o endereço não", () => {
+    const emitida = com({ q: "  console  ", orderBy: "title", direction: "asc" });
+    const lida = le(`?${consultaDe(emitida)}`);
+    expect(lida.q).not.toBe(emitida.q);
+    expect(lida.q).toBe("console");
+    expect(hrefDaVista(lida)).toBe(hrefDaVista(emitida));
+  });
+});
