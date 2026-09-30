@@ -14,11 +14,14 @@
 
 ## Global Constraints
 
-- **Nenhum caso de teste existente pode ser reescrito, alterado ou removido.** Acrescentar casos NOVOS a
-  um arquivo `.test` que o brief nomeia é permitido e esperado (é o que Task 3, Task 6 e Task 10 fazem);
-  o que é proibido é mexer em caso que já existe. Duas exceções que mexem em casos existentes, ambas
-  listadas em "Protected Tests" abaixo e ambas com aprovação já concedida pelo usuário:
-  `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action).
+- **Nenhum caso de teste existente pode ter suas ASSERÇÕES ou sua INTENÇÃO alteradas.** A restrição
+  protege o *significado* do caso, não o identificador dele. Então: acrescentar casos NOVOS a um
+  arquivo `.test` que o brief nomeia é permitido e esperado (é o que Task 3, Task 6 e Task 10
+  fazem); renomear um caso cujo **nome** é defeituoso (anglicismo, ou nome que não descreve o que o
+  caso afirma) é permitido desde que o corpo e as asserções fiquem intocados e a task o reporte.
+  Alterar asserções, afrouxar uma verificação ou remover um caso é proibido. Duas exceções que
+  mexem em asserções, ambas listadas em "Protected Tests" abaixo e ambas com aprovação já concedida
+  pelo usuário: `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action).
 - **Toda a escrita em pt-BR.** Nomes de código, comentários e strings de UI.
 - **Toda constante compartilhada tem uma fonte só.** `FUSO` vem de `@/lib/fuso`; `primeiroValor` de `@/lib/primeiro-valor`; `BuscarParametro` de `@/app/(dashboard)/dashboard/items/estado-da-tabela`. Não re-declarar nenhuma das três.
 - **Fuso do produto é `America/Sao_Paulo`.** Qualquer data que o *usuário* lê (prazo, data) passa por `FUSO`.
@@ -1876,7 +1879,7 @@ import Link from "next/link";
 import { ROTULO_TIPO, type ItemType } from "@/domain/repositories/item-repository";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { hrefDaVista, type OrdenacaoDaVitrine, type VistaDaVitrine } from "./estado-da-vitrine";
+import { hrefDaVista, LISTA_DE_ORDENACOES, type OrdenacaoDaVitrine, type VistaDaVitrine } from "./estado-da-vitrine";
 
 // ponytail: os rotulos sao o CONTRATO VISVEL do parametro `ordenar`, e ele mora
 // aqui e nao em `estado-da-vitrine.ts` porque sao duas metades diferentes: o
@@ -1890,7 +1893,14 @@ export const ROTULOS_DA_ORDENACAO: Record<OrdenacaoDaVitrine, string> = {
   recentes: "Recentes",
 };
 
-const ORDEM_VISUAL: OrdenacaoDaVitrine[] = ["prazo", "lance", "recentes"];
+const ORDEM_VISUAL: OrdenacaoDaVitrine[] = [...LISTA_DE_ORDENACOES];
+// ponytail: `[...LISTA_DE_ORDENACOES]`, e nao o trio escrito a mao. A lista vive em
+// `estado-da-vitrine.ts` porque e a fonte unica da uniao E do `Set` de validacao (ver o
+// `ponytail:` de la); copia-la aqui seria a segunda fonte, e uma ordenacao acrescentada na
+// lista apareceria no tipo e na validacao e nao nesta tela — o mesmo modo de falha
+// silenciosa que o achado 4 da revisao do Batch A removeu deste lado. O `as const` da lista
+// impede reordenacao, entao a ordem visual e a ordem da uniao. Ela e exportada por causa
+// deste uso.
 
 // ponytail: a busca e um `<form method="get">` e nao um input controlado com
 // `onChange` + `router.push`. O form entrega o comportamento de navegacao de graca

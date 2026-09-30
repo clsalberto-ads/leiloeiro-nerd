@@ -128,9 +128,16 @@ lendo para baixo, que é o sentido permitido.
 
 **`EstatisticasDeLances` é uma interface nova, e não um método a mais em `BidRepository`.** O mesmo
 raciocínio de `ItemLister` (`item-repository.ts:188-200`), e pelo mesmo motivo concreto: `BidRepository`
-tem métodos que **gravam** (`placeBid`, `cancelBidByItem`); a vitrine só **lê** um agregado. Uma porta
+tem método que **grava** (`placeBid`); a vitrine só **lê** um agregado. Uma porta
 separada deixa explícito que a vitrine depende de leitura, e — o que importa no curto prazo — os fakes
 de `BidRepository` nos testes de `placeBid` (que gravam) não recebem um método a implementar.
+
+**Correção (2026-09-30):** esta spec citava `cancelBidByItem`, que **não existe** em `BidRepository`
+(só `findByItemId` e `placeBid`) — a referência foi escrita de memória. E a citação tinha efeito
+pior que estar errada: `cancelBidByItem` é feature *planejada*, e quando entrar, `bids` ganha
+semântica de "lance cancelado" e este agregado **passa a contá-lo como lance sem erro de tipo e sem
+teste vermelho**, porque o filtro seria do `SELECT`. Por isso o contrato da porta registra que o
+cancelamento, quando existir, tem de vir com filtro no próprio `SELECT` — não com o `GROUP BY`.
 
 ### 4.2 `estado-da-vitrine.ts` — o contrato de URL
 
