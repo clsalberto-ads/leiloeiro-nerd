@@ -40,16 +40,15 @@ function CartaoEsqueleto() {
       <Skeleton className="aspect-square w-full rounded-none" />
       <div className="space-y-2 p-3">
         <Skeleton className="h-4 w-4/5" />
-        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-5 w-1/2" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/3" />
       </div>
     </div>
   );
 }
 
-// ponytail: as tres barras por card sao a forma do `PublicItemCard` — imagem
-// quadrada, titulo e lance minimo. Um esqueleto com a contagem errada ainda
-// "funciona" (a grade aparece, o usuario espera), mas a troca entre o bloco largo
-// e o curto denuncia que o esqueleto era outro conteudo.
 export function ItemCardSkeleton() {
   return (
     <div

@@ -28,16 +28,15 @@ describe("ItemCardSkeleton", () => {
     expect(saida).toContain('data-slot="skeleton"');
   });
 
-  // ponytail: a forma e a do `PublicItemCard`: um quadrado de imagem e duas
-  // linhas de texto (titulo e lance minimo). O numero de barras por card e o que
-  // prende essa forma — sem a contagem, um esqueleto de duas barras e um de tres
-  // passariam ambos neste teste.
-  it("desenha tres barras por card: a imagem, o titulo e o lance", () => {
+  // ponytail: a forma e a do `PublicItemCard` (imagem + 5 regioes de texto: titulo, lance atual,
+  // lance minimo, tipo/contagem e prazo). O numero de barras por card e o que
+  // prende essa forma.
+  it("desenha seis barras por card: a imagem e as cinco regioes de texto do card novo", () => {
     const saida = html();
     const cards = saida.match(/data-slot="item-card-skeleton"/g) ?? [];
 
     expect(cards).toHaveLength(CARTAS_DO_ESQUELETO);
-    expect(saida.match(/data-slot="skeleton"/g)).toHaveLength(CARTAS_DO_ESQUELETO * 3);
+    expect(saida.match(/data-slot="skeleton"/g)).toHaveLength(CARTAS_DO_ESQUELETO * 6);
   });
 
   // ponytail: o que NAO pode aparecer e o conteudo do card. Um esqueleto que
