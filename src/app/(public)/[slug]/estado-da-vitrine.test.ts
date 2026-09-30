@@ -9,8 +9,10 @@ import {
 // ponytail: o `escrever` monta a `URLSearchParams` e devolve um `buscar` que le
 // dela. E o par inverso do `interpretarVitrine` (que recebe o `buscar` do Next),
 // e e por isso que o round-trip do fim do arquivo fecha sem adaptador: a funcao que
-// escreve a URL e a mesma que a le, entao `ler(emitir(v)) === emitir(v)` para
-// toda vista.
+// escreve a URL e a mesma que a le. A propriedade que vale e a da ESCRITA, que
+// apara o `q` antes de codificar — `emitir(ler(emitir(v))) === emitir(v)` para toda
+// `v`, ate a que chega suja. Ler nunca devolve a `v` original com os espacos: devolve
+// o `q` que o servidor filtrou.
 function escrever(url: string): (nome: string) => string | null {
   const p = new URL(url, "https://ex.com").searchParams;
   return (nome) => p.get(nome);

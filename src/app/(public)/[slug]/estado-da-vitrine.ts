@@ -22,7 +22,16 @@ import type { BuscarParametro } from "@/app/(dashboard)/dashboard/items/estado-d
 // juntos; no desenho invertido a uniao aceitaria "proximos" e o `Set` nao, e a
 // ordenacao nova cairia em `"prazo"` em silencio, sem erro de tipo e sem teste
 // vermelho.
-const LISTA_DE_ORDENACOES = ["prazo", "lance", "recentes"] as const;
+//
+// ponytail: a lista e EXPORTADA porque o consumidor seguinte precisa dela em
+// runtime, e nao so em tempo de compilacao: quem desenhar os botoes de ordenacao
+// vai percorrer esta lista na ordem em que a tela mostra, e e essa ordem que a
+// tela e a URL precisam concordar. Escrever os tres nomes de novo no consumidor
+// seria reintroduzir a duplicacao que este desenho existe para matar — em uma
+// lista de botoes e num `switch` de rotulo, em dois arquivos diferentes. O que a
+// lista nao carrega e a ordem de leitura da tela: ela e so o vocabulario, e quem
+// consome decide em que ordem mostrar.
+export const LISTA_DE_ORDENACOES = ["prazo", "lance", "recentes"] as const;
 
 export type OrdenacaoDaVitrine = (typeof LISTA_DE_ORDENACOES)[number];
 
