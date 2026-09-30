@@ -14,7 +14,11 @@
 
 ## Global Constraints
 
-- **562 testes existentes não podem quebrar.** Duas exceções, ambas listadas em "Protected Tests" abaixo e ambas com aprovação já concedida pelo usuário: `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action). Nenhum outro `.test` pode ser reescrito.
+- **Nenhum caso de teste existente pode ser reescrito, alterado ou removido.** Acrescentar casos NOVOS a
+  um arquivo `.test` que o brief nomeia é permitido e esperado (é o que Task 3, Task 6 e Task 10 fazem);
+  o que é proibido é mexer em caso que já existe. Duas exceções que mexem em casos existentes, ambas
+  listadas em "Protected Tests" abaixo e ambas com aprovação já concedida pelo usuário:
+  `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action).
 - **Toda a escrita em pt-BR.** Nomes de código, comentários e strings de UI.
 - **Toda constante compartilhada tem uma fonte só.** `FUSO` vem de `@/lib/fuso`; `primeiroValor` de `@/lib/primeiro-valor`; `BuscarParametro` de `@/app/(dashboard)/dashboard/items/estado-da-tabela`. Não re-declarar nenhuma das três.
 - **Fuso do produto é `America/Sao_Paulo`.** Qualquer data que o *usuário* lê (prazo, data) passa por `FUSO`.
