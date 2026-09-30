@@ -63,6 +63,27 @@ describe("ordenarParaVitrine", () => {
     expect(ordenarParaVitrine([novos, velho], "recentes").map((i) => i.id)).toEqual(["novo", "velho"]);
   });
 
+  // ponytail: estes DOIS casos sao os que a sentinela `-Infinity` quebrava, e
+  // nenhum dos 14 casos do plano os cobria — o plano so tinha UM item sem lance,
+  // e `-Infinity - -Infinity` (dois sem lance) e `NaN`, que nao cai no desempate.
+  it("entre DOIS itens sem lance o desempate por prazo roda (a sentinela dava NaN)", () => {
+    const tarde = vitrineItem("tarde", null, { bidDeadline: new Date("2026-12-01T12:00:00Z") });
+    const cedo = vitrineItem("cedo", null, { bidDeadline: new Date("2026-10-01T12:00:00Z") });
+    expect(ordenarParaVitrine([tarde, cedo], "lance").map((i) => i.id)).toEqual(["cedo", "tarde"]);
+    expect(ordenarParaVitrine([cedo, tarde], "lance").map((i) => i.id)).toEqual(["cedo", "tarde"]);
+  });
+
+  it("um lance real de R$ 0,00 fica ACIMA de item sem lance", () => {
+    // `placeBid` nao tem piso absoluto (so compara com o maior anterior + incremento
+    // ou com o `minInitialBid`) e o banco nao tem `CHECK` em `bids.amount`, entao
+    // este caso e alcancavel. Com `0` como sentinela os dois empatariam e o
+    // desempate por prazo puxaria o item sem lance para cima.
+    const zero = vitrineItem("zero", 0, { bidDeadline: new Date("2026-12-01T12:00:00Z") });
+    const semLance = vitrineItem("sem", null, { bidDeadline: new Date("2026-10-01T12:00:00Z") });
+    expect(ordenarParaVitrine([semLance, zero], "lance").map((i) => i.id)).toEqual(["zero", "sem"]);
+    expect(ordenarParaVitrine([zero, semLance], "lance").map((i) => i.id)).toEqual(["zero", "sem"]);
+  });
+
   it("a lista original nao e mutada (o .sort() do array recebido seria um bug)", () => {
     const original = [vitrineItem("a", 1), vitrineItem("b", 5)];
     const copia = [...original];

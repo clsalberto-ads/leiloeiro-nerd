@@ -2,39 +2,33 @@ import type { Item, ItemDaVitrine, ItemListFilter, ItemRepository } from "@/doma
 import type { EstatisticasDeLance, EstatisticasDeLances } from "@/domain/repositories/bid-repository";
 import type { OrdenacaoDaVitrine, VistaDaVitrine } from "@/app/(public)/[slug]/estado-da-vitrine";
 
-// ponytail: SEM LANCE e `-Infinity`, e nao `0`. O `maiorLance` e um valor em
-// REAIS, e um lance de R$ 0,00 real precisa ficar ABAIXO de qualquer lance de
-// verdade. Com `0` ele empataria com um lance minimo e o desempate por prazo o
-// poderia puxar para o topo de "Maior lance" — a tela desmentindo o proprio
-// rotulo. `-Infinity` faz o `null` cair para o fim sem nenhum `if` dentro do
-// comparador.
+// ponytail: no sort "Maior lance", item SEM lance vai para o FIM, e a decisao e
+// comparada ANTES de qualquer aritmetica. Uma sentinela (`-Infinity`) seria mais
+// curta e estaria ERRADA: dois itens sem lance dariam `-Infinity - -Infinity`, que
+// e `NaN` — e `NaN !== 0` e verdadeiro, entao o comparador devolvia `NaN` em vez
+// de cair no desempate por prazo. O desempate nunca rodava e a ordem de dois itens
+// sem lance ficava a cargo do `sort`. Comparar os `null` direto e o que torna o
+// comparador TOTAL por construcao, e apaga a sentinela em vez de acrescentar um
+// numero magico que so funciona por acaso do IEEE754.
 //
-// ponytail: "um lance de R$ 0,00 e impossivel HOJE" e verdade, mas NAO e o que o
-// `placeBid` garante, e a distincao e o ponto. O `placeBid` (`place-bid.ts:37`)
-// so compara o lance com o MAIOR ANTERIOR mais o incremento, ou com o
-// `minInitialBid` do item no primeiro lance: ele nao tem piso absoluto nenhum. O
-// piso de R$ 1,00 que torna o lance de zero impossivel hoje mora em
-// `create-item.ts:20` e `update-item.ts:29` (`minInitialBid < 100` lanca), e o
-// banco nao reforca nada disso — `items.min_initial_bid` e `bids.amount` sao dois
-// `integer` sem `CHECK` em nenhuma migracao. Um item importado, um seed, ou o
-// lancamento do minimo de R$ 1,00 reabrem o caso sem nenhuma alteracao no
-// `placeBid`. E se reabrem, `-Infinity` ja e a ordem certa e `0` vira o bug.
-const SEM_LANCE = Number.NEGATIVE_INFINITY;
-
-function valorDoLance(item: ItemDaVitrine): number {
-  return item.maiorLance ?? SEM_LANCE;
-}
+// A ordem de quem vai para o fim e a que faz "o maior lance tem sempre a primeira
+// posicao" ser verdade: um item sem lance algum nao tem lance atual, e um item sem
+// lance no topo de "Maior lance" seria a tela dizendo o oposto do rotulo.
 
 function comparar(a: ItemDaVitrine, b: ItemDaVitrine, ordenar: OrdenacaoDaVitrine): number {
   switch (ordenar) {
     case "lance": {
-      // desc pelo maior lance REAL, e desempate por prazo asc. O desempate
-      // importa: dois itens nao podem ter o mesmo maior lance (`placeBid` valida
-      // incremento), mas um comparador que depende dessa invariante quebra no
-      // dia que ela mudar — e o resultado seria uma ordem que muda entre dois
-      // renders do mesmo conjunto.
-      const porLance = valorDoLance(b) - valorDoLance(a);
-      if (porLance !== 0) return porLance;
+      const aSemLance = a.maiorLance === null;
+      const bSemLance = b.maiorLance === null;
+      if (aSemLance !== bSemLance) return aSemLance ? 1 : -1;
+      // Desempate por prazo. E o mesmo que o resto da tela usa, e ele e OBRIGATORIO
+      // aqui porque dois itens sem lance caem nele: sem o desempate, a ordem entre
+      // eles seria a ordem de entrada do array, e mudaria entre dois renders do
+      // mesmo conjunto.
+      if (!aSemLance) {
+        const porLance = (b.maiorLance as number) - (a.maiorLance as number);
+        if (porLance !== 0) return porLance;
+      }
       return a.bidDeadline.getTime() - b.bidDeadline.getTime();
     }
     case "recentes":
