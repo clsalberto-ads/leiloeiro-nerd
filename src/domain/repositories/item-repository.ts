@@ -212,3 +212,25 @@ export interface ItemRepository {
   createImages(itemId: string, urls: string[]): Promise<ItemImage[]>;
   deleteImage(imageId: string): Promise<void>;
 }
+
+// ponytail: a projecao da vitrine. Fica AQUI, e nao em `src/app/(public)/[slug]/`,
+// porque o produtor deste objeto e o use case `listVitrine`, que vive em
+// `src/application/` — e um use case importando de `src/app` seria a seta da
+// Clean Architecture virada. O `ItemDaTabela` do dashboard mora com o seu
+// consumidor porque o consumidor dele e um componente de `src/app`; aqui o
+// consumidor primario e o use case.
+//
+// E uma WHITELIST, e nao `const { ...resto } = item`: o spread e o que faria
+// `description` (o texto longo) atravessar o payload do RSC sem ser mostrado, e o
+// que faria um campo novo do dominio vazar para a tela sem ninguem perceber. O
+// teste que exige exatamente estas oito chaves e o que trava essa porta.
+export interface ItemDaVitrine {
+  id: string;
+  title: string;
+  type: ItemType;
+  minInitialBid: number;
+  bidDeadline: Date;
+  imageUrl: string | null;
+  totalDeLances: number;
+  maiorLance: number | null;
+}
