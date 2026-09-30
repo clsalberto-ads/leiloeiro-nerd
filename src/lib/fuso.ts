@@ -10,12 +10,13 @@
 // produto). Fixar aqui deixa o fuso do produto explicito e igual em qualquer
 // maquina, sem depender de onde o deploy caiu.
 //
-// Este arquivo existe porque o valor aparecia em DOIS lugares que precisam
-// concordar: a celula de prazo da tabela (`items-list.tsx`) e o agrupamento por
-// dia dos graficos (`drizzle-analise-repository.ts`, via `date_trunc`). Se os
-// dois divergirem, o grafico de "lances por dia" contaria dias diferentes dos que
-// a lista de itens mostra. Uma constante e um comentario; dois callers nao
-// justificam um segundo literal.
+// Este arquivo existe porque o mesmo instante e formatado em mais de um lugar, e
+// os pares precisam concordar no dia: `bidDeadline` na celula de prazo
+// (`colunas.tsx`) e no anuncio do `bid-countdown`; `bids.createdAt` na data do
+// lance (`bid-history.tsx`) e no agrupamento por dia dos graficos
+// (`drizzle-analise-repository.ts`, via `date_trunc`). Se um par divergir, o
+// grafico de "lances por dia" conta dias diferentes dos que a lista mostra. Uma
+// constante e um comentario; um segundo literal nao se justifica.
 //
 // O upgrade path, se um dia o produto atender gente fora do Brasil: um
 // `APP_TIMEZONE` no `.env.example` lido aqui, com este valor como default.

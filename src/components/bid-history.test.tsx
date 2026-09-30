@@ -29,8 +29,15 @@ describe("BidHistory", () => {
   // processo em UTC e o que torna a ausencia do `timeZone` visivel: e o fuso real
   // de um servidor de producao. O Node invalida o cache de fuso do `Intl` quando
   // `process.env.TZ` e atribuido em runtime, entao a troca vale sem reiniciar o
-  // worker. O `try/finally` devolve o `TZ` porque o arquivo compartilha o processo
-  // com os outros testes — sem isso, o resto da suite passa a rodar em UTC.
+  // worker.
+  //
+  // O `try/finally` protege o PROPRIO arquivo, e nao a suite: o vitest deste repo
+  // roda com o default `pool: "forks"` + `isolate: true`, um processo filho por
+  // arquivo, entao um `TZ` vazado aqui nao alcanca `items-list.test.tsx` nem
+  // `bid-countdown.test.tsx`. O que ele protege e um `it` futuro neste arquivo,
+  // que rodando depois deste veria `TZ=UTC` e leria qualquer data no dia errado.
+  // O `delete` no caso `undefined` cobre a maquina que nao tem `TZ` setado: sem
+  // ele o restauro gravaria a string `"undefined"` como fuso.
   it("renderiza a data do lance no fuso do produto, e nao no fuso do processo", () => {
     const fusoOriginal = process.env.TZ;
     try {
