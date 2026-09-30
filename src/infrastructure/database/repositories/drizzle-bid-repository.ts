@@ -1,7 +1,13 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, max, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, items } from "@/infrastructure/database/schema";
-import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
+import type {
+  Bid,
+  BidRepository,
+  CreateBidInput,
+  EstatisticasDeLance,
+  EstatisticasDeLances,
+} from "@/domain/repositories/bid-repository";
 
 export function nextRank(highestRank: number | null): number {
   return (highestRank ?? 0) + 1;
@@ -93,5 +99,43 @@ export const drizzleBidRepository: BidRepository = {
         previousHighestBid: highestBid ?? null,
       };
     });
+  },
+};
+
+// ponytail: `count(*)` volta `bigint` do Postgres e o `pg` entrega como TEXTO, e
+// `max(amount)` volta `integer`. Por isso o `::int` e o `Number` no `paraEstatisticas`:
+// sem eles, `total` seria a string "3" e `maiorLance > 100` compararia string com
+// numero — que em JS significa `NaN` silencioso virando posicao de ordenacao.
+export function paraEstatisticas(
+  linhas: { itemId: string; total: number; maior: number | null }[],
+): Map<string, EstatisticasDeLance> {
+  const mapa = new Map<string, EstatisticasDeLance>();
+  for (const linha of linhas) {
+    mapa.set(linha.itemId, { total: Number(linha.total), maior: linha.maior === null ? null : Number(linha.maior) });
+  }
+  return mapa;
+}
+
+// ponytail: uma query, e nao uma por item. O indice `(item_id, amount DESC)`
+// (migracao 0004) faz isto ser INDEX-ONLY: o `GROUP BY item_id` e o `max(amount)`
+// leem as duas colunas do indice, sem tocar no heap. Verificar com `explain` e o
+// que prova que a query nao degradou. Num banco de 9 linhas o planner escolhe seq scan
+// (e esta certo); o indice e usado quando `bids` cresce — ver Task 0 Step 5, que prova
+// a usabilidade dele com `enable_seqscan = off`.
+// tabela de lances inteira, e `inArray` com a lista toda e o que mantem o plano
+// como index scan.
+export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
+  async deVariosItens(itemIds) {
+    if (itemIds.length === 0) return new Map();
+    const linhas = await db
+      .select({
+        itemId: bids.itemId,
+        total: sql<number>`count(*)::int`,
+        maior: max(bids.amount),
+      })
+      .from(bids)
+      .where(inArray(bids.itemId, itemIds))
+      .groupBy(bids.itemId);
+    return paraEstatisticas(linhas);
   },
 };
