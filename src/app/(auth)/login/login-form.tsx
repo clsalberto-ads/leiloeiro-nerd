@@ -33,7 +33,6 @@ export function LoginForm() {
         {/* ponytail: sem gate no submit — a signInAction segue validando com o signInSchema; trocar por handleSubmit só se o form sair do server action. */}
         <form action={action} className="space-y-4">
           {state.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
-          {state.ok ? <p className="text-sm text-emerald-600"><Link className="underline" href="/dashboard">Entrar no painel</Link></p> : null}
           <Field id="email" label="E-mail" error={errors.email?.message}>
             {(p) => <Input {...p} {...form.register("email")} type="email" required />}
           </Field>

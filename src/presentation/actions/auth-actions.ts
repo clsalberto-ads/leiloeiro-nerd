@@ -20,7 +20,10 @@ export async function signUpAction(_prev: ActionResult, formData: FormData): Pro
   } catch {
     return { error: "Não foi possível criar a conta. Verifique se o e-mail já está cadastrado." };
   }
-  return { ok: true };
+  // ponytail: o `redirect` vem DEPOIS do guarda de erro, nunca antes — um
+  // e-mail duplicado arrancaria o visitante do formulario e o jogaria no painel
+  // sem sessao, que e pior que ficar parado. Mesmo desenho de `item-actions`.
+  redirect("/dashboard");
 }
 
 export async function signInAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -31,7 +34,12 @@ export async function signInAction(_prev: ActionResult, formData: FormData): Pro
   } catch {
     return { error: "Credenciais inválidas" };
   }
-  return { ok: true };
+  // ponytail: nao ha `return { ok: true }` depois daqui. O `redirect` LANCA
+  // (NEXT_REDIRECT) e nunca devolve, entao um `return` ali seria codigo morto que
+  // o `tsc` nao acusa — e da a ler como se o fluxo ainda parasse na pagina.
+  // O cookie de sessao ja foi gravado pelo `nextCookies()` quando `signInEmail`
+  // resolve, por isso o redirect leva o usuario autenticado.
+  redirect("/dashboard");
 }
 
 export async function forgotPasswordAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {

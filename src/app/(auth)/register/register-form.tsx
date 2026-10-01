@@ -33,7 +33,6 @@ export function RegisterForm() {
         {/* ponytail: sem gate no submit — a signUpAction segue validando com o signUpSchema; trocar por handleSubmit só se o form sair do server action. */}
         <form action={action} className="space-y-4">
           {state.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
-          {state.ok ? <p className="text-sm text-emerald-600"><Link className="underline" href="/dashboard">Conta criada — entrar no painel</Link></p> : null}
           <Field id="name" label="Nome / Nick" error={errors.name?.message}>
             {(p) => <Input {...p} {...form.register("name")} required />}
           </Field>
