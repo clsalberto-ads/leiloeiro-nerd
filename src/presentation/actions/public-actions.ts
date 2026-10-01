@@ -1,34 +1,34 @@
 "use server";
 
 import { getSellerBySlug } from "@/application/use-cases/get-seller-by-slug";
+import { getVitrineSeller } from "@/application/use-cases/get-vitrine-seller";
 import { listActiveItemsBySellerId } from "@/application/use-cases/list-active-items-by-seller";
 import { getItemBySlugAndId } from "@/application/use-cases/get-item-by-slug-and-id";
-import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
+import { drizzleUserRepository, drizzleVitrineDeVendedorRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { drizzleBidRepository, drizzleEstatisticasDeLances } from "@/infrastructure/database/repositories/drizzle-bid-repository";
 import { listVitrine } from "@/application/use-cases/list-vitrine";
-import { interpretarVitrine } from "@/app/(public)/[slug]/estado-da-vitrine";
-import { primeiroValor } from "@/lib/primeiro-valor";
+import type { ItemDaVitrine } from "@/domain/repositories/item-repository";
+import type { VitrineDeVendedor } from "@/domain/repositories/user-repository";
+import type { VistaDaVitrine } from "@/app/(public)/[slug]/estado-da-vitrine";
 
-export async function getVitrineSellerAction(slug: string) {
-  return getSellerBySlug(drizzleUserRepository, slug);
+// ponytail: o vendedor vem da porta de VITRINE (`drizzleVitrineDeVendedorRepository`)
+// e nao de `getSellerBySlug`. Sao dois use cases com contratos diferentes: o
+// primeiro devolve `{id, name, slug}` e o segundo devolve o perfil do hero
+// (avatar, membro desde, itens ativos). Trocar um pelo outro faria o hero
+// renderizar `undefined` em tres campos — e o `tsc` nao acusa, porque `undefined`
+// casa com `string | null` e com `Date` narrowed no `toLocaleDateString`.
+export async function getVitrineSellerAction(slug: string): Promise<VitrineDeVendedor | null> {
+  return getVitrineSeller(drizzleVitrineDeVendedorRepository, slug);
 }
 
-// ponytail: a vitrine passa pela ACTION e nao pelo `listVitrine` direto, e o motivo
-// nao e "a regra do projeto proibe" — NAO existe essa regra, e tres paginas do
-// dashboard (`dashboard/page.tsx`, `items/page.tsx`, `items/[id]/edit/page.tsx`)
-// importam `drizzleItemRepository` direto desde antes deste trabalho. A razao real e
-// o TESTE: `page.test.tsx` e um dos testes protegidos e ele faz `vi.mock` de
-// `@/presentation/actions/public-actions`; se a pagina chamasse `listVitrine`
-// direto, o mock nao interceptaria nada e o teste passaria a abrir conexao real
-// com o Postgres. A action e a costura que o teste ja fixa, e o `page.tsx` novo
-// continua nela. Um dia em que esse arquivo puder mudar, a decisao volta a ser da
-// arquitetura e nao do mock.
-//
-// ponytail: a leitura da URL acontece AQUI, e nao na pagina, pelo mesmo motivo do
-// `estado-da-vitrine.ts`: o contrato tem DUAS portas (o `searchParams` do Next e o
-// `URLSearchParams` do cliente) e a action e a unica camada que tem as duas. Se a
-// pagina interpretasse, sobraria um segundo caminho de leitura.
+// ponytail: a action recebe a VISTA inteira, e nao o `searchParams` cru. Quem
+// interpreta a URL e o SHELL (`page.tsx`), e nao a action: a `vista` e o estado que
+// a tela esta mostrando, e e ela que o `<form>`, os `<Link>` de ordenacao e a lista
+// usam — se a action interpretasse, a pagina teria uma `vista` e a action outra, e
+// o "o que a tela mostra" e o "o que a lista filtra" deixariam de ser o mesmo
+// objeto por construcao. A leitura da URL tem uma porta so
+// (`interpretarVitrine`), e ela fica no shell.
 //
 // ponytail: `drizzleEstatisticasDeLances` e NAO `drizzleBidRepository`. Sao duas
 // portas diferentes de proposito: `BidRepository` GRAVA lances (`placeBid`) e a
@@ -37,9 +37,8 @@ export async function getVitrineSellerAction(slug: string) {
 // implementar — e foi o `tsc` que avisou.
 export async function listVitrineItemsAction(
   sellerId: string,
-  searchParams: Record<string, string | string[] | undefined>,
-) {
-  const vista = interpretarVitrine((nome) => primeiroValor(searchParams[nome]));
+  vista: VistaDaVitrine,
+): Promise<ItemDaVitrine[]> {
   return listVitrine(drizzleItemRepository, drizzleEstatisticasDeLances, sellerId, vista);
 }
 

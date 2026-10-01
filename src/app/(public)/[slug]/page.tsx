@@ -1,10 +1,14 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { GavelIcon } from "lucide-react";
+import { GavelIcon, SearchIcon } from "lucide-react";
 import { getVitrineSellerAction, listVitrineItemsAction } from "@/presentation/actions/public-actions";
 import { PublicItemCard } from "@/components/public-item-card";
 import { EmptyState } from "@/components/empty-state";
 import { ItemCardSkeleton } from "@/components/skeletons";
+import { primeiroValor } from "@/lib/primeiro-valor";
+import { ControlesDaVitrine } from "./controles-da-vitrine";
+import { hrefDaVista, interpretarVitrine, type VistaDaVitrine } from "./estado-da-vitrine";
+import { VitrineHero } from "./vitrine-hero";
 
 export const dynamic = "force-dynamic";
 
@@ -15,43 +19,65 @@ export const dynamic = "force-dynamic";
 // `await` dentro de um filho async, o filho e que suspende, e o fallback sai no
 // primeiro flush enquanto a consulta responde.
 //
-// ponytail: e por isso que o `<h1>` fica FORA da fronteira, e o que a mede e o
-// `page.test.tsx` desta rota (com `renderToPipeableStream`, o renderizador que o
-// Next usa): uma fronteira sozinha, sem nada em volta, recebe `onShellReady` e
-// NAO despeja o fallback — o React espera e entrega o conteudo pronto num unico
-// flush. Com conteudo no shell (o titulo, e o `<header>` do layout publico), o
-// primeiro flush leva o esqueleto e o segundo traz os cards.
-async function ItensDaVitrine({
+// ponytail: e por isso que o HERO e os CONTROLES ficam FORA da fronteira. Medido
+// nesta suite (com `renderToPipeableStream`, o renderizador que o Next usa): uma
+// fronteira sozinha, sem nada em volta, recebe `onShellReady` e NAO despeja o
+// fallback — o React espera e entrega o conteudo pronto num unico flush. Com
+// conteudo no shell (o hero, que carrega o `<h1>`), o primeiro flush leva o
+// esqueleto e o segundo traz os cards.
+async function ListaDaVitrine({
   sellerId,
   slug,
-  searchParams,
+  vista,
 }: {
   sellerId: string;
   slug: string;
-  searchParams: Record<string, string | string[] | undefined>;
+  vista: VistaDaVitrine;
 }) {
-  // ponytail: a pagina passa o `searchParams` CRU para a acao, e a acao e que
-  // interpreta a URL. A leitura da URL e um contrato com DUAS portas — o
-  // `searchParams` do Next (servidor) e o `URLSearchParams` do cliente — e ele
-  // vive no `estado-da-vitrine.ts`; a acao e quem tem as duas, entao e ela que
-  // traduz. Se a pagina interpretasse, sobraria um segundo caminho de leitura, e
-  // e a duplicacao que o `estado-da-vitrine.ts` existe para matar.
-  const items = await listVitrineItemsAction(sellerId, searchParams);
-  // ponytail: a vitrine vazia NAO tem acao. O `EmptyState` aceita uma, e o
-  // plano pedia uma acao aqui, mas o visitante de uma vitrine sem itens nao tem
-  // nada a fazer: nao ha onde criar, nao ha busca e a pagina inicial e um
-  // cartao de boas-vindas, nao um catalogo. Um link ali seria uma saida para
-  // lugar nenhum — e o `EmptyState` sem acao e exatamente o caso que o teste de
-  // componente cobre.
+  const items = await listVitrineItemsAction(sellerId, vista);
+
+  // ponytail: a vitrine vazia tem DOIS motivos, e os dois nao podem dizer a mesma
+  // frase. Com a busca vinda da URL, "o vendedor nao tem nada" e "nada casou com
+  // o que voce procurou" chegam no mesmo lugar — e so um deles tem para onde
+  // voltar. O texto unico mandava quem procurava um item que nao existe ler "ele
+  // nao tem item nenhum", que e uma acusacao falsa sobre o vendedor.
   if (items.length === 0) {
+    const filtrada = vista.q !== "";
     return (
       <EmptyState
-        title="Nenhum item em leilão"
-        description="Assim que ele leiloar algo, os itens aparecem aqui."
-        icon={<GavelIcon aria-hidden="true" className="size-6 text-muted-foreground" />}
+        title={filtrada ? "Nenhum item encontrado" : "Nenhum item em leilão"}
+        description={
+          filtrada
+            ? "Nada casou com essa busca. Tente outro termo."
+            : "Assim que ele leiloar algo, os itens aparecem aqui."
+        }
+        icon={
+          filtrada ? (
+            <SearchIcon aria-hidden="true" className="size-6 text-muted-foreground" />
+          ) : (
+            <GavelIcon aria-hidden="true" className="size-6 text-muted-foreground" />
+          )
+        }
+        // ponytail: o "voltar" e um LINK, e nao um botao que chama `navegar`: um
+        // link tem as afinidades que o botao nao tem (abrir em nova aba, clique do
+        // meio, ctrl-clique, copiar endereco, rastreamento) sem ganhar nada em
+        // troca, porque a propriedade que importa e "a URL e escrita num lugar so" —
+        // e ela continua sendo o `hrefDaVista`, chamado com a vista sem filtro (que
+        // e a MESMA frase de URL com outra vista, nao uma segunda copia).
+        //
+        // E sem busca nao ha acao, e a decisao e a original do `page.tsx:26-31`: o
+        // visitante de uma vitrine sem itens nao tem nada a fazer — nao ha onde
+        // criar, nao ha busca e a pagina inicial e um cartao de boas-vindas. Um
+        // link ali seria uma saida para lugar nenhum.
+        action={
+          filtrada
+            ? { label: "Limpar busca", href: hrefDaVista(slug, { q: "", ordenar: vista.ordenar }) }
+            : undefined
+        }
       />
     );
   }
+
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
@@ -70,22 +96,34 @@ export default async function VitrinePage({
 }) {
   const { slug } = await params;
   // ponytail: o `notFound()` e do SHELL, e nao da fronteira, por causa do STATUS
-  // CODE — e nao por preferencia de leitura. A documentacao do proprio Next 16
-  // ("Calling `notFound()` after streaming has started", em
-  // `next/dist/docs/01-app/03-api-reference/04-functions/not-found.md`) mostra o
-  // outro desenho — a checagem dentro da fronteira — e nomeia a conta: "the
-  // response has already begun streaming as a 200, and the status can't change
-  // once streaming has started", com um `noindex` para segurar o soft 404. Esta
-  // e a rota mais rastreada do produto, e um soft 404 com 200 e uma vitrine
-  // inexistente e um indexavel como pagina valida; a vitrine e `force-dynamic`
-  // (sem Cache Components), entao a checagem aqui ainda devolve 404 de verdade.
-  const [sp, seller] = await Promise.all([searchParams, getVitrineSellerAction(slug)]);
-  if (!seller) notFound();
+  // CODE. A documentacao do proprio Next 16 ("Calling `notFound()` after streaming
+  // has started") mostra o outro desenho — a checagem dentro da fronteira — e
+  // nomeia a conta: "the response has already begun streaming as a 200, and the
+  // status can't change once streaming has started", com um `noindex` para segurar
+  // o soft 404. Esta e a rota mais rastreada do produto, e um soft 404 com 200 e
+  // uma vitrine inexistente e um indexavel como pagina valida.
+  const vendedor = await getVitrineSellerAction(slug);
+  if (!vendedor) notFound();
+
+  // ponytail: a URL e lida AQUI, no shell, e a `vista` e passada para a fronteira.
+  // Ler dentro do filho daria duas leituras do mesmo parametro e a URL poderia
+  // mudar entre elas. E a `vista` do shell e a que o `<form>` e os `<Link>` dos
+  // controles usam, entao o que a tela mostra e o que a lista filtra.
+  //
+  // ponytail: o `searchParams` e esperado no SHELL e nao na fronteira, e por
+  // causa do `force-dynamic` + do `notFound()`. Numa rota dinamica o Next le o
+  // `searchParams` antes de comecar a renderizar, entao o 404 sai com o codigo
+  // certo; se ele vivesse dentro da fronteira, a resposta ja teria comecado a
+  // sair com 200.
+  const paramsDaUrl = await searchParams;
+  const vista = interpretarVitrine((nome) => primeiroValor(paramsDaUrl[nome]));
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Vitrine de {seller.name}</h1>
+      <VitrineHero vendedor={vendedor} />
+      <ControlesDaVitrine slug={slug} vista={vista} />
       <Suspense fallback={<ItemCardSkeleton />}>
-        <ItensDaVitrine sellerId={seller.id} slug={slug} searchParams={sp} />
+        <ListaDaVitrine sellerId={vendedor.id} slug={slug} vista={vista} />
       </Suspense>
     </div>
   );
