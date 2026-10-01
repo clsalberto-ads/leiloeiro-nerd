@@ -15,18 +15,26 @@ export async function getVitrineSellerAction(slug: string) {
 }
 
 // ponytail: a vitrine passa pela ACTION e nao pelo `listVitrine` direto, e o motivo
-// e a seta: a pagina e um Server Component de `src/app`, e a regra do projeto e que
-// `src/app` nao importa `src/infrastructure` (Drizzle) nem `src/application`
-// diretamente — a costura e a acao. E a leitura da URL acontece AQUI, e nao na
-// pagina, porque o `estado-da-vitrine.ts` e um contrato com DUAS portas (o
-// `searchParams` do Next e o `URLSearchParams` do cliente) e esta e a unica camada
-// que tem as duas.
+// nao e "a regra do projeto proibe" — NAO existe essa regra, e tres paginas do
+// dashboard (`dashboard/page.tsx`, `items/page.tsx`, `items/[id]/edit/page.tsx`)
+// importam `drizzleItemRepository` direto desde antes deste trabalho. A razao real e
+// o TESTE: `page.test.tsx` e um dos testes protegidos e ele faz `vi.mock` de
+// `@/presentation/actions/public-actions`; se a pagina chamasse `listVitrine`
+// direto, o mock nao interceptaria nada e o teste passaria a abrir conexao real
+// com o Postgres. A action e a costura que o teste ja fixa, e o `page.tsx` novo
+// continua nela. Um dia em que esse arquivo puder mudar, a decisao volta a ser da
+// arquitetura e nao do mock.
+//
+// ponytail: a leitura da URL acontece AQUI, e nao na pagina, pelo mesmo motivo do
+// `estado-da-vitrine.ts`: o contrato tem DUAS portas (o `searchParams` do Next e o
+// `URLSearchParams` do cliente) e a action e a unica camada que tem as duas. Se a
+// pagina interpretasse, sobraria um segundo caminho de leitura.
 //
 // ponytail: `drizzleEstatisticasDeLances` e NAO `drizzleBidRepository`. Sao duas
 // portas diferentes de proposito: `BidRepository` GRAVA lances (`placeBid`) e a
 // vitrine so LE um agregado. Passar o repositorio inteiro aqui da certo por
 // acaso hoje e quebra no dia em que os fakes de `placeBid` receberem um metodo a
-// implementar — e o `tsc` e quem avisa, que e o que aconteceu.
+// implementar — e foi o `tsc` que avisou.
 export async function listVitrineItemsAction(
   sellerId: string,
   searchParams: Record<string, string | string[] | undefined>,
