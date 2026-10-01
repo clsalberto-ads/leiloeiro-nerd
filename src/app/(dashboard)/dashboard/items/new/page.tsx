@@ -1,9 +1,10 @@
 import { ItemForm } from "@/components/item-form";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default function NewItemPage() {
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Novo item</h1>
+      <PageHeader title="Novo item" />
       <ItemForm mode="create" />
     </div>
   );
