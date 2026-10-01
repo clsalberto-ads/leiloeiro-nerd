@@ -77,6 +77,29 @@ export const drizzleUserRepository: UserRepository = {
 // O `count(*)::int` e obrigatorio: sem o cast o Postgres devolve `bigint`, o `pg`
 // entrega como TEXTO, e `totalDeItensAtivos` viraria a string "3" — que no
 // `pluralize` do hero comparada com 1 seria sempre falsa.
+// ponytail: a consulta mora numa funcao EXPORTADA e nao inline no metodo, e o
+// motivo e o teste. Um teste que montasse a propria query para conferir o SQL
+// estaria testando uma COPIA — mudar o repositorio deixaria o teste verde, que e
+// a segunda fonte de verdade que este projeto vem desarmando. Com a consulta
+// exportada, `drizzle-user-repository.test.ts` afirma o SQL que o codigo de
+// producao executa.
+export function consultaDeVitrine(slug: string) {
+  return db
+    .select({
+      id: userTable.id,
+      name: userTable.name,
+      slug: userTable.slug,
+      image: userTable.image,
+      criadoEm: userTable.createdAt,
+      totalDeItensAtivos: sql<number>`count(${items.id})::int`,
+    })
+    .from(userTable)
+    .leftJoin(items, and(eq(items.sellerId, userTable.id), eq(items.status, "active")))
+    .where(eq(userTable.slug, slug))
+    .groupBy(userTable.id, userTable.name, userTable.slug, userTable.image, userTable.createdAt)
+    .limit(1);
+}
+
 export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
   async findVitrineBySlug(slug) {
     // ponytail: o `LEFT JOIN` no lugar da subquery correlacionada por um BUG que a
@@ -100,20 +123,7 @@ export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
     // `innerJoin` a linha sumiria e a vitrine distinguiria "vendedor sem itens" de
     // "vendedor inexistente" — o `notFound()` do shell passaria a responder 404
     // para um vendedor que existe e nao tem nada leiloado.
-    const [row] = await db
-      .select({
-        id: userTable.id,
-        name: userTable.name,
-        slug: userTable.slug,
-        image: userTable.image,
-        criadoEm: userTable.createdAt,
-        totalDeItensAtivos: sql<number>`count(${items.id})::int`,
-      })
-      .from(userTable)
-      .leftJoin(items, and(eq(items.sellerId, userTable.id), eq(items.status, "active")))
-      .where(eq(userTable.slug, slug))
-      .groupBy(userTable.id, userTable.name, userTable.slug, userTable.image, userTable.createdAt)
-      .limit(1);
+    const [row] = await consultaDeVitrine(slug);
     if (!row || !row.slug) return null;
     // o objeto e montado campo a campo (como o `findBySlug` acima) porque o
     // `{ ...row }` do plano nao carrega o estreitamento do `!row.slug` para o
