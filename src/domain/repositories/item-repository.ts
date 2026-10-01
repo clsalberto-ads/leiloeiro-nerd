@@ -142,8 +142,21 @@ export type ItemSortDirection = "asc" | "desc";
 //
 // `total` e a contagem do conjunto filtrado ANTES de `limit`/`offset`, sempre: e o
 // que o rodape usa para dizer "de 47". Um total contado antes do filtro faz o
-// rodape prometer paginas que nao existem — e o usuario clica na proxima e recebe
-// "Nenhum resultado".
+export interface ItemDaVitrine {
+  id: string;
+  title: string;
+  type: ItemType;
+  minInitialBid: number;
+  bidDeadline: Date;
+  imageUrl: string | null;
+  totalDeLances: number;
+  maiorLance: number | null;
+  // ponytail: `criadoEm` e usado pelo comparador "Recentes" (ver `list-vitrine.ts`)
+  // para garantir uma ordem total mesmo sem lance. E parte do DTO para nao
+  // precisarmos de um `createdAt` no card, que quebraria o layout.
+  criadoEm: Date;
+}
+
 export interface ItemListFilter {
   status?: ItemStatus;
   // ponytail: `q` e substring do TITULO e dos rotulos canonicos de status e de

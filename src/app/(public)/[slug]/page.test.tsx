@@ -29,23 +29,19 @@ vi.mock("@/presentation/actions/public-actions", () => ({
 }));
 
 import VitrinePage from "./page";
-import type { Item } from "@/domain/repositories/item-repository";
+import type { ItemDaVitrine } from "@/domain/repositories/item-repository";
 
-function item(overrides: Partial<Item> = {}): Item {
+function item(overrides: Partial<ItemDaVitrine> = {}): ItemDaVitrine {
   return {
     id: "i1",
-    sellerId: "u1",
     title: "Console retrô",
-    description: "Completo.",
     type: "product",
     imageUrl: null,
     minInitialBid: 5000,
-    minBidIncrement: 500,
     bidDeadline: new Date("2026-10-01T12:00:00Z"),
-    paymentDeadlineDays: 3,
-    status: "active",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-02-01T00:00:00Z"),
+    totalDeLances: 0,
+    maiorLance: null,
+    criadoEm: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -154,8 +150,8 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
   // primeiro flush e o esqueleto; quando chegam, e o segundo.
   it("o primeiro flush é o esqueleto e os cards vêm no flush seguinte", async () => {
     espiao.vendedor.mockResolvedValue(VENDEDOR);
-    let chega!: (valor: Item[]) => void;
-    espiao.itens.mockReturnValue(new Promise<Item[]>((resolve) => { chega = resolve; }));
+    let chega!: (valor: ItemDaVitrine[]) => void;
+    espiao.itens.mockReturnValue(new Promise<ItemDaVitrine[]>((resolve) => { chega = resolve; }));
 
     const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
     const fluxo = streamar(elemento);
@@ -175,7 +171,7 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
     expect(texto(primeiro)).not.toContain("Console retrô");
 
     expect(partes.join("")).toContain("Console retrô");
-    expect(espiao.itens).toHaveBeenCalledWith("u1");
+    expect(espiao.itens).toHaveBeenCalledWith("u1", {});
   });
 
   // ponytail: a fronteira e um placeholder, nao um manto. O esqueleto SAI no

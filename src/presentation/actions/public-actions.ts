@@ -5,14 +5,34 @@ import { listActiveItemsBySellerId } from "@/application/use-cases/list-active-i
 import { getItemBySlugAndId } from "@/application/use-cases/get-item-by-slug-and-id";
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
-import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
+import { drizzleBidRepository, drizzleEstatisticasDeLances } from "@/infrastructure/database/repositories/drizzle-bid-repository";
+import { listVitrine } from "@/application/use-cases/list-vitrine";
+import { interpretarVitrine } from "@/app/(public)/[slug]/estado-da-vitrine";
+import { primeiroValor } from "@/lib/primeiro-valor";
 
 export async function getVitrineSellerAction(slug: string) {
   return getSellerBySlug(drizzleUserRepository, slug);
 }
 
-export async function listVitrineItemsAction(sellerId: string) {
-  return listActiveItemsBySellerId(drizzleItemRepository, sellerId);
+// ponytail: a vitrine passa pela ACTION e nao pelo `listVitrine` direto, e o motivo
+// e a seta: a pagina e um Server Component de `src/app`, e a regra do projeto e que
+// `src/app` nao importa `src/infrastructure` (Drizzle) nem `src/application`
+// diretamente — a costura e a acao. E a leitura da URL acontece AQUI, e nao na
+// pagina, porque o `estado-da-vitrine.ts` e um contrato com DUAS portas (o
+// `searchParams` do Next e o `URLSearchParams` do cliente) e esta e a unica camada
+// que tem as duas.
+//
+// ponytail: `drizzleEstatisticasDeLances` e NAO `drizzleBidRepository`. Sao duas
+// portas diferentes de proposito: `BidRepository` GRAVA lances (`placeBid`) e a
+// vitrine so LE um agregado. Passar o repositorio inteiro aqui da certo por
+// acaso hoje e quebra no dia em que os fakes de `placeBid` receberem um metodo a
+// implementar — e o `tsc` e quem avisa, que e o que aconteceu.
+export async function listVitrineItemsAction(
+  sellerId: string,
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const vista = interpretarVitrine((nome) => primeiroValor(searchParams[nome]));
+  return listVitrine(drizzleItemRepository, drizzleEstatisticasDeLances, sellerId, vista);
 }
 
 // ponytail: a vitrine (`app/(public)/[slug]/page.tsx`) nao usa mais ESTA acao — ela
