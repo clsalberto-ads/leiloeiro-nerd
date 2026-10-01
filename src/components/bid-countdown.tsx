@@ -58,7 +58,22 @@ export function BidCountdown({ deadline }: { deadline: Date }) {
   // regiao `aria-live="polite"` SEPARADA que so muda em degraus (1 min, 10 min,
   // 1 h) em vez de a cada tick — nunca este no texto que muda 1x/segundo.
   return (
-    <span role="timer" className="motion-reduce:animate-none">
+    // ponytail: o `suppressHydrationWarning` aqui e obrigatorio, e nao enfeite.
+    // O `useState(() => deadline - Date.now())` roda no SERVIDOR (SSR) e DE NOVO
+    // no cliente (hidratacao), com `Date.now()` diferente nas duas execucoes — a
+    // contagem cai na Wrong Value do segundo certo. Medido neste repo com um
+    // `hydrateRoot` de verdade: sem o atributo, o React loga "Hydration failed
+    // because the server rendered text didn't match the client" e **descarta o HTML
+    // do servidor**, re-renderizando a arvore no cliente — na rota publica mais
+    // acessada do produto, e num componente que aparece em TODOS os cards.
+    //
+    // Por que o atributo resolve em vez de mascarar: a divergencia e de UM SEGUNDO
+    // e se corrige sozinha no primeiro tick do `setInterval`. O que o React faz sem
+    // ele e bem mais caro que um texto desatualizado por ate 1 s: ele joga fora o
+    // servidor inteiro daquela subarvore e refaz no cliente. E o `sr-only` abaixo
+    // NAO precisa do atributo — `formatAbsolute(deadline)` nao usa `Date.now()`, entao
+    // servidor e cliente concordam sempre nele.
+    <span role="timer" className="motion-reduce:animate-none" suppressHydrationWarning>
       {formatted}
       <span className="sr-only">{`Prazo: ${formattedDate}`}</span>
     </span>

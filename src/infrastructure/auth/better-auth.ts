@@ -13,7 +13,18 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     // Placeholder até a Fase 3 (Resend): loga o link de redefinição no console.
+    // ponytail: o `throw` em produção é o ponto inteiro deste callback. A `url` aqui
+    // é o token de redefinição — quem lê o stdout do processo toma conta da conta
+    // de quem pediu a redefinição, e o prefixo "[DEV]" não protege nada porque não
+    // havia guard nenhum: em produção o token ia inteiro para o log. Falhar
+    // fechado (nenhum e-mail sai, o chamador vê o erro) é o único jeito seguro de
+    // não ter o provedor de e-mail ainda. O upgrade path é o Resend na Fase 3,
+    // que troca o `throw` por um `send` — e o `throw` some junto, porque ele só
+    // existe para este placeholder.
     sendResetPassword: async ({ url }) => {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Envio de redefinição de senha não configurado (Fase 3 / Resend)");
+      }
       console.log("[DEV] link de redefinição de senha:", url);
     },
   },

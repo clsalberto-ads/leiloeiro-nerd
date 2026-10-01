@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createSlug } from "@/domain/value-objects/slug";
 import { formatReais } from "@/lib/format-reais";
+import { deInputDeData } from "@/lib/fuso";
 
 // ponytail: UNIDADE. O dominio, o payload da action e o `minBid` do item sao
 // sempre em CENTAVOS; so o campo visivel do form de lance e em REAIS. Este
@@ -47,7 +48,17 @@ export const itemSchema = z.object({
   type: z.enum(["product", "service", "piece"], { message: "Tipo inválido" }),
   minInitialBid: z.coerce.number().positive("Lance mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Lance mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
   minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
-  bidDeadline: z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),
+  // ponytail: o preprocess NAO substitui o `z.coerce.date()`, ele so devolve a
+  // string para `deInputDeData` antes dele. Um `Date` pronto continua passando
+  // direto (por isso o `typeof === "string"`), e um ISO com `Z`/`+hh:mm` tambem:
+  // sao inequivocos, e `deInputDeData` os repassa. So a string crua do
+  // `datetime-local` — a unica que nao carrega fuso — passa a ser lida no fuso do
+  // produto. Sem isso, salvar qualquer campo do item num servidor em UTC arrastava
+  // o prazo 3 h para tras. Ver `deInputDeData` em `@/lib/fuso`.
+  bidDeadline: z.preprocess(
+    (v) => (typeof v === "string" ? deInputDeData(v) : v),
+    z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),
+  ),
   paymentDeadlineDays: z.coerce.number().int("Dias de pagamento inválido").min(1, "Mínimo 1 dia para pagamento").max(30, "Máximo 30 dias para pagamento").default(3),
   imageUrls: z
     .string()

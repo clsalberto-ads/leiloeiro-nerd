@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { createItemAction, updateItemAction } from "@/presentation/actions/item-actions";
 import { uploadItemImagesAction } from "@/presentation/actions/upload-actions";
 import { itemSchema } from "@/lib/validators";
+import { paraInputDeData } from "@/lib/fuso";
 import type { Item } from "@/domain/repositories/item-repository";
 
 type ItemInput = z.input<typeof itemSchema>;
@@ -48,9 +49,13 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
 
   const removeUrl = (url: string) => setUrls((prev) => prev.filter((u) => u !== url));
 
-  const formattedDate = item?.bidDeadline
-    ? new Date(item.bidDeadline.getTime() - item.bidDeadline.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-    : undefined;
+  // ponytail: `paraInputDeData` (e nao o `getTimezoneOffset()` que estava aqui)
+  // porque o input e uma HORA DE PAREDE sem fuso: o `getTimezoneOffset()` usava o
+  // fuso do PROCESSO, e num servidor em UTC o vendedor via 01/10 02:59 no lugar
+  // dos 30/09 23:59 que ele digitou. A volta (ler de volta) e `deInputDeData`, em
+  // `@/lib/validators` — os dois lados leem `FUSO`, entao o round-trip e exato em
+  // qualquer maquina. Ver o ponytail de `deInputDeData`.
+  const formattedDate = item?.bidDeadline ? paraInputDeData(item.bidDeadline) : undefined;
 
   const form = useForm<ItemInput, unknown, ItemOutput>({
     resolver: zodResolver(itemSchema),
