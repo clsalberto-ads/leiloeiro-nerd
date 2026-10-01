@@ -5,20 +5,20 @@ import { Separator } from "@/components/ui/separator";
 
 export function DashboardSidebar() {
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-card">
-      <nav className="flex flex-1 flex-col gap-1 p-3">
-        <Button render={<Link href="/dashboard">Painel</Link>} variant="ghost" className="justify-start gap-2">
+    <aside className="flex shrink-0 flex-row overflow-x-auto border-b bg-card md:h-full md:w-64 md:flex-col md:border-r md:border-b-0">
+      <nav className="flex flex-1 flex-row gap-1 p-2 md:flex-col md:p-3">
+        <Button render={<Link href="/dashboard" />} variant="ghost" className="justify-start gap-2">
           <LayoutDashboard className="h-4 w-4" /> Painel
         </Button>
-        <Button render={<Link href="/dashboard/items">Meus itens</Link>} variant="ghost" className="justify-start gap-2">
+        <Button render={<Link href="/dashboard/items" />} variant="ghost" className="justify-start gap-2">
           <Package className="h-4 w-4" /> Meus itens
         </Button>
-        <Button render={<Link href="/dashboard/settings">Configurações</Link>} variant="ghost" className="justify-start gap-2">
+        <Button render={<Link href="/dashboard/settings" />} variant="ghost" className="justify-start gap-2">
           <Settings className="h-4 w-4" /> Configurações
         </Button>
       </nav>
-      <Separator />
-      <div className="p-3 text-xs text-muted-foreground">Leiloeiro Nerd</div>
+      <Separator className="hidden md:block" />
+      <div className="hidden p-3 text-xs text-muted-foreground md:block">Leiloeiro Nerd</div>
     </aside>
   );
 }

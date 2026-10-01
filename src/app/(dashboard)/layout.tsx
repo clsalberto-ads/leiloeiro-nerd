@@ -10,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getSession();
   if (!session) redirect("/login");
   return (
-    <div className="flex min-h-svh">
+    <div className="flex min-h-svh flex-col md:flex-row">
       <DashboardSidebar />
       <div className="flex min-h-svh flex-1 flex-col">
         <DashboardHeader userName={session.user.name} />
