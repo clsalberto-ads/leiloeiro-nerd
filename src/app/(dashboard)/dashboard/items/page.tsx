@@ -1,4 +1,5 @@
 import { getSession } from "@/presentation/actions/auth-actions";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listSellerItems } from "@/application/use-cases/list-seller-items";
@@ -8,6 +9,7 @@ import { filtroDaVista, interpretarParametros, ultimaPagina, hrefDaVista } from 
 import { paraItemDaTabela } from "./item-da-tabela";
 import { BecomeSellerForm } from "@/components/become-seller-form";
 import { primeiroValor } from "@/lib/primeiro-valor";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +42,14 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   const session = await getSession();
   if (!session) return null;
 
+  // ponytail: o "Meus itens" e o mesmo `h1` nos dois ramos, entao os dois usam o
+  // `PageHeader` — um titulo de pagina nao pode depender de o usuario ter virado
+  // leiloeiro, senao o `<h1>` muda de forma entre os ramos. O ramo de quem nao e
+  // leiloeiro nao ganha `actions`: nao ha item novo para criar sem esse papel.
   if (session.user.role !== "seller" && session.user.role !== "both") {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Meus itens</h1>
+        <PageHeader title="Meus itens" />
         <p className="text-muted-foreground">Você ainda não é leiloeiro.</p>
         <BecomeSellerForm />
       </div>
@@ -77,10 +83,14 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Meus itens</h1>
-        <Link href="/dashboard/items/new" className="text-sm font-medium text-primary underline">+ Novo item</Link>
-      </div>
+      <PageHeader
+        title="Meus itens"
+        actions={
+          <Button render={<Link href="/dashboard/items/new" />} size="sm">
+            + Novo item
+          </Button>
+        }
+      />
       <ItensDaUrl items={items.map(paraItemDaTabela)} vista={vista} totalCount={total} />
     </div>
   );
