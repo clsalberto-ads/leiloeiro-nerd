@@ -12,9 +12,9 @@ export function AppHeader() {
         <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Leiloeiro Nerd</span>
       </Link>
       <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-        <Link href="#features" className="transition-colors hover:text-foreground">Recursos</Link>
-        <Link href="#benefits" className="transition-colors hover:text-foreground">Vantagens</Link>
-        <Link href="#stats" className="transition-colors hover:text-foreground">Plataforma</Link>
+        <Link href="/#features" className="transition-colors hover:text-foreground">Recursos</Link>
+        <Link href="/#benefits" className="transition-colors hover:text-foreground">Vantagens</Link>
+        <Link href="/#stats" className="transition-colors hover:text-foreground">Plataforma</Link>
       </nav>
       <div className="flex items-center gap-3">
         <Button render={<Link href="/login">Entrar</Link>} variant="ghost" size="sm" />
