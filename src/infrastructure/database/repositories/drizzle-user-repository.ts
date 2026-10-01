@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import { items } from "@/infrastructure/database/schema";
@@ -79,6 +79,27 @@ export const drizzleUserRepository: UserRepository = {
 // `pluralize` do hero comparada com 1 seria sempre falsa.
 export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
   async findVitrineBySlug(slug) {
+    // ponytail: o `LEFT JOIN` no lugar da subquery correlacionada por um BUG que a
+    // suite nao pegou e so a rota real pegou (HTTP 500, `42883 No operator matches`).
+    //
+    // O desenho anterior era `sql`(select count(*)::int from items i where i.seller_id
+    // = ${userTable.id})``. Ele funciona e nao tem N+1, mas o drizzle 0.45 renderiza
+    // a coluna de uma tabela que NAO esta no `FROM` da subquery SEM qualificar: saiu
+    // `i.seller_id = "id"`, e dentro do escopo da subquery esse `"id"` resolve para
+    // `items.id`. A query virava `items.seller_id = items.id` — `text` contra
+    // `uuid` — e o Postgres respondia "no operator matches text = uuid".
+    // `alias(userTable, "u")` NAO corrige: medido, o drizzle tambem renderiza
+    // `"id"` nesse caso. So `sql.raw`("user"."id")` qualifica, e isso amarra o
+    // codigo a uma string que ninguem renomeia junto.
+    //
+    // O `LEFT JOIN` resolve pela via tipada: `items` esta no `FROM`, entao
+    // `${items.id}` renderiza `"items"."id"`, e o `eq(items.sellerId, userTable.id)`
+    // do `on` fica fora do `sql` e sai qualificado pelos dois lados. O filtro de
+    // `active` vai no proprio `on` — e por isso que e `leftJoin` e nao `innerJoin`:
+    // um vendedor sem item ativo tem de voltar NA mesma linha, com `count = 0`. Com
+    // `innerJoin` a linha sumiria e a vitrine distinguiria "vendedor sem itens" de
+    // "vendedor inexistente" — o `notFound()` do shell passaria a responder 404
+    // para um vendedor que existe e nao tem nada leiloado.
     const [row] = await db
       .select({
         id: userTable.id,
@@ -86,10 +107,12 @@ export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
         slug: userTable.slug,
         image: userTable.image,
         criadoEm: userTable.createdAt,
-        totalDeItensAtivos: sql<number>`(select count(*)::int from ${items} i where i.seller_id = ${userTable.id} and i.status = 'active')`,
+        totalDeItensAtivos: sql<number>`count(${items.id})::int`,
       })
       .from(userTable)
+      .leftJoin(items, and(eq(items.sellerId, userTable.id), eq(items.status, "active")))
       .where(eq(userTable.slug, slug))
+      .groupBy(userTable.id, userTable.name, userTable.slug, userTable.image, userTable.createdAt)
       .limit(1);
     if (!row || !row.slug) return null;
     // o objeto e montado campo a campo (como o `findBySlug` acima) porque o
