@@ -29,23 +29,19 @@ vi.mock("@/presentation/actions/public-actions", () => ({
 }));
 
 import VitrinePage from "./page";
-import type { Item } from "@/domain/repositories/item-repository";
+import type { ItemDaVitrine } from "@/domain/repositories/item-repository";
 
-function item(overrides: Partial<Item> = {}): Item {
+function item(overrides: Partial<ItemDaVitrine> = {}): ItemDaVitrine {
   return {
     id: "i1",
-    sellerId: "u1",
     title: "Console retrô",
-    description: "Completo.",
     type: "product",
     imageUrl: null,
     minInitialBid: 5000,
-    minBidIncrement: 500,
     bidDeadline: new Date("2026-10-01T12:00:00Z"),
-    paymentDeadlineDays: 3,
-    status: "active",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-02-01T00:00:00Z"),
+    totalDeLances: 0,
+    maiorLance: null,
+    criadoEm: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -70,8 +66,24 @@ function streamar(elemento: ReactElement) {
   const partes: string[] = [];
   const erros: string[] = [];
   let acorda!: () => void;
+  // ponytail: `primeiroFlush` espera o FIM DO SHELL, e nao o primeiro `data` do
+  // stream. Sao coisas diferentes, e a distincao e o que faz este teste medir o que
+  // o nome diz. O React pode partir o shell em VARIOS chunks — medido nesta suite:
+  // com o hero e os controles no shell, o primeiro chunk sao 1.532 bytes e termina
+  // no meio do `class` de um `<button>`, sem fronteira nenhuma. Resolver no
+  // primeiro `data` media CHUNK, nao FLUSH, e o teste passava aNtES por motivo
+  // errado: o shell antigo cabia inteiro num chunk, entao as duas coisas
+  // coincidiam e ninguem via o bug.
+  //
+  // O marcador do fim do shell e o `<!--/$-->` que o React fecha depois de todo
+  // fallback. Ele vem DEPOIS do esqueleto, entao espera-lo mede o shell completo —
+  // e o que separa o fallback do conteudo que sobe depois. Se a fronteira nao
+  // fechar, o `end` resolve assim mesmo, para o caso virar uma falha com mensagem
+  // em vez de um travamento.
   const primeiroFlush = new Promise<string>((resolve) => {
-    acorda = () => resolve(partes[0] ?? "");
+    acorda = () => {
+      if (partes.join("").includes("<!--/$-->")) resolve(partes.join(""));
+    };
   });
   const fim = new Promise<string[]>((resolve) => {
     const saida = new PassThrough();
@@ -80,7 +92,10 @@ function streamar(elemento: ReactElement) {
       partes.push(pedaco);
       acorda();
     });
-    saida.on("end", () => resolve(partes));
+    saida.on("end", () => {
+      acorda();
+      resolve(partes);
+    });
     const { pipe } = renderToPipeableStream(elemento, {
       onShellReady() {
         pipe(saida);
@@ -136,7 +151,18 @@ function texto(html: string): string {
   return html.replaceAll("<!-- -->", "");
 }
 
-const VENDEDOR = { id: "u1", name: "Ana", slug: "ana" };
+// ponytail: o `vendedor` grew porque a action trocou de porta: `getSellerBySlug`
+// devolvia `{id, name, slug}` e o HERO precisa de `image`, `criadoEm` e
+// `totalDeItensAtivos`. Os tres `it` nao mudaram de intencao — o que mudou foi a
+// forma do dado que o spy devolve.
+const VENDEDOR = {
+  id: "u1",
+  name: "Ana",
+  slug: "ana",
+  image: null,
+  criadoEm: new Date("2026-01-15T12:00:00Z"),
+  totalDeItensAtivos: 1,
+};
 
 // ponytail: os espioes sao zerados entre os `it` porque o `it` do 404 afirma que a
 // listagem NAO chega a rodar — e um spy que carrega as chamadas do teste anterior
@@ -154,8 +180,8 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
   // primeiro flush e o esqueleto; quando chegam, e o segundo.
   it("o primeiro flush é o esqueleto e os cards vêm no flush seguinte", async () => {
     espiao.vendedor.mockResolvedValue(VENDEDOR);
-    let chega!: (valor: Item[]) => void;
-    espiao.itens.mockReturnValue(new Promise<Item[]>((resolve) => { chega = resolve; }));
+    let chega!: (valor: ItemDaVitrine[]) => void;
+    espiao.itens.mockReturnValue(new Promise<ItemDaVitrine[]>((resolve) => { chega = resolve; }));
 
     const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
     const fluxo = streamar(elemento);
@@ -170,12 +196,22 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
     // recebe `onShellReady` sem nunca despejar o fallback — o React espera e
     // entrega o conteudo pronto num unico flush. Sem o `<h1>` no shell, o
     // primeiro flush seria o dos cards e este teste acusaria.
-    expect(texto(primeiro)).toContain("Vitrine de Ana");
+    // ponytail: aqui a string "Vitrine de Ana" virou `data-slot="vitrine-hero"` +
+    // "Ana", e a mudanca de conteudo e menor que a de nome. O `<h1>` saiu da PAGINA
+    // e foi para o HERO (que o layout publico nao tem — la so ha um `<header>` sem
+    // nome, entao continua havendo um unico `<h1>` na rota, e nenhum landmark
+    // duplicado). O que este `it` continua provando e o que ele sempre provou, e o
+    // que o comentario abaixo diz: o SHELL tem conteudo antes do primeiro flush, e e
+    // por isso que o esqueleto aparece. O marcador do hero e a forma mais forte de
+    // dizer isso — ele falha se o hero sair do shell, e a string passaria a passar
+    // por acidente se o nome aparecesse em qualquer outro lugar do HTML.
+    expect(primeiro).toContain('data-slot="vitrine-hero"');
+    expect(texto(primeiro)).toContain("Ana");
     expect(primeiro).toContain('data-slot="item-card-skeleton"');
     expect(texto(primeiro)).not.toContain("Console retrô");
 
     expect(partes.join("")).toContain("Console retrô");
-    expect(espiao.itens).toHaveBeenCalledWith("u1");
+    expect(espiao.itens).toHaveBeenCalledWith("u1", { q: "", ordenar: "prazo" });
   });
 
   // ponytail: a fronteira e um placeholder, nao um manto. O esqueleto SAI no

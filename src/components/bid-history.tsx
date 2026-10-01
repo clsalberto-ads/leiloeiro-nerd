@@ -1,5 +1,6 @@
 import type { Bid } from "@/domain/repositories/bid-repository";
 import { formatReais } from "@/lib/format-reais";
+import { FUSO } from "@/lib/fuso";
 
 export function BidHistory({ bids }: { bids: Bid[] }) {
   if (bids.length === 0) {
@@ -30,7 +31,14 @@ export function BidHistory({ bids }: { bids: Bid[] }) {
             <td className="py-2 pr-4">{bid.rank ?? "–"}</td>
             <td className="py-2 pr-4">R$ {formatReais(bid.amount)}</td>
             <td className="py-2 pr-4">{bid.bidderName}</td>
-            <td className="py-2">{new Date(bid.createdAt).toLocaleDateString("pt-BR")}</td>
+            {/* ponytail: formata `bids.createdAt`, o mesmo campo que o `date_trunc`
+                agrupa por dia no `drizzle-analise-repository.ts` (grafico de
+                "lances por dia"); o outro leitor de data, `colunas.tsx`, repete o
+                argumento por `bidDeadline`. O por que do fuso esta na casa
+                canonica, `@/lib/fuso`. Nao remova o `timeZone` achando que e
+                redundante: dev roda em America/Fortaleza (UTC-3, mesmo offset de
+                Sao Paulo hoje), onde o bug passa reto e so quebra em servidor UTC. */}
+            <td className="py-2">{new Date(bid.createdAt).toLocaleDateString("pt-BR", { timeZone: FUSO })}</td>
           </tr>
         ))}
       </tbody>

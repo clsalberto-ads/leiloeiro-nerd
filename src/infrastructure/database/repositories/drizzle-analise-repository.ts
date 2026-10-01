@@ -1,6 +1,6 @@
 import { and, count, desc, eq, max, sql, sum } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
-import { FUSO } from "@/lib/fuso";
+import { FUSO, diaLocalDe, inicioDoDiaLocal } from "@/lib/fuso";
 import { bids, items } from "@/infrastructure/database/schema";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import type { ItemStatus, ItemType } from "@/domain/repositories/item-repository";
@@ -55,18 +55,24 @@ function preencherDias(linhas: { dia: string; total: number }[], dias: number, a
   const mapa = new Map(linhas.map((l) => [l.dia, l.total]));
   const saida: PontoPorDia[] = [];
   for (let i = dias - 1; i >= 0; i--) {
-    const d = new Date(ate);
-    d.setUTCDate(d.getUTCDate() - i);
-    saida.push({ dia: d.toISOString().slice(0, 10), total: mapa.get(d.toISOString().slice(0, 10)) ?? 0 });
+    // ponytail: a CHAVE do dia vem de `diaLocalDe`, e nao de `toISOString().slice`.
+    // A janela e uma lista de dias do fuso do produto, e ela tem de casar com as
+    // chaves que o SQL agrupa (`date_trunc` em `at time zone FUSO`). Entre 18h e
+    // 21h BRT, `toISOString()` devolve a data de amanha e o ultimo ponto do
+    // grafico saia rotulado com o dia errado.
+    const dia = diaLocalDe(inicioDoDiaLocal(i, ate));
+    saida.push({ dia, total: mapa.get(dia) ?? 0 });
   }
   return saida;
 }
 
+// ponytail: `inicioDoDiaLocal` e nao `setUTCHours(0,0,0,0)`. O limite inferior do
+// `WHERE` e um instante, e ele tem de ser a MEIA-NOITE do fuso do produto: em UTC
+// a janela de 30 dias comecava as 21:00 de BRT do dia anterior, e o lance das
+// 00h30 do primeiro dia ficava fora do grafico. Este e o mesmo par que o
+// `datetime-local` usa, entao o grafico e o formulario concordam sobre o dia.
 function inicioDaJanela(dias: number): Date {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  d.setUTCDate(d.getUTCDate() - (dias - 1));
-  return d;
+  return inicioDoDiaLocal(dias - 1);
 }
 
 /**

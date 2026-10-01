@@ -29,20 +29,38 @@ function comparar(a: ItemDaVitrine, b: ItemDaVitrine, ordenar: OrdenacaoDaVitrin
         const porLance = (b.maiorLance as number) - (a.maiorLance as number);
         if (porLance !== 0) return porLance;
       }
-      return a.bidDeadline.getTime() - b.bidDeadline.getTime();
+      return porPrazo(a, b);
     }
     case "recentes":
-      // ponytail: "recentes" usa o `id` como desempate, nao `createdAt`, porque o
-      // DTO nao carrega `createdAt` (nao aparece em lugar nenhum do card). Como
-      // o `id` e um uuid, o desempate e estavel e total, que e o que o
-      // comparador precisa ser — mas ele e ARBITRARIO entre itens com o mesmo
-      // instante, o que e aceitavel porque o `createdAt` tem precisao de
-      // segundos. O upgrade path, se dois itens dependerem dessa ordem, e
-      // adicionar `createdAt` ao DTO — mais um campo no payload.
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      return porCriacao(a, b);
     case "prazo":
-      return a.bidDeadline.getTime() - b.bidDeadline.getTime();
+      return porPrazo(a, b);
   }
+}
+
+// ponytail: os tres sorts terminam num desempate por `id`, e e o que torna o
+// comparador TOTAL. Sem ele, dois itens com o mesmo instante ficam na ordem em que
+// o repositorio os devolveu — e o `findBySellerId` tambem nao garante essa ordem
+// quando ha empate de `createdAt`. A ordem da vitrine passaria a depender de query
+// plan, que e o tipo de coisa que muda sem ninguem mexer.
+//
+// O desempate por `id` e ARBITRARIO e tudo bem: ele so decide itens que sao
+// indistinguiveis pela chave que o visitante escolheu. O que nao pode ser
+// arbitrario e a chave principal.
+function porCriacao(a: ItemDaVitrine, b: ItemDaVitrine): number {
+  const diferenca = b.criadoEm.getTime() - a.criadoEm.getTime();
+  if (diferenca !== 0) return diferenca;
+  return porId(a, b);
+}
+
+function porPrazo(a: ItemDaVitrine, b: ItemDaVitrine): number {
+  const diferenca = a.bidDeadline.getTime() - b.bidDeadline.getTime();
+  if (diferenca !== 0) return diferenca;
+  return porId(a, b);
+}
+
+function porId(a: ItemDaVitrine, b: ItemDaVitrine): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 // ponytail: `[...itens]` antes do `.sort()`. `Array.prototype.sort` e IN-PLACE, e
@@ -115,6 +133,7 @@ export async function listVitrine(
       imageUrl: item.imageUrl,
       totalDeLances: stat?.total ?? 0,
       maiorLance: stat?.maior ?? null,
+      criadoEm: item.createdAt,
     };
   });
 

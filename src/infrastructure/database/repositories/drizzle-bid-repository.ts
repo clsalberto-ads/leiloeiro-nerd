@@ -1,7 +1,13 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, max, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, items } from "@/infrastructure/database/schema";
-import type { Bid, BidRepository, CreateBidInput } from "@/domain/repositories/bid-repository";
+import type {
+  Bid,
+  BidRepository,
+  CreateBidInput,
+  EstatisticasDeLance,
+  EstatisticasDeLances,
+} from "@/domain/repositories/bid-repository";
 
 export function nextRank(highestRank: number | null): number {
   return (highestRank ?? 0) + 1;
@@ -93,5 +99,51 @@ export const drizzleBidRepository: BidRepository = {
         previousHighestBid: highestBid ?? null,
       };
     });
+  },
+};
+
+// ponytail: `total: number | string` e o que torna o `Number()` LOAD-BEARING.
+// `count(*)` volta `bigint` do Postgres e o `pg` entrega `bigint`/`numeric` como
+// TEXTO (o mesmo que o `drizzle-analise-repository.ts` trata com
+// `Number(ativos[0]?.soma ?? 0)`). Com o parametro tipado `number`, a coercia
+// ficava INVISIVEL para o compilador: `sql<number>` afirma ao `tsc` que ja e
+// numero, entao apagar o `Number()` nao dava erro de tipo — e um `maiorLance`
+// string viraria `NaN` silencioso na posicao de ordenacao, sem teste vermelho.
+// Tipando a fronteira como `number | string`, remover a coercia passa a ser erro
+// de compilacao, e o unico `Number` defensivo do arquivo e o que sobrevive.
+//
+// ponytail: `maior` continua `number | null` e NAO foi alargado, porque `max()`
+// de `integer` volta inteiro de verdade — o `Number` no corpo dele e o par do
+// `total`, e nao ha evidencia de que ele algum dia venha texto.
+export function paraEstatisticas(
+  linhas: { itemId: string; total: number | string; maior: number | null }[],
+): Map<string, EstatisticasDeLance> {
+  const mapa = new Map<string, EstatisticasDeLance>();
+  for (const linha of linhas) {
+    mapa.set(linha.itemId, { total: Number(linha.total), maior: linha.maior === null ? null : Number(linha.maior) });
+  }
+  return mapa;
+}
+
+// ponytail: uma query, e nao uma por item. O indice `(item_id, amount DESC)`
+// (migracao 0004) faz isto ser INDEX-ONLY: o `GROUP BY item_id` e o `max(amount)`
+// leem as duas colunas do indice, sem tocar no heap. Num banco de 9 linhas o
+// planner escolhe seq scan, e esta certo — a prova de que o indice e usavel vem
+// de um `explain` com `SET enable_seqscan = off`, onde o plano mostra
+// `Index Only Scan using bids_item_id_amount_idx`. E o `inArray` com a lista de
+// ids, e nao a tabela de lances inteira, que mantem o plano em index scan.
+export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
+  async deVariosItens(itemIds) {
+    if (itemIds.length === 0) return new Map();
+    const linhas = await db
+      .select({
+        itemId: bids.itemId,
+        total: sql<number>`count(*)::int`,
+        maior: max(bids.amount),
+      })
+      .from(bids)
+      .where(inArray(bids.itemId, itemIds))
+      .groupBy(bids.itemId);
+    return paraEstatisticas(linhas);
   },
 };

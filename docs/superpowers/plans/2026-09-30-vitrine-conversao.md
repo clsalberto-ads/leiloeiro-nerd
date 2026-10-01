@@ -14,7 +14,14 @@
 
 ## Global Constraints
 
-- **562 testes existentes não podem quebrar.** Duas exceções, ambas listadas em "Protected Tests" abaixo e ambas com aprovação já concedida pelo usuário: `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action). Nenhum outro `.test` pode ser reescrito.
+- **Nenhum caso de teste existente pode ter suas ASSERÇÕES ou sua INTENÇÃO alteradas.** A restrição
+  protege o *significado* do caso, não o identificador dele. Então: acrescentar casos NOVOS a um
+  arquivo `.test` que o brief nomeia é permitido e esperado (é o que Task 3, Task 6 e Task 10
+  fazem); renomear um caso cujo **nome** é defeituoso (anglicismo, ou nome que não descreve o que o
+  caso afirma) é permitido desde que o corpo e as asserções fiquem intocados e a task o reporte.
+  Alterar asserções, afrouxar uma verificação ou remover um caso é proibido. Duas exceções que
+  mexem em asserções, ambas listadas em "Protected Tests" abaixo e ambas com aprovação já concedida
+  pelo usuário: `skeletons.test.tsx` (contagem de barras) e `page.test.tsx` (assinatura da action).
 - **Toda a escrita em pt-BR.** Nomes de código, comentários e strings de UI.
 - **Toda constante compartilhada tem uma fonte só.** `FUSO` vem de `@/lib/fuso`; `primeiroValor` de `@/lib/primeiro-valor`; `BuscarParametro` de `@/app/(dashboard)/dashboard/items/estado-da-tabela`. Não re-declarar nenhuma das três.
 - **Fuso do produto é `America/Sao_Paulo`.** Qualquer data que o *usuário* lê (prazo, data) passa por `FUSO`.
@@ -147,11 +154,22 @@ node -e "
 const {Client}=require('pg');const fs=require('fs');
 const url=fs.readFileSync('.env','utf8').match(/^DATABASE_URL=(.*)\$/m)[1];
 (async()=>{const c=new Client({connectionString:url});await c.connect();
-const e=await c.query(\"explain select item_id, count(*), max(amount) from bids where item_id in (select id from items) group by item_id\");
-console.log(e.rows.map(r=>r['QUERY PLAN']).join(' | '));await c.end();})();"
+const ids=['ce009dc3-7c77-4033-9339-02f0adbeaabb','dc78548b-8252-4ae0-b0cd-d4840bada13a'];
+const q='explain select item_id, count(*)::int, max(amount) from bids where item_id = any(\$1::uuid[]) group by item_id';
+console.log('padrao: ', (await c.query(q,[ids])).rows.map(r=>r['QUERY PLAN']).join(' | '));
+await c.query('set enable_seqscan = off');
+console.log('forcado:', (await c.query(q,[ids])).rows.map(r=>r['QUERY PLAN']).join(' | '));
+await c.end();})();"
 ```
 
-Expected: `Index Scan using bids_item_id_amount_idx` ou `Index Only Scan` — **não** `Seq Scan on bids`. Um `Seq Scan` aqui significa que a Task 3 vai ler a tabela de lances inteira.
+Expected na segunda linha: `Index Only Scan using bids_item_id_amount_idx` com
+`Index Cond: (item_id = ANY(...))`.
+
+**CUIDADO com a primeira linha:** com a base de desenvolvimento `bids` tem **9 linhas**, e para 9 linhas o
+planner escolhe `Seq Scan` — que e o plano OTIMO e nao um defeito. Por isso o gate usa
+`enable_seqscan = off`, que prova que o indice e utilizavel **sem inserir dado** e sem depender do volume
+da tabela. Se a primeira linha mostrar `Seq Scan` e a segunda mostrar `Index Only Scan`, o indice esta
+correto e a Task 3 pode seguir.
 
 - [ ] **Step 6: Commit**
 
@@ -581,7 +599,9 @@ export function paraEstatisticas(
 // ponytail: uma query, e nao uma por item. O indice `(item_id, amount DESC)`
 // (migracao 0004) faz isto ser INDEX-ONLY: o `GROUP BY item_id` e o `max(amount)`
 // leem as duas colunas do indice, sem tocar no heap. Verificar com `explain` e o
-// que prova que a query nao degradou — `Seq Scan on bids` aqui seria ler a
+// que prova que a query nao degradou. Num banco de 9 linhas o planner escolhe seq scan
+// (e esta certo); o indice e usado quando `bids` cresce — ver Task 0 Step 5, que prova
+// a usabilidade dele com `enable_seqscan = off`.
 // tabela de lances inteira, e `inArray` com a lista toda e o que mantem o plano
 // como index scan.
 export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
@@ -1859,7 +1879,7 @@ import Link from "next/link";
 import { ROTULO_TIPO, type ItemType } from "@/domain/repositories/item-repository";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { hrefDaVista, type OrdenacaoDaVitrine, type VistaDaVitrine } from "./estado-da-vitrine";
+import { hrefDaVista, LISTA_DE_ORDENACOES, type OrdenacaoDaVitrine, type VistaDaVitrine } from "./estado-da-vitrine";
 
 // ponytail: os rotulos sao o CONTRATO VISVEL do parametro `ordenar`, e ele mora
 // aqui e nao em `estado-da-vitrine.ts` porque sao duas metades diferentes: o
@@ -1873,7 +1893,14 @@ export const ROTULOS_DA_ORDENACAO: Record<OrdenacaoDaVitrine, string> = {
   recentes: "Recentes",
 };
 
-const ORDEM_VISUAL: OrdenacaoDaVitrine[] = ["prazo", "lance", "recentes"];
+const ORDEM_VISUAL: OrdenacaoDaVitrine[] = [...LISTA_DE_ORDENACOES];
+// ponytail: `[...LISTA_DE_ORDENACOES]`, e nao o trio escrito a mao. A lista vive em
+// `estado-da-vitrine.ts` porque e a fonte unica da uniao E do `Set` de validacao (ver o
+// `ponytail:` de la); copia-la aqui seria a segunda fonte, e uma ordenacao acrescentada na
+// lista apareceria no tipo e na validacao e nao nesta tela — o mesmo modo de falha
+// silenciosa que o achado 4 da revisao do Batch A removeu deste lado. O `as const` da lista
+// impede reordenacao, entao a ordem visual e a ordem da uniao. Ela e exportada por causa
+// deste uso.
 
 // ponytail: a busca e um `<form method="get">` e nao um input controlado com
 // `onChange` + `router.push`. O form entrega o comportamento de navegacao de graca

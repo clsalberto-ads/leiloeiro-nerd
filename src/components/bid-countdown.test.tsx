@@ -27,9 +27,25 @@ describe("BidCountdown", () => {
   });
 
   it("exibe o texto para screen readers com o prazo absoluto", () => {
+    // 2026-09-20T11:00:00Z == 20/09/2026 08:00 em America/Sao_Paulo (UTC-3). Este
+    // caso fixava `11:00` — a saida UTC que a correcao trocou por `08:00`. A
+    // virgula antes das horas vem do `toLocaleString("pt-BR", ...)`.
     const deadline = new Date("2026-09-20T11:00:00Z"); // specific date for snapshot
     const html = renderToString(<BidCountdown deadline={deadline} />);
-    expect(html).toContain('<span class="sr-only">Prazo: 20/09/2026 11:00</span>');
+    expect(html).toContain('<span class="sr-only">Prazo: 20/09/2026, 08:00</span>');
+  });
+
+  // O prazo que o LEITOR DE TELA ouve, em FUSO do produto. Antes desta correção
+  // o `sr-only` formatava com `getUTCDate()`, e um deadline de 30/09 23:59 (fuso
+  // de Sao Paulo) aparecia como "1/10 2:59" — um dia e tres horas errado. O
+  // countdown numerico contava certo, entao o bug era invisivel olhando o numero.
+  it("anuncia o prazo absoluto no fuso do produto, nao em UTC", () => {
+    // 2026-10-01T02:59:00Z == 30/09/2026 23:59 em America/Sao_Paulo (UTC-3).
+    // O `toLocaleString("pt-BR", ...)` quebra a data e a hora com VIRGULA.
+    const html = renderToString(<BidCountdown deadline={new Date("2026-10-01T02:59:00Z")} />);
+    expect(html).toContain("30/09/2026");
+    expect(html).toContain("23:59");
+    expect(html).not.toContain("1/10/2026");
   });
 
   it("desabilita animacao com prefers-reduced-motion", () => {

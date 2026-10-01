@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { ItemForm } from "@/components/item-form";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function EditItemPage({ params }: PageProps<"/dashboard/ite
   if (!item || item.sellerId !== session.user.id) notFound();
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Editar item</h1>
+      <PageHeader title="Editar item" />
       <ItemForm item={item} mode="edit" />
     </div>
   );

@@ -20,7 +20,8 @@ function vitrineItem(id: string, maior: number | null, over: Partial<ItemDaVitri
   return {
     id, title: `Item ${id}`, type: "product", minInitialBid: 1000,
     bidDeadline: new Date("2026-10-10T12:00:00Z"), imageUrl: null,
-    totalDeLances: maior === null ? 0 : 1, maiorLance: maior, ...over,
+    totalDeLances: maior === null ? 0 : 1, maiorLance: maior,
+    criadoEm: new Date("2026-01-01T00:00:00Z"), ...over,
   };
 }
 
@@ -55,25 +56,17 @@ describe("ordenarParaVitrine", () => {
     expect(ordenarParaVitrine([tarde, cedo], "lance").map((i) => i.id)).toEqual(["cedo", "tarde"]);
   });
 
-  it("por recentes: o mais novo primeiro", () => {
-    const velho = vitrineItem("velho", 1, { title: "x" });
-    const novos = vitrineItem("novo", 1);
-    // createdAt nao esta no DTO; o desempate de "recentes" usa o id como
-    // substituto estavel — ver a nota do comparador na implementacao.
-    expect(ordenarParaVitrine([novos, velho], "recentes").map((i) => i.id)).toEqual(["novo", "velho"]);
-  });
-
-  // ponytail: estes DOIS casos sao os que a sentinela `-Infinity` quebrava, e
-  // nenhum dos 14 casos do plano os cobria — o plano so tinha UM item sem lance,
-  // e `-Infinity - -Infinity` (dois sem lance) e `NaN`, que nao cai no desempate.
-  it("entre DOIS itens sem lance o desempate por prazo roda (a sentinela dava NaN)", () => {
+  // ponytail: estes DOIS casos sao os que a sentinela `-Infinity` quebrava, e nenhum
+  // dos casos do plano os cobria — o plano so tinha UM item sem lance, e
+  // `-Infinity - -Infinity` (dois sem lance) e `NaN`, que nao cai no desempate.
+  it("por lance: entre DOIS itens sem lance o desempate por prazo roda", () => {
     const tarde = vitrineItem("tarde", null, { bidDeadline: new Date("2026-12-01T12:00:00Z") });
     const cedo = vitrineItem("cedo", null, { bidDeadline: new Date("2026-10-01T12:00:00Z") });
     expect(ordenarParaVitrine([tarde, cedo], "lance").map((i) => i.id)).toEqual(["cedo", "tarde"]);
     expect(ordenarParaVitrine([cedo, tarde], "lance").map((i) => i.id)).toEqual(["cedo", "tarde"]);
   });
 
-  it("um lance real de R$ 0,00 fica ACIMA de item sem lance", () => {
+  it("por lance: um lance real de R$ 0,00 fica ACIMA de item sem lance", () => {
     // `placeBid` nao tem piso absoluto (so compara com o maior anterior + incremento
     // ou com o `minInitialBid`) e o banco nao tem `CHECK` em `bids.amount`, entao
     // este caso e alcancavel. Com `0` como sentinela os dois empatariam e o
@@ -82,6 +75,35 @@ describe("ordenarParaVitrine", () => {
     const semLance = vitrineItem("sem", null, { bidDeadline: new Date("2026-10-01T12:00:00Z") });
     expect(ordenarParaVitrine([semLance, zero], "lance").map((i) => i.id)).toEqual(["zero", "sem"]);
     expect(ordenarParaVitrine([zero, semLance], "lance").map((i) => i.id)).toEqual(["zero", "sem"]);
+  });
+
+  // ponytail: este caso tinha um nome que MENTIA. Os fixtures eram "velho" e "novo"
+  // sem nenhum tempo dentro — a diferenca entre eles era o `title`, campo que o
+  // sort nao olha. O que o sort fazia era ordenar por `id`, entao o teste passava
+  // sendo tautologia sobre ordem de id, com nome de recencia. Agora os dois tem
+  // `criadoEm` de verdade, e o `id` esta em ordem OPOSTA a de criacao: se o sort
+  // voltar a usar o `id`, este caso cai.
+  it("por recentes: o mais novo primeiro, e o id nao decide", () => {
+    const velho = vitrineItem("a-velho", 1, { criadoEm: new Date("2026-01-01T00:00:00Z") });
+    const novo = vitrineItem("z-novo", 1, { criadoEm: new Date("2026-06-01T00:00:00Z") });
+    expect(ordenarParaVitrine([velho, novo], "recentes").map((i) => i.id)).toEqual(["z-novo", "a-velho"]);
+  });
+
+  it("por recentes: empate de criacao desempata pelo id", () => {
+    const mesmo = new Date("2026-03-01T00:00:00Z");
+    const a = vitrineItem("a", 1, { criadoEm: mesmo });
+    const z = vitrineItem("z", 1, { criadoEm: mesmo });
+    expect(ordenarParaVitrine([z, a], "recentes").map((i) => i.id)).toEqual(["a", "z"]);
+  });
+
+  // ponytail: o mesmo desempate final no sort de prazo. Sem ele, dois itens com o
+  // prazo identico ficariam na ordem do repositorio — e o repositorio nao garante
+  // a propria em caso de empate de `createdAt`.
+  it("por prazo: empate de prazo desempata pelo id", () => {
+    const mesmo = new Date("2026-10-10T12:00:00Z");
+    const a = vitrineItem("a", 1, { bidDeadline: mesmo });
+    const z = vitrineItem("z", 2, { bidDeadline: mesmo });
+    expect(ordenarParaVitrine([z, a], "prazo").map((i) => i.id)).toEqual(["a", "z"]);
   });
 
   it("a lista original nao e mutada (o .sort() do array recebido seria um bug)", () => {
@@ -157,7 +179,7 @@ describe("listVitrine", () => {
     const itemRepo = { async findBySellerId() { return [item("i1", { description: "LONGO" })]; } };
     const [primeiro] = await listVitrine(itemRepo as never, lances, "u1", VISTA);
     expect(Object.keys(primeiro).sort()).toEqual(
-      ["bidDeadline", "id", "imageUrl", "maiorLance", "minInitialBid", "title", "totalDeLances", "type"],
+      ["bidDeadline", "criadoEm", "id", "imageUrl", "maiorLance", "minInitialBid", "title", "totalDeLances", "type"],
     );
     expect(JSON.stringify(primeiro)).not.toContain("LONGO");
   });

@@ -246,7 +246,17 @@ export function interpretarParametros(buscar: BuscarParametro): VistaDaTabela {
 // sobrevivesse na URL apareceria nela depois de um back/forward — e o campo de
 // texto e a unica parte da tela que o usuario pode REESCREVER, entao o que ele ve
 // precisa ser o que o servidor filtrou. Aparar nas duas pontes torna o
-// `hrefDaVista` ponto fixo: ler(emitir(v)) === emitir(v) para toda vista.
+// `hrefDaVista` ponto fixo: `hrefDaVista(interpretarParametros(ler(hrefDaVista(v))))`
+// devolve a MESMA string de `hrefDaVista(v)`, para toda `v`.
+//
+// ponytail: a propriedade e do HREF e nao da VISTA, e a distincao e o que evita
+// um comentario que mente. `ler(emitir(v)) === emitir(v)` compara uma
+// `VistaDaTabela` com uma `string` e e FALSO: com `q` suja (`"  console  "`), ler
+// volta o valor aparado, que nao e a `VistaDaTabela` original. O que vale e que a
+// NORMALIZACAO e da escrita — o `hrefDaVista` apara antes de codificar (linha
+// abaixo) — e por isso que reescrever o endereco lido devolve o endereco. O mesmo
+// vale no modulo irmao da vitrine (`[slug]/estado-da-vitrine.ts`), e o caso de
+// teste com `q` suja esta em `estado-da-tabela.test.ts`.
 function codificar(valor: string): string {
   return encodeURIComponent(valor);
 }

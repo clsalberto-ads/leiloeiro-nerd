@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FUSO } from "@/lib/fuso";
 
 function format(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -11,11 +12,23 @@ function format(ms: number): string {
   return `${d} d ${h} h ${m} min ${s} s`;
 }
 
+// ponytail: o prazo que o leitor de tela ouve e formatado com `FUSO`, e nao com
+// `getUTC*`. As duas formas mostram o mesmo instante com textos diferentes, e o
+// produto tem fuso fixo (ver `@/lib/fuso`) — o vendedor digita "30/09 23:59" no
+// formulario e a tela precisa devolver "30/09 23:59". A versao com `getUTC*`
+// devolvia "1/10 2:59": um dia e tres horas de erro, invisivel porque o
+// countdown numerico (aritmetica de `Date`) contava certo. O upgrade path, se o
+// produto atender gente fora do Brasil, e um `APP_TIMEZONE` no `.env` lido em
+// `@/lib/fuso` — este arquivo continua lendo a constante e nao muda.
 function formatAbsolute(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
-  const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-  return `${date} ${time}`;
+  return d.toLocaleString("pt-BR", {
+    timeZone: FUSO,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function BidCountdown({ deadline }: { deadline: Date }) {
@@ -45,7 +58,22 @@ export function BidCountdown({ deadline }: { deadline: Date }) {
   // regiao `aria-live="polite"` SEPARADA que so muda em degraus (1 min, 10 min,
   // 1 h) em vez de a cada tick — nunca este no texto que muda 1x/segundo.
   return (
-    <span role="timer" className="motion-reduce:animate-none">
+    // ponytail: o `suppressHydrationWarning` aqui e obrigatorio, e nao enfeite.
+    // O `useState(() => deadline - Date.now())` roda no SERVIDOR (SSR) e DE NOVO
+    // no cliente (hidratacao), com `Date.now()` diferente nas duas execucoes — a
+    // contagem cai na Wrong Value do segundo certo. Medido neste repo com um
+    // `hydrateRoot` de verdade: sem o atributo, o React loga "Hydration failed
+    // because the server rendered text didn't match the client" e **descarta o HTML
+    // do servidor**, re-renderizando a arvore no cliente — na rota publica mais
+    // acessada do produto, e num componente que aparece em TODOS os cards.
+    //
+    // Por que o atributo resolve em vez de mascarar: a divergencia e de UM SEGUNDO
+    // e se corrige sozinha no primeiro tick do `setInterval`. O que o React faz sem
+    // ele e bem mais caro que um texto desatualizado por ate 1 s: ele joga fora o
+    // servidor inteiro daquela subarvore e refaz no cliente. E o `sr-only` abaixo
+    // NAO precisa do atributo — `formatAbsolute(deadline)` nao usa `Date.now()`, entao
+    // servidor e cliente concordam sempre nele.
+    <span role="timer" className="motion-reduce:animate-none" suppressHydrationWarning>
       {formatted}
       <span className="sr-only">{`Prazo: ${formattedDate}`}</span>
     </span>

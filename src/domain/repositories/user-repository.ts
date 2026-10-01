@@ -31,3 +31,26 @@ export interface UserRepository {
   findByIds(ids: string[]): Promise<UserProfile[]>;
   updateRole(userId: string, role: UserRole, slug: string): Promise<UserProfile>;
 }
+
+// ponytail: o perfil que o HERO da vitrine precisa, e uma porta separada porque
+// `findBySlug` nao pode mudar de forma: o `get-seller-by-slug.test.ts:32` faz
+// `toEqual(sellerRow)` sobre `{id, name, slug}`, e 7 fakes de `UserRepository`
+// implementam esse retorno (contados em `grep -rn "implements UserRepository"
+// src/ --include=*.test.ts` -> 7 classes, nenhuma com `findVitrineBySlug`).
+// Acrescentar `image`/`createdAt`/`totalDeItensAtivos` ali quebraria os sete.
+// E o mesmo motivo do `ItemLister`.
+//
+// Os tres campos novos sao os que `user` JA tem (`image`, `created_at`) ou o que
+// se deriva com um `count` (`total_de_itens_ativos`) — nenhum exige migration.
+export interface VitrineDeVendedor {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+  criadoEm: Date;
+  totalDeItensAtivos: number;
+}
+
+export interface VitrineDeVendedorRepository {
+  findVitrineBySlug(slug: string): Promise<VitrineDeVendedor | null>;
+}
