@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { getSession, signOutAction } from "@/presentation/actions/auth-actions";
+import { getSession } from "@/presentation/actions/auth-actions";
 import { resumoDoDashboard } from "@/application/use-cases/resumo-do-dashboard";
 import { drizzleAnaliseRepository } from "@/infrastructure/database/repositories/drizzle-analise-repository";
 import { VisaoDoVendedorPainel } from "./graficos/visao-vendedor";
@@ -8,6 +6,7 @@ import { VisaoDoCompradorPainel } from "./graficos/visao-comprador";
 import { PeriodoSelect } from "./periodo/periodo-select";
 import { interpretarPeriodo } from "./periodo/periodo";
 import { primeiroValor } from "@/lib/primeiro-valor";
+import { PageHeader } from "@/components/layout/page-header";
 
 // ponytail: `force-dynamic` e obrigatorio aqui, e nao porFORMANCE. A pagina le a
 // sessao E cinco agregados, todos dependentes de quem esta logado e de "agora"
@@ -40,30 +39,19 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   const ehVendedor = visao.papel === "vendedor";
 
+  // ponytail: o "Ola, {nome}" NAO se repete aqui — quem manda no nome e no
+  // "Sair" e o `DashboardHeader`, que o `(dashboard)/layout.tsx` ja renderiza
+  // acima desta pagina. A `description` carrega so o e-mail, que o header nao
+  // mostra: e o dado que confirma de qual conta o painel esta aberto. O titulo
+  // ("Seu painel"/"Meus lances") e o `PeriodoSelect` sao os unicos acoes do
+  // cabecalho da pagina; os links para itens e perfil sao do `DashboardSidebar`.
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {ehVendedor ? "Seu painel" : "Meus lances"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Olá, {session.user.name} · {session.user.email}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <PeriodoSelect atual={periodo} />
-          <form action={signOutAction}>
-            <Button type="submit" variant="outline">Sair</Button>
-          </form>
-        </div>
-      </div>
-
-      <nav className="flex gap-4 text-sm">
-        <Link className="text-primary underline" href="/dashboard/items">Meus itens</Link>
-        <Link className="text-primary underline" href="/dashboard/settings">Editar perfil</Link>
-      </nav>
-
+      <PageHeader
+        title={ehVendedor ? "Seu painel" : "Meus lances"}
+        description={session.user.email}
+        actions={<PeriodoSelect atual={periodo} />}
+      />
       {ehVendedor ? (
         <VisaoDoVendedorPainel visao={visao} periodo={periodo} />
       ) : (
