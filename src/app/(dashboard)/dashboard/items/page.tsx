@@ -86,7 +86,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
       <PageHeader
         title="Meus itens"
         actions={
-          <Button render={<Link href="/dashboard/items/new" />} size="sm">
+          <Button nativeButton={false} render={<Link href="/dashboard/items/new" />} size="sm">
             + Novo item
           </Button>
         }

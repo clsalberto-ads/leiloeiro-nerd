@@ -24,12 +24,14 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Button 
+              <Button
+                nativeButton={false}
                 render={<Link href="/register">Começar Agora <ArrowRight className="h-4 w-4 ml-1" /></Link>} 
                 size="lg" 
                 className="w-full sm:w-auto h-12 px-8 text-base shadow-md" 
               />
-              <Button 
+              <Button
+                nativeButton={false}
                 render={<Link href="/login">Explorar Plataforma</Link>} 
                 variant="outline" 
                 size="lg" 
@@ -107,7 +109,7 @@ export default function Home() {
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Pronto para encontrar seu próximo tesouro?</h2>
               <p className="text-muted-foreground text-lg">Junte-se a centenas de colecionadores e comece a dar lances ou criar seus próprios leilões hoje mesmo.</p>
               <div className="pt-2">
-                <Button render={<Link href="/register">Criar Conta Gratuita</Link>} size="lg" className="h-12 px-8 text-base shadow-md" />
+                <Button nativeButton={false} render={<Link href="/register">Criar Conta Gratuita</Link>} size="lg" className="h-12 px-8 text-base shadow-md" />
               </div>
             </div>
           </div>
