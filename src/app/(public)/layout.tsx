@@ -1,12 +1,10 @@
-import Link from "next/link";
+import { AppHeader } from "@/components/layout/app-header";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <header className="border-b px-4 py-3">
-        <Link href="/" className="text-xl font-bold">Leiloeiro Nerd</Link>
-      </header>
-      <main className="container mx-auto py-8 px-4">{children}</main>
-    </>
+    <div className="flex min-h-svh flex-col">
+      <AppHeader />
+      <main className="flex-1">{children}</main>
+    </div>
   );
 }
