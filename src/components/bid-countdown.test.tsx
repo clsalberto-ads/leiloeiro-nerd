@@ -49,9 +49,9 @@ describe("BidCountdown", () => {
   });
 
   it("desabilita animacao com prefers-reduced-motion", () => {
-    // This test would typically require a way to mock CSS media queries,
-    // which is not directly possible with renderToString.
-    // We'll rely on the class being present, assuming the CSS handles it.
+    // Este teste exigiria uma forma de mockar media queries de CSS, o que nao e
+    // possivel com `renderToString`. Confia-se na classe estar presente e deixar o
+    // CSS resolver o resto.
     const deadline = new Date(Date.now() + 3600_000);
     const html = renderToString(<BidCountdown deadline={deadline} />);
     expect(html).toContain('motion-reduce:animate-none');

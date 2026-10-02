@@ -5,9 +5,9 @@ import { deleteItemImage } from "@/application/use-cases/delete-item-image";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { utapi } from "@/infrastructure/upload/uploadthing";
 import { imageUploadSchema } from "@/lib/validators";
-import { mensagemDeErro } from "@/lib/erro-de-action";
+import { toActionError } from "@/lib/action-error";
 
-export type UploadActionResult = { urls?: string[]; error?: string };
+export type UploadActionResult = { urls?: string[]; error?: string; partial?: boolean; falhas?: number };
 
 export async function uploadItemImagesAction(
   _prev: UploadActionResult | null,
@@ -29,10 +29,16 @@ export async function uploadItemImagesAction(
   try {
     const results = await utapi.uploadFiles(Array.from(parsed.data.images));
     const urls = results.filter((r) => r.error === null).map((r) => r.data!.ufsUrl);
+    const falhas = results.filter((r) => r.error !== null).length;
     if (urls.length === 0) return { error: "Não foi possível enviar as imagens." };
+    // ponytail: falha parcial NÃO volta como erro (o usuario ainda pode salvar o que
+    // subiu), mas volta como `partial: true` para a UI avisar: "X de Y imagens
+    // falharam". Sem isso, o usuario via 3 previews, achava que as 4 tinham
+    // subido, e salvava o item achando que estava completo.
+    if (falhas > 0) return { urls, partial: true, falhas };
     return { urls };
   } catch (err) {
-    return { error: mensagemDeErro(err, "Não foi possível enviar as imagens.") };
+    return { error: toActionError(err, "Não foi possível enviar as imagens.") };
   }
 }
 
@@ -47,6 +53,6 @@ export async function deleteItemImageAction(
     await deleteItemImage(drizzleItemRepository, session.user.id, imageId);
     return { ok: true };
   } catch (err) {
-    return { error: mensagemDeErro(err, "Não foi possível excluir a imagem.") };
+    return { error: toActionError(err, "Não foi possível excluir a imagem.") };
   }
 }

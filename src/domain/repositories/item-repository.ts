@@ -6,8 +6,8 @@ export type ItemStatus = "draft" | "active" | "closed" | "awaiting_payment" | "p
 // tem pt-BR". O que segura a mudanca e o seguinte.
 //
 // O QUE GANHA: uma fonte. Antes desta mudanca o rotulo de status vivia em tres
-// lugares (o `LABELS` do badge, o `ROTULO_STATUS` da lista e a aba "Em leilao" do
-// `TABS`) e o de tipo vivia em mais um, o `ROTULO_TIPO` da lista, que espelhava as
+// lugares (o `LABELS` do badge, o `STATUS_LABELS` da lista e a aba "Em leilao" do
+// `TABS`) e o de tipo vivia em mais um, o `TYPE_LABELS` da lista, que espelhava as
 // `<option>` do `item-form`. Quatro copias nao e uma fonte: sao quatro lugares
 // para divergirem em silencio, e divergir ali tem preco visivel — o badge
 // escrevendo "Cancelado" enquanto a busca e as abas dizem outra coisa. E o segundo
@@ -29,7 +29,7 @@ export type ItemStatus = "draft" | "active" | "closed" | "awaiting_payment" | "p
 // Os dois sao `Record` exaustivos de proposito: um `ItemStatus` novo sem linha
 // aqui quebra o `tsc`, em vez de virar `undefined` renderizado vazio no badge e
 // ausente da busca sem ninguem perceber.
-export const ROTULO_STATUS: Record<ItemStatus, string> = {
+export const STATUS_LABELS: Record<ItemStatus, string> = {
   draft: "Rascunho",
   active: "Em leilão",
   closed: "Encerrado",
@@ -38,7 +38,7 @@ export const ROTULO_STATUS: Record<ItemStatus, string> = {
   cancelled: "Cancelado",
 };
 
-export const ROTULO_TIPO: Record<ItemType, string> = {
+export const TYPE_LABELS: Record<ItemType, string> = {
   product: "Produto",
   service: "Serviço",
   piece: "Peça colecionável",
@@ -136,31 +136,18 @@ export type ItemSortDirection = "asc" | "desc";
 // default de pagina aqui truncaria em silencio quem esquecesse o `limit` — e a
 // `page.tsx` de hoje e exatamente esse forgotado: o resultado seria "dos meus 12 itens
 // aparecem 10", com rodape dizendo "de 12" e o sumico sem nenhuma explicacao. O 10 do
-// produto ja existe em um lugar so, o `DataTable` (`TAMANHOS_DE_PAGINA`/`pageSize`),
+// produto ja existe em um lugar so, o `DataTable` (`PAGE_SIZES`/`pageSize`),
 // que e onde o usuario escolhe; repetir o numero aqui daria duas fontes de verdade
 // para a mesma escolha e um lugar para elas divergirem.
 //
 // `total` e a contagem do conjunto filtrado ANTES de `limit`/`offset`, sempre: e o
 // que o rodape usa para dizer "de 47". Um total contado antes do filtro faz o
-export interface ItemDaVitrine {
-  id: string;
-  title: string;
-  type: ItemType;
-  minInitialBid: number;
-  bidDeadline: Date;
-  imageUrl: string | null;
-  totalDeLances: number;
-  maiorLance: number | null;
-  // ponytail: `criadoEm` e usado pelo comparador "Recentes" (ver `list-vitrine.ts`)
-  // para garantir uma ordem total mesmo sem lance. E parte do DTO para nao
-  // precisarmos de um `createdAt` no card, que quebraria o layout.
-  criadoEm: Date;
-}
-
+// rodape prometer paginas que nao existem — e o usuario clica na next e recebe
+// "Nenhum resultado".
 export interface ItemListFilter {
   status?: ItemStatus;
   // ponytail: `q` e substring do TITULO e dos rotulos canonicos de status e de
-  // tipo (`ROTULO_STATUS`/`ROTULO_TIPO`, mais acima), insensivel a caixa e a
+  // tipo (`STATUS_LABELS`/`TYPE_LABELS`, mais acima), insensivel a caixa e a
   // acento. Ja foi mais estreito — so o titulo — e a Task 8 tinha consertado o
   // oposto de proposito: a busca do `DataTable` casava com TODA coluna que
   // tivesse `accessorFn`, e o `accessorFn` das colunas `status` e `tipo` entrega o
@@ -198,8 +185,34 @@ export interface ItemListResult {
   total: number;
 }
 
+// ponytail: a projecao da vitrine. Fica AQUI, e nao em `columns.tsx`,
+// porque o produtor deste objeto e o use case `list-storefront`, que vive em
+// `src/application/use-cases/` — e um use case importando de `components/` seria a seta da
+// Clean Architecture virada. O `DashboardItemRow` do dashboard mora com o seu
+// consumidor porque o consumidor dele e um componente de `dashboard/items`; aqui o
+// consumidor primario e o use case.
+//
+// E uma WHITELIST, e nao `Omit`: o spread e o que faria
+// `description` (o texto longo) atravessar o payload do RSC sem ser mostrado, e o
+// `whitelist` que faria um campo novo do dominio vazar para a tela sem ninguem perceber. O
+// teste que exige exatamente estas nove chaves e o que trava essa porta.
+export interface StorefrontItem {
+  id: string;
+  title: string;
+  type: ItemType;
+  minInitialBid: number;
+  bidDeadline: Date;
+  imageUrl: string | null;
+  totalBids: number;
+  highestBid: number | null;
+  // ponytail: `createdAt` e usado pelo comparador \"Recentes\" (ver `list-storefront.ts`)
+  // para garantir uma ordem total mesmo sem lance. Ele e parte do DTO para nao
+  // precisarmos de um segundo campo de data no card, que quebraria o layout.
+  createdAt: Date;
+}
+
 // ponytail: porta separada, e nao mais um metodo no `ItemRepository`. A alternativa
-// obvia — mudar `findBySellerId` para devolver `{ items, total }` — foi descartada
+// obvia — mudar `findBySellerId` para devolver `StorefrontItem` — foi descartada
 // por custo, nao por arquitetura: existem 11 implementacoes de teste de
 // `ItemRepository` espalhadas pelos use cases, todas com `implements ItemRepository`,
 // e a quebra de contrato passaria a exigir reescrever 11 arquivos de teste de
@@ -224,26 +237,4 @@ export interface ItemRepository {
   findImageById(imageId: string): Promise<ItemImage | null>;
   createImages(itemId: string, urls: string[]): Promise<ItemImage[]>;
   deleteImage(imageId: string): Promise<void>;
-}
-
-// ponytail: a projecao da vitrine. Fica AQUI, e nao em `src/app/(public)/[slug]/`,
-// porque o produtor deste objeto e o use case `listVitrine`, que vive em
-// `src/application/` — e um use case importando de `src/app` seria a seta da
-// Clean Architecture virada. O `ItemDaTabela` do dashboard mora com o seu
-// consumidor porque o consumidor dele e um componente de `src/app`; aqui o
-// consumidor primario e o use case.
-//
-// E uma WHITELIST, e nao `const { ...resto } = item`: o spread e o que faria
-// `description` (o texto longo) atravessar o payload do RSC sem ser mostrado, e o
-// que faria um campo novo do dominio vazar para a tela sem ninguem perceber. O
-// teste que exige exatamente estas oito chaves e o que trava essa porta.
-export interface ItemDaVitrine {
-  id: string;
-  title: string;
-  type: ItemType;
-  minInitialBid: number;
-  bidDeadline: Date;
-  imageUrl: string | null;
-  totalDeLances: number;
-  maiorLance: number | null;
 }

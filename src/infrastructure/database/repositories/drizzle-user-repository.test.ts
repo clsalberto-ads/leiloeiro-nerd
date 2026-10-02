@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consultaDeVitrine } from "./drizzle-user-repository";
+import { storefrontQuery } from "./drizzle-user-repository";
 
 // ponytail: este arquivo existe por um bug que NENHUM outro teste pegou, e a
 // historia vale mais que o teste: `findVitrineBySlug` usava uma subquery
@@ -20,27 +20,27 @@ import { consultaDeVitrine } from "./drizzle-user-repository";
 // comparavel que o Postgres nao tem. `sql.raw` passing por cima produziria o
 // mesmo SQL quebrado com a suite inteira verde, entao a guarda e sobre o SQL
 // gerado, e nao sobre a forma do codigo.
-describe("drizzleVitrineDeVendedorRepository — o SQL que ele gera", () => {
+describe("drizzleSellerStorefrontRepository — o SQL que ele gera", () => {
   // ponytail: o teste chama a consulta que o REPOSITORIO chama, e nao uma
   // reconstrucao dela aqui. A primeira versao deste arquivo montava o proprio
   // `db.select()` para conferir o SQL — e isso testava uma COPIA: mudar o
   // repositorio deixava o teste verde, que e a segunda fonte de verdade que este
   // projeto vem desarmando. A consulta foi extraida para uma funcao exportada por
   // esse motivo, e nao por organizacao.
-  const consulta = () => consultaDeVitrine("x");
+  const query = () => storefrontQuery("x");
 
 
   it("qualifica a coluna do usuario dentro da contagem", () => {
-    const sqlGerado = consulta().toSQL().sql;
+    const generatedSql = query().toSQL().sql;
     // o `on` do join tem de dizer de qual tabela e cada lado
-    expect(sqlGerado).toContain('"items"."seller_id" = "user"."id"');
+    expect(generatedSql).toContain('"items"."seller_id" = "user"."id"');
   });
 
   it("a contagem e de `items.id` qualificado, e nao de uma coluna solta", () => {
-    const sqlGerado = consulta().toSQL().sql;
+    const generatedSql = query().toSQL().sql;
     // sem o qualificador, um `count("id")` aqui contaria a coluna ambigua e o
     // erro reaparece em outra forma
-    expect(sqlGerado).toContain('count("items"."id")::int');
+    expect(generatedSql).toContain('count("items"."id")::int');
   });
 
   it("e leftJoin, e nao innerJoin: vendedor sem item ativo tem de voltar com 0", () => {
@@ -49,15 +49,15 @@ describe("drizzleVitrineDeVendedorRepository — o SQL que ele gera", () => {
     // shell responderia 404 para um vendedor que EXISTE e nao tem nada leiloado.
     // E o `count` volta 0 (e nao null) porque e `count(items.id)` sobre um
     // `leftJoin`, que conta zero linhas quando nao houve casamento.
-    expect(consulta().toSQL().sql).toContain('left join "items"');
+    expect(query().toSQL().sql).toContain('left join "items"');
   });
 
   it("o filtro de `active` fica no ON, e nao no WHERE", () => {
     // no `where` o filtro depois de um `leftJoin` vira `innerJoin` disfarçado e o
     // vendedor sem item ativo some — o mesmo defeito do item anterior, por outra
     // porta. Os parametros sao: $1 = "active" (o ON) e $2 = "x" (o slug).
-    const { sql: sqlGerado, params } = consulta().toSQL();
-    expect(sqlGerado).toContain('and "items"."status" = $1');
+    const { sql: generatedSql, params } = query().toSQL();
+    expect(generatedSql).toContain('and "items"."status" = $1');
     expect(params[0]).toBe("active");
   });
 });

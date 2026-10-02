@@ -52,7 +52,7 @@ export interface DataTableSort {
   desc: boolean;
 }
 
-interface DataTablePropsComuns<T> {
+interface CommonDataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   pageSize?: number;
@@ -64,7 +64,7 @@ interface DataTablePropsComuns<T> {
   // ponytail: `sort` e `filter` sao a MESMA informacao que `pageIndex`/`pageSize`,
   // so que para as outras duas casas da tabela: o que esta aplicado. A diferenca
   // e que eles sao espelhados no estado local na renderizacao (veja
-  // `ordenacaoEspelhada` e `filtroEspelhado`, abaixo): a tabela guarda a intencao do
+  // `mirroredSort` e `mirroredFilter`, abaixo): a tabela guarda a intencao do
   // usuario, a prop carrega a verdade que o pai leu de algum lugar — a URL, no caso
   // da lista de itens. Sao opcionais porque no modo cliente nao ha pai: quem ordena e
   // filtra e a propria tabela, e nenhum dos dois props existe.
@@ -99,13 +99,13 @@ interface DataTablePropsComuns<T> {
 // defesa: o esquecimento vira erro de compilacao no consumidor, onde e barato,
 // em vez de um diagnostico em producao, onde e caro.
 export type DataTableProps<T> =
-  | (DataTablePropsComuns<T> & {
+  | (CommonDataTableProps<T> & {
       manualPagination: true;
       totalCount: number;
       sort: DataTableSort | null;
       filter: string;
     })
-  | (DataTablePropsComuns<T> & { manualPagination?: false; totalCount?: number });
+  | (CommonDataTableProps<T> & { manualPagination?: false; totalCount?: number });
 
 // ponytail: `getIsSorted()` devolve "asc"/"desc"/false e "asc" NAO e um valor
 // valido de `aria-sort` — a ARIA so aceita "none" | "ascending" | "descending" |
@@ -113,9 +113,9 @@ export type DataTableProps<T> =
 // um token que a spec nao define.
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
-const DEBOUNCE_BUSCA_MS = 300;
+const SEARCH_DEBOUNCE_MS = 300;
 // ponytail: o `10` do `pageSize = 10` do DEFAULT DESTE COMPONENTE e o MESMO numero
-// que `TAMANHO_DE_PAGINA_PADRAO` em `estado-da-tabela.ts` (a camada da URL), e a
+// que `DEFAULT_PAGE_SIZE` em `dashboard-table-state.ts` (a camada da URL), e a
 // duplicacao e forcada pelo limite do App Router: com `manualPagination` quem
 // calcula o `OFFSET` e o servidor, e ele nao alcanca um modulo `"use client"` — o
 // `pageSize` ausente da URL precisa virar numero antes de virar query. Derivar um do
@@ -124,9 +124,9 @@ const DEBOUNCE_BUSCA_MS = 300;
 // pode descobrir o padrao lendo o componente que ela manda configurar. O preco e um
 // numero em dois lugares; a mitigacao e este par de notas apontando uma para a
 // outra, e o `pageSize` que a URL manda e o mesmo que o `Select` desta lista oferece.
-const TAMANHOS_DE_PAGINA = [5, 10, 20, 50] as const;
-const ROTULO_BUSCA = "Buscar";
-const ROTULO_TAMANHO = "Linhas por página";
+const PAGE_SIZES = [5, 10, 20, 50] as const;
+const SEARCH_LABEL = "Buscar";
+const SIZE_LABEL = "Linhas por página";
 const MARCA_COMBINANTE = /\p{Diacritic}/gu;
 
 // ponytail: o filtro global padrao (`includesString`, alcancado por
@@ -135,8 +135,8 @@ const MARCA_COMBINANTE = /\p{Diacritic}/gu;
 // aparece e o resultado lido e "nao achou" em vez de "voce nao escreveu o
 // acento". NFD decompoe o caractere em letra + marca combinante, e `Diacritic`
 // cobre o `\p{M}` todo — o mesmo caminho para "ç" e para "ã".
-function semAcento(texto: string): string {
-  return texto.normalize("NFD").replace(MARCA_COMBINANTE, "").toLowerCase();
+function stripAccents(text: string): string {
+  return text.normalize("NFD").replace(MARCA_COMBINANTE, "").toLowerCase();
 }
 
 // ponytail: os DOIS lados sao normalizados, nao so o valor da celula — normalizar
@@ -144,10 +144,10 @@ function semAcento(texto: string): string {
 // vazia (`accessorFn` devolvendo `null`/`undefined`) nao casa, que e o
 // comportamento do `includesString` que esta funcao substitui: a busca nao
 // inventa criterio novo, so deixa de penalizar o acento.
-function contemSemAcento<T>(linha: Row<T>, columnId: string, valor: unknown): boolean {
-  const celula = linha.getValue<unknown>(columnId);
-  if (celula === null || celula === undefined) return false;
-  return semAcento(String(celula)).includes(semAcento(String(valor)));
+function containsIgnoringAccents<T>(row: Row<T>, columnId: string, value: unknown): boolean {
+  const cell = row.getValue<unknown>(columnId);
+  if (cell === null || cell === undefined) return false;
+  return stripAccents(String(cell)).includes(stripAccents(String(value)));
 }
 
 // ponytail: `sortable` e `enableSorting` sao o mesmo interruptor com dois nomes
@@ -156,16 +156,16 @@ function contemSemAcento<T>(linha: Row<T>, columnId: string, valor: unknown): bo
 // "eu desliguei e a coluna continuou ordenando". Coluna sem `accessorFn` nunca
 // ordena: sem valor de acesso nao ha o que comparar, e e assim que a coluna de
 // acoes (botoes/links) fica fora da ordenacao sem precisar de `false`.
-function ordenavel<T>(coluna: DataTableColumn<T>): boolean {
-  if (coluna.sortable === false || coluna.enableSorting === false) return false;
-  return coluna.accessorFn !== undefined;
+function sortable<T>(column: DataTableColumn<T>): boolean {
+  if (column.sortable === false || column.enableSorting === false) return false;
+  return column.accessorFn !== undefined;
 }
 
 function resolver<T>(updater: Updater<T>, base: T): T {
   return typeof updater === "function" ? (updater as (old: T) => T)(base) : updater;
 }
 
-function deOrdenacao(sort: DataTableSort | null | undefined): SortingState {
+function sortStateOf(sort: DataTableSort | null | undefined): SortingState {
   return sort === null || sort === undefined ? [] : [{ id: sort.id, desc: sort.desc }];
 }
 
@@ -174,7 +174,7 @@ function deOrdenacao(sort: DataTableSort | null | undefined): SortingState {
 // precisam ser a mesma coisa para a tabela, e treatar um como diferente do outro
 // faria a busca por parametro reescrever o estado de um componente que nunca
 // pediu para ser controlado.
-function mesmoSort(
+function sameSort(
   um: DataTableSort | null | undefined,
   outro: DataTableSort | null | undefined,
 ): boolean {
@@ -203,19 +203,19 @@ export function DataTable<T>({
   // ponytail: `query` e o que esta no input (muda a cada tecla); `filtro` e o que
   // foi efetivamente aplicado a tabela (so depois do debounce).
   const [query, setQuery] = useState(filter ?? "");
-  const [filtro, setFiltro] = useState(filter ?? "");
-  const [sorting, setSorting] = useState<SortingState>(deOrdenacao(sort));
+  const [itemFilter, setFilter] = useState(filter ?? "");
+  const [sorting, setSorting] = useState<SortingState>(sortStateOf(sort));
   // ponytail: estado interno so do modo client-side. No modo servidor (`manualPagination`)
   // a pagina vem de `pageIndex`/`pageSize` e o estado abaixo e ignorado — o
   // contrato e quem manda. `pageSize` entra aqui como valor inicial e volta a valer
   // se o pai mudar a prop depois (o efeito abaixo), para o prop nao virar letra morta.
-  const [paginaInterna, setPaginaInterna] = useState<PaginationState>({
+  const [internalPage, setInternalPage] = useState<PaginationState>({
     pageIndex: 0,
     pageSize,
   });
 
   const recentes = useRef({ onFilterChange, onPageChange, manualPagination, pageIndex });
-  const filtroNotificado = useRef(filter ?? "");
+  const notifiedFilter = useRef(filter ?? "");
 
   // ponytail: espelhar a prop no estado local durante a RENDERIZACAO (e nao em
   // `useEffect`) e o que mantem a tela e a URL em acordo no mesmo quadro. Em efeito
@@ -231,14 +231,14 @@ export function DataTable<T>({
   // `sorting` local e a intencao e o pai so devolve a mesma prop enquanto o
   // servidor nao respondeu, entao nao ha o que sobrescrever. Quando a resposta
   // chega com um valor diferente, ela vence.
-  const ordenacaoEspelhada = useRef(sort);
-  if (!mesmoSort(sort, ordenacaoEspelhada.current)) {
-    ordenacaoEspelhada.current = sort;
-    setSorting(deOrdenacao(sort));
+  const mirroredSort = useRef(sort);
+  if (!sameSort(sort, mirroredSort.current)) {
+    mirroredSort.current = sort;
+    setSorting(sortStateOf(sort));
   }
 
   // ponytail: o mesmo espelho para a busca, e com um passo a mais: marcar o
-  // `filtroNotificado` com o valor que CHEGOU. Sem isso, um termo vindo do
+  // `notifiedFilter` com o valor que CHEGOU. Sem isso, um termo vindo do
   // historico (voltar/avancar) ficaria 300ms na caixa como se fosse digitado e
   // dispararia um `onFilterChange` de volta — a tela escrevendo na URL o valor que
   // acabou de ler dela.
@@ -250,13 +250,13 @@ export function DataTable<T>({
   // piora em conexao lenta, que e a situacao em que o usuario ainda esta digitando
   // quando a resposta chega. Termo que a tabela NUNCA notificou (o "voltar") segue
   // repreenchendo a caixa: e o que a prop e, e o que o usuario ve na URL.
-  const filtroEspelhado = useRef(filter);
-  if (filter !== filtroEspelhado.current) {
-    filtroEspelhado.current = filter;
-    if (filter !== undefined && filter !== filtroNotificado.current) {
-      filtroNotificado.current = filter;
+  const mirroredFilter = useRef(filter);
+  if (filter !== mirroredFilter.current) {
+    mirroredFilter.current = filter;
+    if (filter !== undefined && filter !== notifiedFilter.current) {
+      notifiedFilter.current = filter;
       setQuery(filter);
-      setFiltro(filter);
+      setFilter(filter);
     }
   }
 
@@ -276,12 +276,12 @@ export function DataTable<T>({
   // para o pai que acabou de setar a prop.
   useEffect(() => {
     if (manualPagination) return;
-    setPaginaInterna((anterior) => {
-      if (anterior.pageSize === pageSize) return anterior;
-      const tamanho = Math.max(1, pageSize);
+    setInternalPage((previous) => {
+      if (previous.pageSize === pageSize) return previous;
+      const size = Math.max(1, pageSize);
       return {
-        pageIndex: Math.floor((anterior.pageSize * anterior.pageIndex) / tamanho),
-        pageSize: tamanho,
+        pageIndex: Math.floor((previous.pageSize * previous.pageIndex) / size),
+        pageSize: size,
       };
     });
   }, [manualPagination, pageSize]);
@@ -291,15 +291,15 @@ export function DataTable<T>({
   // reiniciaria o timer — a busca nunca dispararia. Por isso os callbacks vivem
   // num ref atualizado a cada render.
   //
-  // ponytail: `filtroNotificado` evita o timer no mount (e o disparo espurio de
+  // ponytail: `notifiedFilter` evita o timer no mount (e o disparo espurio de
   // `onFilterChange("")` logo apos abrir a tabela). Escrever no ref, e nao
   // derivar de `filtro`, porque o usuario pode digitar "a", o timer disparar, e
   // depois limpar para "" — que precisa notificar de novo.
   useEffect(() => {
-    if (query === filtroNotificado.current) return;
+    if (query === notifiedFilter.current) return;
     const timer = setTimeout(() => {
-      filtroNotificado.current = query;
-      setFiltro(query);
+      notifiedFilter.current = query;
+      setFilter(query);
       const atual = recentes.current;
       atual.onFilterChange?.(query);
       // ponytail: no modo cliente o proprio TanStack volta para a pagina 0 quando a
@@ -308,7 +308,7 @@ export function DataTable<T>({
       // responsabilidade nossa, senao a busca continua presa numa pagina que o
       // servidor ja nao devolve.
       if (atual.manualPagination && atual.pageIndex !== 0) atual.onPageChange?.(0);
-    }, DEBOUNCE_BUSCA_MS);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -316,33 +316,33 @@ export function DataTable<T>({
     () =>
       manualPagination
         ? { pageIndex: Math.max(0, pageIndex), pageSize }
-        : paginaInterna,
-    [manualPagination, pageIndex, pageSize, paginaInterna],
+        : internalPage,
+    [manualPagination, pageIndex, pageSize, internalPage],
   );
 
-  const tratarOrdenacao: OnChangeFn<SortingState> = (updater) => {
-    const proxima = resolver(updater, sorting);
-    setSorting(proxima);
-    const primeira = proxima[0];
+  const handleSort: OnChangeFn<SortingState> = (updater) => {
+    const next = resolver(updater, sorting);
+    setSorting(next);
+    const primeira = next[0];
     onSortChange?.(primeira ? { id: primeira.id, desc: primeira.desc } : null);
     if (manualPagination && paginacao.pageIndex !== 0) onPageChange?.(0);
   };
 
-  const tratarPagina: OnChangeFn<PaginationState> = (updater) => {
-    const proxima = resolver(updater, paginacao);
-    if (!manualPagination) setPaginaInterna(proxima);
-    if (proxima.pageIndex !== paginacao.pageIndex) onPageChange?.(proxima.pageIndex);
-    if (proxima.pageSize !== paginacao.pageSize) onPageSizeChange?.(proxima.pageSize);
+  const handlePage: OnChangeFn<PaginationState> = (updater) => {
+    const next = resolver(updater, paginacao);
+    if (!manualPagination) setInternalPage(next);
+    if (next.pageIndex !== paginacao.pageIndex) onPageChange?.(next.pageIndex);
+    if (next.pageSize !== paginacao.pageSize) onPageSizeChange?.(next.pageSize);
   };
 
   const defs = useMemo<ColumnDef<T>[]>(
     () =>
-      columns.map((coluna) => ({
-        id: coluna.id,
-        accessorFn: coluna.accessorFn,
-        enableSorting: ordenavel(coluna),
-        header: coluna.header,
-        cell: ({ row }) => coluna.cell(row.original),
+      columns.map((column) => ({
+        id: column.id,
+        accessorFn: column.accessorFn,
+        enableSorting: sortable(column),
+        header: column.header,
+        cell: ({ row }) => column.cell(row.original),
       })),
     [columns],
   );
@@ -358,10 +358,10 @@ export function DataTable<T>({
   const table = useReactTable({
     data,
     columns: defs,
-    state: { sorting, globalFilter: filtro, pagination: paginacao },
-    onSortingChange: tratarOrdenacao,
-    onPaginationChange: tratarPagina,
-    globalFilterFn: contemSemAcento,
+    state: { sorting, globalFilter: itemFilter, pagination: paginacao },
+    onSortingChange: handleSort,
+    onPaginationChange: handlePage,
+    globalFilterFn: containsIgnoringAccents,
     // ponytail: `manualPagination` sozinho NAO e manual. Sem estes dois o
     // `getFilteredRowModel` e o `getSortedRowModel` continuam rodando sobre a
     // pagina que o servidor mandou, e o resultado era uma tabela que menteva em
@@ -384,23 +384,23 @@ export function DataTable<T>({
 
   const linhas = table.getRowModel().rows;
   const total = table.getRowCount();
-  const primeiro = total === 0 ? 0 : paginacao.pageIndex * paginacao.pageSize + 1;
-  const ultimo = Math.min((paginacao.pageIndex + 1) * paginacao.pageSize, total);
+  const first = total === 0 ? 0 : paginacao.pageIndex * paginacao.pageSize + 1;
+  const last = Math.min((paginacao.pageIndex + 1) * paginacao.pageSize, total);
 
   // ponytail: o `pageSize` pode vir com um valor fora da lista (o consumidor
   // escolhe). O `SelectValue` do base-ui cai no valor cru e o gatilho continua
   // mostrando o numero certo, mas o tamanho em uso ficaria AUSENTE da lista — o
   // usuario veria "3" no gatilho e nao conseguiria escolher "3" de novo. A union
   // mantem a lista com o que esta em uso.
-  const tamanhos = useMemo(() => {
-    return [...new Set([...TAMANHOS_DE_PAGINA, paginacao.pageSize])].sort((a, b) => a - b);
+  const sizes = useMemo(() => {
+    return [...new Set([...PAGE_SIZES, paginacao.pageSize])].sort((a, b) => a - b);
   }, [paginacao.pageSize]);
 
   return (
     <div className="space-y-3">
       <Input
         type="search"
-        aria-label={ROTULO_BUSCA}
+        aria-label={SEARCH_LABEL}
         placeholder={filterPlaceholder}
         value={query}
         onChange={(evento) => setQuery(evento.target.value)}
@@ -409,10 +409,10 @@ export function DataTable<T>({
 
       <Table>
         <TableHeader>
-          {table.getHeaderGroups().map((grupo) => (
-            <TableRow key={grupo.id}>
-              {grupo.headers.map((cabecalho) => {
-                const podeOrdenar = cabecalho.column.getCanSort();
+          {table.getHeaderGroups().map((group) => (
+            <TableRow key={group.id}>
+              {group.headers.map((cabecalho) => {
+                const canSort = cabecalho.column.getCanSort();
                 const direcao = cabecalho.column.getIsSorted();
                 return (
                   <TableHead
@@ -420,9 +420,9 @@ export function DataTable<T>({
                     // ponytail: `aria-sort="none"` significa "ordenavel, sem
                     // ordenacao ativa"; coluna que nao ordena nao leva o atributo
                     // nenhum. So no `th` — o botao dentro dele nao repete.
-                    aria-sort={podeOrdenar ? (direcao ? ARIA_SORT[direcao] : "none") : undefined}
+                    aria-sort={canSort ? (direcao ? ARIA_SORT[direcao] : "none") : undefined}
                   >
-                    {podeOrdenar ? (
+                    {canSort ? (
                       <Button
                         type="button"
                         variant="ghost"
@@ -481,11 +481,11 @@ export function DataTable<T>({
               </TableCell>
             </TableRow>
           ) : (
-            linhas.map((linha) => (
-              <TableRow key={linha.id}>
-                {linha.getVisibleCells().map((celula) => (
-                  <TableCell key={celula.id}>
-                    {flexRender(celula.column.columnDef.cell, celula.getContext())}
+            linhas.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
@@ -496,7 +496,7 @@ export function DataTable<T>({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {`Mostrando ${primeiro}–${ultimo} de ${total} ${total === 1 ? "item" : "itens"}`}
+          {`Mostrando ${first}–${last} de ${total} ${total === 1 ? "item" : "itens"}`}
         </p>
         <div className="flex items-center gap-2">
           <Select<number>
@@ -505,17 +505,17 @@ export function DataTable<T>({
             // `null` e o "selecionado foi limpo", que esta tabela nao tem como
             // oferecer — nao ha item com valor nulo na lista). Descartar e o que
             // mantem o `setPageSize` em `Updater<number>`.
-            onValueChange={(valor) => {
-              if (valor !== null) table.setPageSize(valor);
+            onValueChange={(value) => {
+              if (value !== null) table.setPageSize(value);
             }}
           >
-            <SelectTrigger size="sm" aria-label={ROTULO_TAMANHO} className="w-auto">
+            <SelectTrigger size="sm" aria-label={SIZE_LABEL} className="w-auto">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {tamanhos.map((tamanho) => (
-                <SelectItem key={tamanho} value={tamanho}>
-                  {tamanho}
+              {sizes.map((size) => (
+                <SelectItem key={size} value={size}>
+                  {size}
                 </SelectItem>
               ))}
             </SelectContent>

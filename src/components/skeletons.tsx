@@ -34,7 +34,7 @@ const CARDS = 6;
 // pelos seis blocos vazios procurando informacao que nao existe ali. O anuncio de
 // "carregando" e do CONTAINER (o unico `role="status"`), e nao de cada card:
 // seis regioes vivas repetiriam a mesma frase seis vezes.
-function CartaoEsqueleto() {
+function SkeletonCard() {
   return (
     <div data-slot="item-card-skeleton" aria-hidden="true" className="overflow-hidden rounded-lg border">
       <Skeleton className="aspect-square w-full rounded-none" />
@@ -64,7 +64,7 @@ export function ItemCardSkeleton() {
       className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
     >
       {Array.from({ length: CARDS }, (_, indice) => (
-        <CartaoEsqueleto key={indice} />
+        <SkeletonCard key={indice} />
       ))}
     </div>
   );

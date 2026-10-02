@@ -207,7 +207,7 @@ describe("placeBid", () => {
     ).rejects.toThrow("Lance deve ser ≥ R$ 50,00");
   });
 
-  it("cria lance subsequente ≥ maiorLance + minBidIncrement", async () => {
+  it("cria lance subsequente ≥ highestBid + minBidIncrement", async () => {
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
     const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller, bidder2: outbidUser });
@@ -228,7 +228,7 @@ describe("placeBid", () => {
     });
   });
 
-  it("rejeita lance < maiorLance + minBidIncrement", async () => {
+  it("rejeita lance < highestBid + minBidIncrement", async () => {
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
     const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller });

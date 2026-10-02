@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ItemStatus, ItemType } from "./item-repository";
-import { ROTULO_STATUS, ROTULO_TIPO } from "./item-repository";
+import { STATUS_LABELS, TYPE_LABELS } from "./item-repository";
 
 // ponytail: as listas de membros sao escritas a mao de proposito, e e o unico jeito
 // de o `tsc` dizer que o mapa ficou para tras. O `Record<ItemStatus, string>` ja
@@ -9,7 +9,7 @@ import { ROTULO_STATUS, ROTULO_TIPO } from "./item-repository";
 // conjunto esperado, e e a lista que este arquivo mantem. Duplicar o enum aqui e
 // o preco de ter uma assercao que a leitura nao consegue cumprir sozinha — e o
 // mesmo preco, e bem mais barato, da lista de abas.
-const MEMBROS_DE_STATUS: ItemStatus[] = [
+const STATUS_MEMBERS: ItemStatus[] = [
   "draft",
   "active",
   "closed",
@@ -18,41 +18,41 @@ const MEMBROS_DE_STATUS: ItemStatus[] = [
   "cancelled",
 ];
 
-const MEMBROS_DE_TIPO: ItemType[] = ["product", "service", "piece"];
+const TYPE_MEMBERS: ItemType[] = ["product", "service", "piece"];
 
-function semChavesVazias(rotulos: Record<string, string>): string[] {
-  return Object.entries(rotulos)
-    .filter(([, rotulo]) => rotulo.trim() === "")
-    .map(([chave]) => chave);
+function withoutEmptyKeys(labels: Record<string, string>): string[] {
+  return Object.entries(labels)
+    .filter(([, label]) => label.trim() === "")
+    .map(([key]) => key);
 }
 
-function repetidos(rotulos: Record<string, string>): string[] {
+function duplicates(labels: Record<string, string>): string[] {
   const vistos = new Set<string>();
-  const repetidos: string[] = [];
-  for (const rotulo of Object.values(rotulos)) {
-    if (vistos.has(rotulo)) repetidos.push(rotulo);
-    vistos.add(rotulo);
+  const duplicates: string[] = [];
+  for (const label of Object.values(labels)) {
+    if (vistos.has(label)) duplicates.push(label);
+    vistos.add(label);
   }
-  return repetidos;
+  return duplicates;
 }
 
 describe("o vocabulario canonico dos rotulos de item", () => {
   it("o mapa de status tem uma chave por membro do enum, e nenhuma sobra", () => {
-    expect(Object.keys(ROTULO_STATUS).sort()).toEqual([...MEMBROS_DE_STATUS].sort());
+    expect(Object.keys(STATUS_LABELS).sort()).toEqual([...STATUS_MEMBERS].sort());
   });
 
   it("o mapa de tipo tem uma chave por membro do enum, e nenhuma sobra", () => {
-    expect(Object.keys(ROTULO_TIPO).sort()).toEqual([...MEMBROS_DE_TIPO].sort());
+    expect(Object.keys(TYPE_LABELS).sort()).toEqual([...TYPE_MEMBERS].sort());
   });
 
   it("todo status tem rotulo, e nenhum status divide o rotulo com outro", () => {
-    expect(semChavesVazias(ROTULO_STATUS)).toEqual([]);
-    expect(repetidos(ROTULO_STATUS)).toEqual([]);
+    expect(withoutEmptyKeys(STATUS_LABELS)).toEqual([]);
+    expect(duplicates(STATUS_LABELS)).toEqual([]);
   });
 
   it("todo tipo tem rotulo, e nenhum tipo divide o rotulo com outro", () => {
-    expect(semChavesVazias(ROTULO_TIPO)).toEqual([]);
-    expect(repetidos(ROTULO_TIPO)).toEqual([]);
+    expect(withoutEmptyKeys(TYPE_LABELS)).toEqual([]);
+    expect(duplicates(TYPE_LABELS)).toEqual([]);
   });
 
   // ponytail: os dois mapas sao lidos juntos porque a busca e lida junto: e o `q`
@@ -63,8 +63,8 @@ describe("o vocabulario canonico dos rotulos de item", () => {
   // parece mais larga do que o texto digitado. A distincao e o que faz a busca
   // continuar sendo legivel como lista de resultados.
   it("nenhum rotulo de status e o mesmo texto que um rotulo de tipo", () => {
-    const tipos = new Set(Object.values(ROTULO_TIPO));
-    const emComum = Object.values(ROTULO_STATUS).filter((rotulo) => tipos.has(rotulo));
+    const tipos = new Set(Object.values(TYPE_LABELS));
+    const emComum = Object.values(STATUS_LABELS).filter((label) => tipos.has(label));
     expect(emComum).toEqual([]);
   });
 });

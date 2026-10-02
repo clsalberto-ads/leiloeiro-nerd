@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import type { ItemDaTabela } from "./item-da-tabela";
-import type { VistaDaTabela } from "./estado-da-tabela";
+import type { DashboardItemRow } from "./dashboard-item-row";
+import type { DashboardTableView } from "./dashboard-table-state";
 
 // ponytail: a action real (drizzle/pg/better-auth) arrastaria o banco para
 // dentro do grafo de import — o mesmo motivo do `vi.mock` em
@@ -22,9 +22,9 @@ vi.mock("@/presentation/actions/item-actions", () => ({
   publishItemAction: mocks.publicar,
 }));
 
-// ponytail: o `next/navigation` e mockado para o `ItensDaUrl`, e nao para o
+// ponytail: o `next/navigation` e mockado para o `ItemsUrl`, e nao para o
 // `ItemsList` — que e puro de proposito e nao importa nada de roteador. E a
-// emenda da cadeia: o `ItemsList` devolve a VISTA, o `ItensDaUrl` vira string e o
+// emenda da cadeia: o `ItemsList` devolve a VISTA, o `ItemsUrl` vira string e o
 // `router.push` recebe. Sem este mock, `useRouter` fora do App Router e um
 // `invariant` na hora do render.
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -40,8 +40,8 @@ vi.mock("next/navigation", async (importOriginal) => ({
 vi.mock("@/components/bid-countdown", () => ({ BidCountdown: () => null }));
 
 import { act, cleanup, fireEvent, render, screen, within } from "@/test/dom-render";
-import { ItemsList, ItensDaUrl } from "./items-list";
-import { VISTA_PADRAO } from "./estado-da-tabela";
+import { ItemsList, ItemsUrl } from "./items-list";
+import { DEFAULT_TABLE_VIEW } from "./dashboard-table-state";
 
 // ponytail: meio-dia UTC. O texto da data e formatado no fuso do produto, e
 // 12:00 UTC e a hora que cai no mesmo dia civil tanto em UTC quanto em
@@ -49,20 +49,20 @@ import { VISTA_PADRAO } from "./estado-da-tabela";
 // `01/10/2026` continua o esperado; o fuso se prova no teste que troca `TZ` de
 // verdade, porque para provar o fuso do produto e preciso um instante em que UTC
 // e Sao Paulo discordem do dia.
-const PRAZO = new Date("2026-10-01T12:00:00Z");
+const DEADLINE = new Date("2026-10-01T12:00:00Z");
 
 // ponytail: o item do teste e o DTO de seis campos e nao o `Item` de doze. Montar
 // o `Item` completo aqui seria mais honesto sobre a origem, mas ai o `Item` do
 // teste passaria a depender de campos que a lista nao le — e o teste pararia de
 // dizer o que a lista precisa. Aqui ele diz exatamente isso: estes seis campos, e
 // nenhum outro, sao o que a tela consome.
-function makeItem(overrides: Partial<ItemDaTabela> = {}): ItemDaTabela {
+function makeItem(overrides: Partial<DashboardItemRow> = {}): DashboardItemRow {
   return {
     id: "i1",
     title: "Console retrô",
     type: "product",
     minInitialBid: 10000,
-    bidDeadline: PRAZO,
+    bidDeadline: DEADLINE,
     status: "active",
     ...overrides,
   };
@@ -80,9 +80,9 @@ const DESORDENADOS = [CONSOLE, BICICLETA, SERVICO];
 // processo muda o DIA visivel — 01:00 UTC ainda e 30/09 as 22h em Sao Paulo, e
 // 01/10 as 22h em qualquer fuso a leste. Por isso o prazo deste item nao serve
 // aos outros testes.
-const PRAZO_DE_FRONTEIRA = new Date("2026-10-01T01:00:00Z");
+const BOUNDARY_DEADLINE = new Date("2026-10-01T01:00:00Z");
 
-type Navegar = (vista: VistaDaTabela) => void;
+type Navigate = (view: DashboardTableView) => void;
 
 // ponytail: `navegar` e um `vi.fn()` e nao um `useRouter` mockado porque o
 // contrato da lista e a VISTA, e nao a string que o Next receberia. O roteador
@@ -93,21 +93,21 @@ type Navegar = (vista: VistaDaTabela) => void;
 // faz depois de um `router.push` (e o que o "voltar" do navegador faz sem navegacao
 // nenhuma). Sem ele nao ha como testar a garantia de que a prop NUNCA vira
 // navegacao — o que seria o laco de "navegou, a prop voltou, navegou de novo".
-function renderLista(entrada: { items?: ItemDaTabela[]; vista?: VistaDaTabela; totalCount?: number } = {}): {
-  navegar: Mock<Navegar>;
-  responder: (vista: VistaDaTabela) => void;
+function renderList(entrada: { items?: DashboardItemRow[]; view?: DashboardTableView; totalCount?: number } = {}): {
+  navigate: Mock<Navigate>;
+  responder: (view: DashboardTableView) => void;
 } {
-  const navegar = vi.fn<Navegar>();
-  const lista = (vista: VistaDaTabela) => (
+  const navigate = vi.fn<Navigate>();
+  const list = (view: DashboardTableView) => (
     <ItemsList
       items={entrada.items ?? DESORDENADOS}
-      vista={vista}
+      view={view}
       totalCount={entrada.totalCount ?? DESORDENADOS.length}
-      navegar={navegar}
+      navigate={navigate}
     />
   );
-  const { rerender } = render(lista(entrada.vista ?? VISTA_PADRAO));
-  return { navegar, responder: (vista) => rerender(lista(vista)) };
+  const { rerender } = render(list(entrada.view ?? DEFAULT_TABLE_VIEW));
+  return { navigate, responder: (view) => rerender(list(view)) };
 }
 
 // ponytail: a navegacao sai num `queueMicrotask` (o `ItemsList` junta assim as
@@ -125,48 +125,48 @@ async function acao(gesto: () => void, ms = 0): Promise<void> {
   await act(async () => {});
 }
 
-function ultimaVista(navegar: Mock<Navegar>): VistaDaTabela {
-  expect(navegar, "a lista nao navegou").toHaveBeenCalledTimes(1);
-  const [vista] = navegar.mock.calls[0] as [VistaDaTabela];
-  return vista;
+function lastView(navigate: Mock<Navigate>): DashboardTableView {
+  expect(navigate, "a lista nao navegou").toHaveBeenCalledTimes(1);
+  const [view] = navigate.mock.calls[0] as [DashboardTableView];
+  return view;
 }
 
 // ponytail: `getAllByRole("row")` sem escopo devolveria tambem a linha do
 // cabecalho (o `thead` tambem e `role="row"`), entao a primeira linha seria o
 // titulo das colunas e nunca o titulo de um item.
 function corpo(): HTMLElement {
-  const elemento = document.querySelector("tbody");
-  expect(elemento, "tabela renderizada sem tbody").not.toBeNull();
-  return elemento as HTMLElement;
+  const element = document.querySelector("tbody");
+  expect(element, "tabela renderizada sem tbody").not.toBeNull();
+  return element as HTMLElement;
 }
 
 function linhas(): HTMLElement[] {
   return within(corpo()).getAllByRole("row");
 }
 
-function celulas(linha: HTMLElement): string[] {
-  return within(linha).getAllByRole("cell").map((celula) => celula.textContent ?? "");
+function celulas(row: HTMLElement): string[] {
+  return within(row).getAllByRole("cell").map((cell) => cell.textContent ?? "");
 }
 
 function titulos(): string[] {
-  return linhas().map((linha) => celulas(linha)[0] ?? "");
+  return linhas().map((row) => celulas(row)[0] ?? "");
 }
 
-function unicaLinha(): HTMLElement {
+function singleRow(): HTMLElement {
   const todas = linhas();
   expect(todas, "tabela sem linha de item").toHaveLength(1);
   return todas[0];
 }
 
-function cabecalho(nome: string): HTMLElement {
-  return screen.getByRole("columnheader", { name: nome });
+function cabecalho(name: string): HTMLElement {
+  return screen.getByRole("columnheader", { name: name });
 }
 
-function botaoDeOrdenacao(nome: string): HTMLElement {
-  return within(cabecalho(nome)).getByRole("button", { name: nome });
+function sortButton(name: string): HTMLElement {
+  return within(cabecalho(name)).getByRole("button", { name: name });
 }
 
-function acoesDe(titulo: string): HTMLElement {
+function actionsFrom(titulo: string): HTMLElement {
   return screen.getByRole("button", { name: `Ações de ${titulo}` });
 }
 
@@ -181,11 +181,11 @@ beforeEach(() => {
 // ponytail: o `cleanup()` no fim e o que permite dois renders no mesmo `it`.
 // Sem ele as duas tabelas ficariam no `document` e `unicaLinha()` veria quatro
 // celulas (o `afterEach` do `dom-render` so roda no fim do teste).
-function lerPrazo(item: ItemDaTabela): string {
-  renderLista({ items: [item] });
-  const texto = within(unicaLinha()).getByText(/\d{2}\/\d{2}\/\d{4}/).textContent ?? "";
+function readDeadline(item: DashboardItemRow): string {
+  renderList({ items: [item] });
+  const text = within(singleRow()).getByText(/\d{2}\/\d{2}\/\d{4}/).textContent ?? "";
   cleanup();
-  return texto;
+  return text;
 }
 
 describe("ItemsList — as colunas da tabela", () => {
@@ -194,7 +194,7 @@ describe("ItemsList — as colunas da tabela", () => {
   // aparece. A ordem e uma decisao de produto — o olho le da esquerda para a
   // direita, o titulo abre a linha — entao mudar e um ato consciente.
   it("mostra exatamente as seis colunas acordadas, na ordem", () => {
-    renderLista({ items: [CONSOLE] });
+    renderList({ items: [CONSOLE] });
 
     expect(screen.getAllByRole("columnheader").map((th) => th.textContent)).toEqual([
       "Título",
@@ -207,12 +207,12 @@ describe("ItemsList — as colunas da tabela", () => {
   });
 
   it("preenche a linha com o titulo, o tipo, o status, o lance e o prazo do item", () => {
-    renderLista({ items: [CONSOLE] });
+    renderList({ items: [CONSOLE] });
 
     // ponytail: a celula de acoes entra como string vazia — o gatilho dela e um
     // botao so com icone, e o nome dele e o `aria-label`, nao texto. A string
     // vazia e o que prova que a celula existe mesmo sem texto legivel.
-    expect(celulas(unicaLinha())).toEqual([
+    expect(celulas(singleRow())).toEqual([
       "Console retrô",
       "Produto",
       "Em leilão",
@@ -223,7 +223,7 @@ describe("ItemsList — as colunas da tabela", () => {
   });
 
   it("traduz o tipo do item para pt-BR", () => {
-    renderLista();
+    renderList();
 
     expect(linhas().map(celulas).map((c) => c[1])).toEqual([
       "Produto",
@@ -233,28 +233,28 @@ describe("ItemsList — as colunas da tabela", () => {
   });
 
   it("usa o ItemStatusBadge na celula de status, nao um texto solto", () => {
-    renderLista();
+    renderList();
 
     // ponytail: `data-slot="badge"` e o que separa o `Badge` do shadcn de um
     // `<span>` montado a mao — o rotulo ("Em leilao") sozinho passaria nos dois.
-    for (const rotulo of ["Em leilão", "Rascunho", "Encerrado"]) {
-      expect(within(corpo()).getByText(rotulo).getAttribute("data-slot")).toBe("badge");
+    for (const label of ["Em leilão", "Rascunho", "Encerrado"]) {
+      expect(within(corpo()).getByText(label).getAttribute("data-slot")).toBe("badge");
     }
   });
 
   it("formata o lance minimo em reais, e nao em centavos crus", () => {
-    renderLista({ items: [CONSOLE] });
+    renderList({ items: [CONSOLE] });
 
     // ponytail: 123456 centavos. O ponto e a virgula so saem do `formatReais`: o
     // numero cru renderizaria "123456". A busca e por texto, e nao por indice de
     // celula, para a falha dizer o que sumiu em vez de acusar a coluna vizinha.
-    expect(within(unicaLinha()).getByText("R$ 1.234,56")).toBeTruthy();
+    expect(within(singleRow()).getByText("R$ 1.234,56")).toBeTruthy();
   });
 
   it("formata o prazo em data pt-BR dentro de um elemento time", () => {
-    renderLista({ items: [CONSOLE] });
+    renderList({ items: [CONSOLE] });
 
-    const tempo = within(unicaLinha()).getByText("01/10/2026");
+    const tempo = within(singleRow()).getByText("01/10/2026");
     expect(tempo.tagName).toBe("TIME");
     // ponytail: o `datetime` e o instante em UTC, independente do fuso — e ele
     // que acusa um `toISOString` trocado pelo texto ja formatado, caso em que o
@@ -272,24 +272,24 @@ describe("ItemsList — as colunas da tabela", () => {
   // acusa o texto do `<time>` e joga fora a arvore do servidor. O `TZ` volta ao
   // valor original no `finally` porque o resto do arquivo depende dele.
   it("formata o prazo no fuso do produto, e nao no fuso do processo", () => {
-    const fusoOriginal = process.env.TZ;
-    const item = makeItem({ id: "i-fuso", bidDeadline: PRAZO_DE_FRONTEIRA });
+    const originalTimezone = process.env.TZ;
+    const item = makeItem({ id: "i-fuso", bidDeadline: BOUNDARY_DEADLINE });
     try {
       process.env.TZ = "UTC";
-      const comServidorUtc = lerPrazo(item);
+      const withServerUtc = readDeadline(item);
       process.env.TZ = "America/Sao_Paulo";
-      const comServidorSaoPaulo = lerPrazo(item);
+      const withServerSaoPaulo = readDeadline(item);
 
-      expect(comServidorUtc).toBe("30/09/2026");
-      expect(comServidorSaoPaulo).toBe("30/09/2026");
+      expect(withServerUtc).toBe("30/09/2026");
+      expect(withServerSaoPaulo).toBe("30/09/2026");
     } finally {
-      if (fusoOriginal === undefined) delete process.env.TZ;
-      else process.env.TZ = fusoOriginal;
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
     }
   });
 
   it("liga o titulo da coluna ao editor daquele item", () => {
-    renderLista({ items: [CONSOLE, BICICLETA] });
+    renderList({ items: [CONSOLE, BICICLETA] });
 
     const link = within(linhas()[0]).getByRole("link", { name: "Console retrô" });
     expect(link.getAttribute("href")).toBe("/dashboard/items/i-console/edit");
@@ -306,7 +306,7 @@ describe("ItemsList — as colunas que ordenam", () => {
   // animaria e a tabela voltaria igual. `Ações` esta fora por outro motivo, ja
   // antigo: botao e link nao tem valor de acesso nem ordem.
   it("ordena as tres colunas de dado e deixa Tipo, Status e Ações fora", () => {
-    renderLista();
+    renderList();
 
     const ordenaveis = screen
       .getAllByRole("columnheader")
@@ -316,9 +316,9 @@ describe("ItemsList — as colunas que ordenam", () => {
       "Lance mínimo",
       "Deadline",
     ]);
-    for (const nome of ["Tipo", "Status", "Ações"]) {
-      expect(cabecalho(nome).getAttribute("aria-sort")).toBeNull();
-      expect(within(cabecalho(nome)).queryByRole("button")).toBeNull();
+    for (const name of ["Tipo", "Status", "Ações"]) {
+      expect(cabecalho(name).getAttribute("aria-sort")).toBeNull();
+      expect(within(cabecalho(name)).queryByRole("button")).toBeNull();
     }
   });
 
@@ -329,11 +329,11 @@ describe("ItemsList — as colunas que ordenam", () => {
   // teste de navegacao notaria, mas a tela mostraria os itens ja ordenados sem
   // nenhuma seta apontando para onde — o estado na URL sem reflexo na tela.
   it("marca a coluna que a URL mandou ordenar, e so ela", () => {
-    renderLista({ vista: { ...VISTA_PADRAO, orderBy: "minInitialBid", direction: "desc" } });
+    renderList({ view: { ...DEFAULT_TABLE_VIEW, orderBy: "minInitialBid", direction: "desc" } });
 
     expect(cabecalho("Lance mínimo").getAttribute("aria-sort")).toBe("descending");
-    for (const nome of ["Título", "Deadline"]) {
-      expect(cabecalho(nome).getAttribute("aria-sort")).toBe("none");
+    for (const name of ["Título", "Deadline"]) {
+      expect(cabecalho(name).getAttribute("aria-sort")).toBe("none");
     }
   });
 
@@ -342,7 +342,7 @@ describe("ItemsList — as colunas que ordenam", () => {
   // Se uma coluna aparecesse marcada aqui, a tela estaria jurando que a ordem
   // default e por titulo, e so o `ORDER BY` do servidor discordaria.
   it("nao marca nenhuma coluna na tela padrão, que ordena por data de criação", () => {
-    renderLista();
+    renderList();
 
     const marcadas = screen
       .getAllByRole("columnheader")
@@ -367,12 +367,12 @@ describe("ItemsList — as colunas que ordenam", () => {
     ["Título", "title", "asc"],
     ["Lance mínimo", "minInitialBid", "desc"],
     ["Deadline", "bidDeadline", "desc"],
-  ])("manda %s para o orderBy %s com direcao %s", async (coluna, orderBy, direction) => {
-    const { navegar } = renderLista();
+  ])("manda %s para o orderBy %s com direcao %s", async (column, orderBy, direction) => {
+    const { navigate } = renderList();
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao(coluna)));
+    await acao(() => fireEvent.click(sortButton(column)));
 
-    expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, orderBy, direction });
+    expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, orderBy, direction });
   });
 
   // ponytail: o segundo clique inverte, e o terceiro (o "sem ordenacao" do
@@ -381,39 +381,39 @@ describe("ItemsList — as colunas que ordenam", () => {
   // leitura assume `createdAt desc` — entao a tela sempre esta ordenada por alguma
   // coisa, e a seta sumindo seria o unico estado que a URL nao sabe descrever.
   it("inverte a direcao no segundo clique e volta ao padrao no terceiro", async () => {
-    const { navegar } = renderLista();
+    const { navigate } = renderList();
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Título")));
-    expect(ultimaVista(navegar).direction).toBe("asc");
+    await acao(() => fireEvent.click(sortButton("Título")));
+    expect(lastView(navigate).direction).toBe("asc");
 
-    navegar.mockClear();
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Título")));
-    expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, orderBy: "title", direction: "desc" });
+    navigate.mockClear();
+    await acao(() => fireEvent.click(sortButton("Título")));
+    expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, orderBy: "title", direction: "desc" });
 
-    navegar.mockClear();
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Título")));
-    expect(ultimaVista(navegar)).toEqual(VISTA_PADRAO);
+    navigate.mockClear();
+    await acao(() => fireEvent.click(sortButton("Título")));
+    expect(lastView(navigate)).toEqual(DEFAULT_TABLE_VIEW);
   });
 
   it("nao reordena a pagina do servidor: ordena e a URL que decide", async () => {
-    const { navegar } = renderLista();
+    const { navigate } = renderList();
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Lance mínimo")));
+    await acao(() => fireEvent.click(sortButton("Lance mínimo")));
 
     // ponytail: as tres linhas continuam na ordem que o servidor mandou. Um
     // reordenamento local mostraria um fragmento ordenado que nao corresponde a
     // nenhum conjunto de dados, e a segunda pagina viraria do conjunto errado.
     expect(titulos()).toEqual(["Console retrô", "Bicicleta", "Serviço de reparo"]);
-    expect(ultimaVista(navegar).orderBy).toBe("minInitialBid");
+    expect(lastView(navigate).orderBy).toBe("minInitialBid");
   });
 
   it("volta para a primeira pagina quando a ordenacao muda", async () => {
-    const { navegar } = renderLista({ vista: { ...VISTA_PADRAO, page: 4 } });
+    const { navigate } = renderList({ view: { ...DEFAULT_TABLE_VIEW, page: 4 } });
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Deadline")));
+    await acao(() => fireEvent.click(sortButton("Deadline")));
 
-    expect(ultimaVista(navegar)).toEqual({
-      ...VISTA_PADRAO,
+    expect(lastView(navigate)).toEqual({
+      ...DEFAULT_TABLE_VIEW,
       orderBy: "bidDeadline",
       direction: "desc",
       page: 1,
@@ -423,9 +423,9 @@ describe("ItemsList — as colunas que ordenam", () => {
 
 describe("ItemsList — as acoes por status", () => {
   it("oferece Publicar e Excluir num rascunho", async () => {
-    renderLista({ items: [BICICLETA] });
+    renderList({ items: [BICICLETA] });
 
-    fireEvent.click(acoesDe("Bicicleta"));
+    fireEvent.click(actionsFrom("Bicicleta"));
 
     expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
       "Publicar",
@@ -434,27 +434,27 @@ describe("ItemsList — as acoes por status", () => {
   });
 
   it("oferece Cancelar num item em leilao e num encerrado", async () => {
-    renderLista({ items: [CONSOLE, SERVICO] });
+    renderList({ items: [CONSOLE, SERVICO] });
 
-    fireEvent.click(acoesDe("Console retrô"));
+    fireEvent.click(actionsFrom("Console retrô"));
     expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Cancelar"]);
-    fireEvent.keyDown(acoesDe("Console retrô"), { key: "Escape" });
+    fireEvent.keyDown(actionsFrom("Console retrô"), { key: "Escape" });
 
-    fireEvent.click(acoesDe("Serviço de reparo"));
+    fireEvent.click(actionsFrom("Serviço de reparo"));
     expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Cancelar"]);
   });
 
   it("nao oferece nenhuma acao num item cancelado", () => {
-    renderLista({ items: [CANCELADO] });
+    renderList({ items: [CANCELADO] });
 
     // ponytail: um menu vazio e um beco sem saida: melhor nao ter gatilho.
     expect(screen.queryByRole("button", { name: "Ações de Monitor quebrado" })).toBeNull();
   });
 
   it("manda o id do item para a action escolhida, e so para ela", async () => {
-    renderLista({ items: [BICICLETA, CONSOLE] });
+    renderList({ items: [BICICLETA, CONSOLE] });
 
-    fireEvent.click(acoesDe("Bicicleta"));
+    fireEvent.click(actionsFrom("Bicicleta"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Publicar" }));
 
     expect(mocks.publicar).toHaveBeenCalledTimes(1);
@@ -468,9 +468,9 @@ describe("ItemsList — as acoes por status", () => {
   });
 
   it("manda o id do item para Cancelar, e nao para Publicar", async () => {
-    renderLista({ items: [CONSOLE] });
+    renderList({ items: [CONSOLE] });
 
-    fireEvent.click(acoesDe("Console retrô"));
+    fireEvent.click(actionsFrom("Console retrô"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Cancelar" }));
 
     expect(mocks.cancelar).toHaveBeenCalledTimes(1);
@@ -492,11 +492,11 @@ describe("ItemsList — a busca e do servidor, a tabela nao refiltra", () => {
   it("manda o termo para a URL e deixa a pagina do servidor como esta", async () => {
     vi.useFakeTimers();
     try {
-      const { navegar } = renderLista();
+      const { navigate } = renderList();
 
       await acao(() => fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Console" } }), 400);
 
-      expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, q: "Console" });
+      expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, q: "Console" });
       // ponytail: as tres linhas continuam. A tabela recebeu uma pagina de 3
       // linhas de um conjunto de 3; filtrar aqui daria "Console" e o rodape
       // continuaria anunciando 3 de 3 — a tela mentindo sobre o tamanho do
@@ -510,21 +510,21 @@ describe("ItemsList — a busca e do servidor, a tabela nao refiltra", () => {
   it("nao avisa a URL antes do debounce, e nao avisa ao abrir", async () => {
     vi.useFakeTimers();
     try {
-      const { navegar } = renderLista();
+      const { navigate } = renderList();
 
       await acao(() => fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Con" } }), 200);
-      expect(navegar).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
 
       await acao(() => {}, 200);
-      expect(navegar).toHaveBeenCalledTimes(1);
-      expect(ultimaVista(navegar).q).toBe("Con");
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(lastView(navigate).q).toBe("Con");
     } finally {
       vi.useRealTimers();
     }
   });
 
   it("abre a caixa ja com o termo que veio da URL", () => {
-    renderLista({ vista: { ...VISTA_PADRAO, q: "Console" } });
+    renderList({ view: { ...DEFAULT_TABLE_VIEW, q: "Console" } });
 
     expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Console");
   });
@@ -532,11 +532,11 @@ describe("ItemsList — a busca e do servidor, a tabela nao refiltra", () => {
   it("volta para a primeira pagina quando a busca muda", async () => {
     vi.useFakeTimers();
     try {
-      const { navegar } = renderLista({ vista: { ...VISTA_PADRAO, page: 3 } });
+      const { navigate } = renderList({ view: { ...DEFAULT_TABLE_VIEW, page: 3 } });
 
       await acao(() => fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "x" } }), 400);
 
-      expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, q: "x", page: 1 });
+      expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, q: "x", page: 1 });
     } finally {
       vi.useRealTimers();
     }
@@ -545,7 +545,7 @@ describe("ItemsList — a busca e do servidor, a tabela nao refiltra", () => {
 
 describe("ItemsList — as abas leem o status da URL", () => {
   it("marca a aba que esta na URL, e so ela", () => {
-    renderLista({ vista: { ...VISTA_PADRAO, status: "draft" } });
+    renderList({ view: { ...DEFAULT_TABLE_VIEW, status: "draft" } });
 
     const abas = screen.getAllByRole("link");
     const ativa = abas.filter((aba) => (aba.getAttribute("class") ?? "").includes("bg-primary"));
@@ -553,7 +553,7 @@ describe("ItemsList — as abas leem o status da URL", () => {
   });
 
   it("marca Todos quando a URL nao filtra por status", () => {
-    renderLista();
+    renderList();
 
     const ativa = screen
       .getAllByRole("link")
@@ -567,7 +567,7 @@ describe("ItemsList — as abas leem o status da URL", () => {
   // a pagina 4 que nao existe mais, e COM o tamanho de pagina que o usuario
   // escolheu (que e escolha independente do filtro).
   it("zera busca e pagina ao trocar de aba, e guarda o tamanho escolhido", () => {
-    renderLista({ vista: { ...VISTA_PADRAO, q: "Console", page: 4, pageSize: 20 } });
+    renderList({ view: { ...DEFAULT_TABLE_VIEW, q: "Console", page: 4, pageSize: 20 } });
 
     const emLeilao = screen.getByRole("link", { name: "Em leilão" });
     expect(emLeilao.getAttribute("href")).toBe("/dashboard/items?status=active&pageSize=20");
@@ -581,13 +581,13 @@ describe("ItemsList — a paginação é do servidor", () => {
   // ponytail: a janela e a da pagina 3 com 10 por pagina (o padrao do `DataTable`): o
   // que distingue "o servidor conta" de "a tabela conta" e o 100.
   it("conta o total do servidor no rodapé, e nao o tamanho da página", () => {
-    renderLista({ items: [BICICLETA, CONSOLE], vista: { ...VISTA_PADRAO, page: 3 }, totalCount: 100 });
+    renderList({ items: [BICICLETA, CONSOLE], view: { ...DEFAULT_TABLE_VIEW, page: 3 }, totalCount: 100 });
 
     expect(screen.getByText("Mostrando 21–30 de 100 itens")).toBeTruthy();
   });
 
   it("manda a proxima pagina para a URL, em numero de pagina e nao de indice", async () => {
-    const { navegar } = renderLista({ totalCount: 100 });
+    const { navigate } = renderList({ totalCount: 100 });
 
     await acao(() => fireEvent.click(screen.getByRole("button", { name: "Próxima" })));
 
@@ -595,7 +595,7 @@ describe("ItemsList — a paginação é do servidor", () => {
     // TanStack, e a URL fala em pagina (1, 2, 3) porque e o que a pessoa le. O
     // `+ 1` mora no `ItemsList`, e este e o teste que trava a borda: sem ele a
     // primeira pagina da URL seria 0 e o `page=0` voltaria como 1.
-    expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, page: 2 });
+    expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, page: 2 });
   });
 
   // ponytail: este e o teste do `queueMicrotask`. Trocar o tamanho na pagina 3 de
@@ -604,7 +604,7 @@ describe("ItemsList — a paginação é do servidor", () => {
   // agrupamento seriam dois `router.push`, e o segundo venceria a URL com a
   // prop `pageSize` antiga; com ele, uma navegacao so, com os dois campos certos.
   it("trocar o tamanho e a pagina de uma vez vira uma navegacao so", async () => {
-    const { navegar } = renderLista({ items: [BICICLETA, CONSOLE], vista: { ...VISTA_PADRAO, page: 3 }, totalCount: 100 });
+    const { navigate } = renderList({ items: [BICICLETA, CONSOLE], view: { ...DEFAULT_TABLE_VIEW, page: 3 }, totalCount: 100 });
 
     // ponytail: abrir o `Select` e um `act` a parte porque o popup so existe DEPOIS
     // do re-render do gatilho, e dentro do mesmo `act` a busca do `option` rodaria
@@ -623,17 +623,17 @@ describe("ItemsList — a paginação é do servidor", () => {
     // primeira linha continua na tela. E o que distingue esta implementacao de
     // um `Math.ceil` ingênuo, que mandaria o usuario para a ultima pagina e
     // perderia o lugar.
-    expect(ultimaVista(navegar)).toEqual({ ...VISTA_PADRAO, page: 1, pageSize: 50 });
+    expect(lastView(navigate)).toEqual({ ...DEFAULT_TABLE_VIEW, page: 1, pageSize: 50 });
   });
 
   it("usa o pageSize do pai como tamanho em uso", () => {
-    renderLista({ items: [BICICLETA, CONSOLE], vista: { ...VISTA_PADRAO, pageSize: 50 } });
+    renderList({ items: [BICICLETA, CONSOLE], view: { ...DEFAULT_TABLE_VIEW, pageSize: 50 } });
 
     expect(screen.getByRole("combobox", { name: "Linhas por página" }).textContent).toContain("50");
   });
 
   it("nao refaz a janela do servidor nem ao trocar de pagina", async () => {
-    renderLista({ totalCount: 100 });
+    renderList({ totalCount: 100 });
 
     await acao(() => fireEvent.click(screen.getByRole("button", { name: "Próxima" })));
 
@@ -652,15 +652,15 @@ describe("ItemsList — a paginação é do servidor", () => {
   // so RECONTA. Por isso o teste empurra a prop que o servidor devolveria e exige
   // que `navegar` continue com uma unica chamada.
   it("nao navega de novo quando a vista que o pai devolve e a que foi pedida", async () => {
-    const { navegar, responder } = renderLista({ totalCount: 100 });
+    const { navigate, responder } = renderList({ totalCount: 100 });
 
     await acao(() => fireEvent.click(screen.getByRole("button", { name: "Próxima" })));
-    const pedida = ultimaVista(navegar);
-    expect(pedida).toEqual({ ...VISTA_PADRAO, page: 2 });
+    const pedida = lastView(navigate);
+    expect(pedida).toEqual({ ...DEFAULT_TABLE_VIEW, page: 2 });
 
     await acao(() => responder(pedida));
 
-    expect(navegar).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledTimes(1);
   });
 
   // ponytail: o outro lado da mesma garantia, e o teste que impede a lista de
@@ -672,15 +672,15 @@ describe("ItemsList — a paginação é do servidor", () => {
   // na segunda pagina — o mesmo defeito de "a busca continua filtrando depois que eu
   // limpei o campo", ao contrario).
   it("preserva a busca e a aba que o pai devolveu no clique seguinte", async () => {
-    const { navegar, responder } = renderLista({ totalCount: 100 });
+    const { navigate, responder } = renderList({ totalCount: 100 });
 
     // o que o servidor devolve depois de um filtro novo
-    await acao(() => responder({ ...VISTA_PADRAO, q: "console", status: "active" }));
+    await acao(() => responder({ ...DEFAULT_TABLE_VIEW, q: "console", status: "active" }));
 
     await acao(() => fireEvent.click(screen.getByRole("button", { name: "Próxima" })));
 
-    expect(ultimaVista(navegar)).toEqual({
-      ...VISTA_PADRAO,
+    expect(lastView(navigate)).toEqual({
+      ...DEFAULT_TABLE_VIEW,
       q: "console",
       status: "active",
       page: 2,
@@ -691,19 +691,19 @@ describe("ItemsList — a paginação é do servidor", () => {
 // ponytail: aqui a assercao e sobre a STRING, e nao sobre a vista. E o unico teste
 // da cadeia inteira que fecha no roteador: ate aqui os outros provam "o clique
 // produz a vista certa" e "a pagina lê a URL", e este prova a emenda — a string
-// que sai daqui e a mesma que a `ItemsPage` vai ler de volta. Um `hrefDaVista` com
+// que sai daqui e a mesma que a `ItemsPage` vai ler de volta. Um `buildStorefrontHref` com
 // os parametros fora de ordem, ou com `page=1` escrito, quebraria a equivalencia
-// `le(hrefDaVista(v)) === v` sem nenhum teste de vista notar.
-describe("ItensDaUrl — o clique vira URL", () => {
+// `le(buildStorefrontHref(v)) === v` sem nenhum teste de vista notar.
+describe("ItemsUrl — o clique vira URL", () => {
   // ponytail: a string tem que ser `?orderBy=title` e nao `?orderBy=title&direction=asc`
   // — a direcao `asc` e omitida porque e a que o leitor assume quando `orderBy`
   // foi escrito, e a `page=1` some pelo mesmo motivo (a primeira e a padrao). A URL
   // curta e o que faz o link colado no chat continuar funcionando quando a tela
   // mudar; a equivalencia round-trip e o que garante que ela volta igual.
   it("manda a coluna escolhida como a URL mais curta que a descreve", async () => {
-    render(<ItensDaUrl items={DESORDENADOS} vista={VISTA_PADRAO} totalCount={100} />);
+    render(<ItemsUrl items={DESORDENADOS} view={DEFAULT_TABLE_VIEW} totalCount={100} />);
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Título")));
+    await acao(() => fireEvent.click(sortButton("Título")));
 
     expect(mocks.push).toHaveBeenCalledWith("/dashboard/items?orderBy=title");
   });
@@ -715,14 +715,14 @@ describe("ItensDaUrl — o clique vira URL", () => {
   // `minInitialBid asc` — dinheiro do MENOR para o maior, o contrario do clique.
   it("leva busca, aba e tamanho, e joga fora a pagina que a coluna nova invalida", async () => {
     render(
-      <ItensDaUrl
+      <ItemsUrl
         items={DESORDENADOS}
-        vista={{ ...VISTA_PADRAO, q: "console", status: "active", page: 4, pageSize: 50 }}
+        view={{ ...DEFAULT_TABLE_VIEW, q: "console", status: "active", page: 4, pageSize: 50 }}
         totalCount={100}
       />,
     );
 
-    await acao(() => fireEvent.click(botaoDeOrdenacao("Lance mínimo")));
+    await acao(() => fireEvent.click(sortButton("Lance mínimo")));
 
     expect(mocks.push).toHaveBeenCalledWith(
       "/dashboard/items?q=console&status=active&orderBy=minInitialBid&direction=desc&pageSize=50",
@@ -730,7 +730,7 @@ describe("ItensDaUrl — o clique vira URL", () => {
   });
 
   it("leva a pagina que o botao pediu, ja em numero de pagina", async () => {
-    render(<ItensDaUrl items={DESORDENADOS} vista={VISTA_PADRAO} totalCount={100} />);
+    render(<ItemsUrl items={DESORDENADOS} view={DEFAULT_TABLE_VIEW} totalCount={100} />);
 
     await acao(() => fireEvent.click(screen.getByRole("button", { name: "Próxima" })));
 

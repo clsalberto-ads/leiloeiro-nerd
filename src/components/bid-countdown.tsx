@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FUSO } from "@/lib/fuso";
+import { APP_TIMEZONE } from "@/lib/timezone";
 
 function format(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -22,7 +22,7 @@ function format(ms: number): string {
 // `@/lib/fuso` — este arquivo continua lendo a constante e nao muda.
 function formatAbsolute(d: Date): string {
   return d.toLocaleString("pt-BR", {
-    timeZone: FUSO,
+    timeZone: APP_TIMEZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   // o `redirect` lanca de proposito (e o que o Next faz); o destino nao e
   // assertado aqui porque o que importa nestas actions e o guarda ANTES dele
-  redirect: vi.fn((destino: string): never => {
-    throw new Error(`NEXT_REDIRECT:${destino}`);
+  redirect: vi.fn((target: string): never => {
+    throw new Error(`NEXT_REDIRECT:${target}`);
   }),
   updateItem: vi.fn(),
   publishItem: vi.fn(),
@@ -67,7 +67,7 @@ describe("actions de item — guarda de id", () => {
     ["publish", publishItemAction, mocks.publishItem],
     ["cancel", cancelItemAction, mocks.cancelItem],
     ["delete", deleteItemAction, mocks.deleteItem],
-  ])("%s recusa id fora do formato uuid sem tocar no use case", async (_nome, action, useCase) => {
+  ])("%s recusa id fora do formato uuid sem tocar no use case", async (_name, action, useCase) => {
     for (const ruim of ["x", "1; DROP TABLE items", "../../etc/passwd", "0b61e95c-2be1-4d38-8f74", ""]) {
       const r = await action(null, form(ruim));
       expect(r).toEqual({ error: "Item inválido" });
@@ -83,7 +83,7 @@ describe("actions de item — guarda de id", () => {
     expect(mocks.updateItem).not.toHaveBeenCalled();
   });
 
-  // ponytail: `mensagemDeErro` distingue o erro de NOSSO codigo (que o usuario
+  // ponytail: `toActionError` distingue o erro de NOSSO codigo (que o usuario
   // pode corrigir: "Item com lances nao pode ser excluido") do erro de DRIVER
   // (que traz o SQL do `pg`: `Failed query: delete from "items" ... params: i1`,
   // `permission denied for schema user`, `ECONNREFUSED host:port`). O `code` que

@@ -4,7 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { placeBidAction } from "@/presentation/actions/bid-actions";
-import { formatReais } from "@/lib/format-reais";
+import { formatBRL } from "@/lib/format-brl";
 import { bidFormSchema } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/field";
@@ -33,7 +33,7 @@ type BidFormValues = z.input<ReturnType<typeof bidFormSchema>>;
 
 export function BidForm({ itemId, minBid, onBid }: BidFormProps) {
   const [state, formAction, pending] = useActionState(placeBidAction, null);
-  const minReais = formatReais(minBid);
+  const minReais = formatBRL(minBid);
   const form = useForm<BidFormValues>({
     // ponytail: sem `useMemo` no schema/resolver, como nos outros forms
     // (item-form.tsx:49 e os de auth) — o memo anterior envolvia o schema mas

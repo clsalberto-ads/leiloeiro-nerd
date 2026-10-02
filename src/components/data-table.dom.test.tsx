@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@/test/dom-render";
 import { DataTable, type DataTableColumn, type DataTableProps } from "./data-table";
 
-interface Linha {
+interface Row {
   id: string;
   titulo: string;
 }
@@ -12,7 +12,7 @@ interface Linha {
 // ponytail: a coluna "acoes" nao tem `accessorFn` de proposito — e assim que uma
 // coluna de acoes (botoes/links, sem valor de acesso) fica fora da ordenacao sem
 // precisar de `sortable: false`. O header "Titulo" com `accessorFn` e o que ordena.
-const COLUNAS: DataTableColumn<Linha>[] = [
+const COLUNAS: DataTableColumn<Row>[] = [
   { id: "titulo", header: "Título", accessorFn: (l) => l.titulo, cell: (l) => l.titulo },
   { id: "acoes", header: "Ações", cell: () => <button type="button">Editar</button> },
 ];
@@ -20,13 +20,13 @@ const COLUNAS: DataTableColumn<Linha>[] = [
 // ponytail: desordenadas de proposito: B, C, A. Ascendente comeca em "A" e
 // descendente em "C", entao cada estado da ordenacao e distinguivel dos outros
 // dois.
-const LINHAS: Linha[] = [
+const ROWS: Row[] = [
   { id: "1", titulo: "B" },
   { id: "2", titulo: "C" },
   { id: "3", titulo: "A" },
 ];
 
-const DOZE: Linha[] = Array.from({ length: 12 }, (_, i) => ({
+const DOZE: Row[] = Array.from({ length: 12 }, (_, i) => ({
   id: String(i + 1),
   titulo: `Item ${String(i + 1).padStart(2, "0")}`,
 }));
@@ -35,7 +35,7 @@ const DOZE: Linha[] = Array.from({ length: 12 }, (_, i) => ({
 // pagina (a 3 pagina de 5 vira 2 de 10 nas duas leituras) e o teste nao
 // distinguiria as duas. O zero a esquerda ("Item 001") mantem a ordem
 // lexicografica igual a numerica: sem ele "Item 10" ordenaria antes de "Item 2".
-const CEM: Linha[] = Array.from({ length: 100 }, (_, i) => ({
+const CEM: Row[] = Array.from({ length: 100 }, (_, i) => ({
   id: String(i + 1),
   titulo: `Item ${String(i + 1).padStart(3, "0")}`,
 }));
@@ -43,26 +43,26 @@ const CEM: Linha[] = Array.from({ length: 100 }, (_, i) => ({
 // ponytail: acento em "Ação"/"ção" e o que separa a busca que funciona da que nao
 // funciona para quem escreve "acao" num teclado sem cedilha. A coluna de acoes
 // segue sem `accessorFn`, entao ela fica fora da busca global.
-const COM_ACENTO: Linha[] = [
+const WITH_ACCENT: Row[] = [
   { id: "1", titulo: "Ação de megaponte" },
   { id: "2", titulo: "Bicicleta" },
 ];
 
-function cabecalho(nome: string): HTMLElement {
-  return screen.getByRole("columnheader", { name: nome });
+function cabecalho(name: string): HTMLElement {
+  return screen.getByRole("columnheader", { name: name });
 }
 
 // ponytail: `getAllByRole("row")` sem escopo devolveria tambem a linha de header
 // (o `thead` tambem e `role="row"`), entao o primeiro elemento seria o titulo das
 // colunas e nunca um titulo de item. O escopo no `tbody` tira o header fora.
-function linhasDoCorpo(): HTMLElement[] {
+function bodyRows(): HTMLElement[] {
   const corpo = document.querySelector("tbody");
   expect(corpo, "tabela renderizada sem tbody").not.toBeNull();
   return within(corpo as HTMLElement).getAllByRole("row");
 }
 
 function titulos(): string[] {
-  return linhasDoCorpo().map((linha) => within(linha).getAllByRole("cell")[0]?.textContent ?? "");
+  return bodyRows().map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
 }
 
 // ponytail: a linha de estado vazio tambem e uma `role="row"` do `tbody`, entao ela
@@ -70,23 +70,23 @@ function titulos(): string[] {
 // atravessa as duas colunas (`colspan="2"`) — e `null` enquanto houver linhas.
 // O `colspan` tambem e asserido de graca: com `colSpan` errado a tabela fica com
 // buraco no layout.
-function mensagemDeVazio(): string | null {
+function emptyMessage(): string | null {
   return document.querySelector('tbody [colspan="2"]')?.textContent ?? null;
 }
 
-function botao(nome: string): HTMLElement {
-  return screen.getByRole("button", { name: nome });
+function button(name: string): HTMLElement {
+  return screen.getByRole("button", { name: name });
 }
 
 // ponytail: a propriedade `disabled` do botao nativo e o que realmente segura o
 // `onClick`; um `aria-disabled` sozinho deixaria o handler de pe. E por isso que
 // este helper le `disabled` e nao o atributo ARIA — nao existe `aria-disabled`
 // neste componente, e um atributo sem efeito seria uma assercao que nunca acusa.
-function estaDesabilitado(botaoEl: HTMLElement): boolean {
-  return (botaoEl as HTMLButtonElement).disabled === true;
+function isDisabled(buttonEl: HTMLElement): boolean {
+  return (buttonEl as HTMLButtonElement).disabled === true;
 }
 
-async function avancarRelogio(ms: number): Promise<void> {
+async function advanceClock(ms: number): Promise<void> {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
   });
@@ -95,7 +95,7 @@ async function avancarRelogio(ms: number): Promise<void> {
 describe("DataTable — ordenação pelo header", () => {
   it("alterna ascendente/descendente/sem ordenação e reflete em aria-sort", () => {
     const onSortChange = vi.fn();
-    render(<DataTable columns={COLUNAS} data={LINHAS} onSortChange={onSortChange} />);
+    render(<DataTable columns={COLUNAS} data={ROWS} onSortChange={onSortChange} />);
 
     expect(cabecalho("Título").getAttribute("aria-sort")).toBe("none");
     expect(titulos()).toEqual(["B", "C", "A"]);
@@ -119,12 +119,12 @@ describe("DataTable — ordenação pelo header", () => {
 
   it("nao notifica ordenacao antes de o usuario clicar", () => {
     const onSortChange = vi.fn();
-    render(<DataTable columns={COLUNAS} data={LINHAS} onSortChange={onSortChange} />);
+    render(<DataTable columns={COLUNAS} data={ROWS} onSortChange={onSortChange} />);
     expect(onSortChange).not.toHaveBeenCalled();
   });
 
   it("a coluna de acoes nao tem botao de ordenacao nem aria-sort", () => {
-    render(<DataTable columns={COLUNAS} data={LINHAS} />);
+    render(<DataTable columns={COLUNAS} data={ROWS} />);
 
     const acoes = cabecalho("Ações");
     expect(acoes.getAttribute("aria-sort")).toBeNull();
@@ -139,8 +139,8 @@ describe("DataTable — ordenação pelo header", () => {
   it.each([
     ["sortable", { sortable: false } as const],
     ["enableSorting", { enableSorting: false } as const],
-  ])("desliga a ordenacao com %s: false mesmo com accessorFn", (_nome, flag) => {
-    render(<DataTable columns={[{ ...COLUNAS[0], ...flag }, COLUNAS[1]]} data={LINHAS} />);
+  ])("desliga a ordenacao com %s: false mesmo com accessorFn", (_name, flag) => {
+    render(<DataTable columns={[{ ...COLUNAS[0], ...flag }, COLUNAS[1]]} data={ROWS} />);
 
     const titulo = cabecalho("Título");
     expect(titulo.getAttribute("aria-sort")).toBeNull();
@@ -158,26 +158,26 @@ describe("DataTable — busca com debounce", () => {
     vi.useFakeTimers();
     try {
       const onFilterChange = vi.fn();
-      render(<DataTable columns={COLUNAS} data={LINHAS} onFilterChange={onFilterChange} />);
-      const busca = screen.getByLabelText("Buscar");
+      render(<DataTable columns={COLUNAS} data={ROWS} onFilterChange={onFilterChange} />);
+      const search = screen.getByLabelText("Buscar");
 
-      fireEvent.change(busca, { target: { value: "A" } });
+      fireEvent.change(search, { target: { value: "A" } });
       expect(onFilterChange).not.toHaveBeenCalled();
       expect(titulos()).toEqual(["B", "C", "A"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
 
       act(() => {
         vi.advanceTimersByTime(299);
       });
       expect(onFilterChange).not.toHaveBeenCalled();
       expect(titulos()).toEqual(["B", "C", "A"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
 
-      await avancarRelogio(1);
+      await advanceClock(1);
       expect(onFilterChange).toHaveBeenCalledTimes(1);
       expect(onFilterChange).toHaveBeenCalledWith("A");
       expect(titulos()).toEqual(["A"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -188,21 +188,21 @@ describe("DataTable — busca com debounce", () => {
     try {
       const onFilterChange = vi.fn();
       render(
-        <DataTable columns={COLUNAS} data={LINHAS} onFilterChange={onFilterChange} emptyMessage="Nada encontrado" />,
+        <DataTable columns={COLUNAS} data={ROWS} onFilterChange={onFilterChange} emptyMessage="Nada encontrado" />,
       );
-      const busca = screen.getByLabelText("Buscar");
+      const search = screen.getByLabelText("Buscar");
 
-      fireEvent.change(busca, { target: { value: "A" } });
+      fireEvent.change(search, { target: { value: "A" } });
       act(() => {
         vi.advanceTimersByTime(200);
       });
-      fireEvent.change(busca, { target: { value: "AB" } });
+      fireEvent.change(search, { target: { value: "AB" } });
 
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenCalledTimes(1);
       expect(onFilterChange).toHaveBeenCalledWith("AB");
-      expect(linhasDoCorpo()).toHaveLength(1);
-      expect(mensagemDeVazio()).toBe("Nada encontrado");
+      expect(bodyRows()).toHaveLength(1);
+      expect(emptyMessage()).toBe("Nada encontrado");
     } finally {
       vi.useRealTimers();
     }
@@ -212,9 +212,9 @@ describe("DataTable — busca com debounce", () => {
     vi.useFakeTimers();
     try {
       const onFilterChange = vi.fn();
-      render(<DataTable columns={COLUNAS} data={LINHAS} onFilterChange={onFilterChange} />);
+      render(<DataTable columns={COLUNAS} data={ROWS} onFilterChange={onFilterChange} />);
 
-      await avancarRelogio(1000);
+      await advanceClock(1000);
       expect(onFilterChange).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -227,12 +227,12 @@ describe("DataTable — busca com debounce", () => {
       render(<DataTable columns={COLUNAS} data={DOZE} pageSize={5} emptyMessage="Nada encontrado" />);
 
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item 03" } });
-      await avancarRelogio(300);
+      await advanceClock(300);
 
       expect(titulos()).toEqual(["Item 03"]);
       expect(screen.getByText("Mostrando 1–1 de 1 item")).toBeTruthy();
-      expect(estaDesabilitado(botao("Anterior"))).toBe(true);
-      expect(estaDesabilitado(botao("Próxima"))).toBe(true);
+      expect(isDisabled(button("Anterior"))).toBe(true);
+      expect(isDisabled(button("Próxima"))).toBe(true);
     } finally {
       vi.useRealTimers();
     }
@@ -247,13 +247,13 @@ describe("DataTable — busca sem acento", () => {
   it("acha 'Ação' quando o usuario digita 'acao' sem acento", async () => {
     vi.useFakeTimers();
     try {
-      render(<DataTable columns={COLUNAS} data={COM_ACENTO} />);
+      render(<DataTable columns={COLUNAS} data={WITH_ACCENT} />);
 
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "acao" } });
-      await avancarRelogio(300);
+      await advanceClock(300);
 
       expect(titulos()).toEqual(["Ação de megaponte"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -264,13 +264,13 @@ describe("DataTable — busca sem acento", () => {
   it("acha 'Ação' quando o usuario digita 'Ação' com acento", async () => {
     vi.useFakeTimers();
     try {
-      render(<DataTable columns={COLUNAS} data={COM_ACENTO} />);
+      render(<DataTable columns={COLUNAS} data={WITH_ACCENT} />);
 
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Ação" } });
-      await avancarRelogio(300);
+      await advanceClock(300);
 
       expect(titulos()).toEqual(["Ação de megaponte"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -290,31 +290,31 @@ describe("DataTable — o debounce sobrevive ao pai", () => {
       const onFilterChange = vi.fn();
       // `comPaiNovo()` cria uma arrow nova a cada chamada — e o que um pai que
       // escreve `onFilterChange={(q) => ...}` no JSX produz a cada render.
-      const comPaiNovo = () => (
-        <DataTable columns={COLUNAS} data={LINHAS} onFilterChange={(q) => onFilterChange(q)} />
+      const withNewParent = () => (
+        <DataTable columns={COLUNAS} data={ROWS} onFilterChange={(q) => onFilterChange(q)} />
       );
-      const { rerender } = render(comPaiNovo());
-      const busca = screen.getByLabelText("Buscar");
+      const { rerender } = render(withNewParent());
+      const search = screen.getByLabelText("Buscar");
 
-      fireEvent.change(busca, { target: { value: "a" } });
+      fireEvent.change(search, { target: { value: "a" } });
       act(() => {
         vi.advanceTimersByTime(100);
       });
-      rerender(comPaiNovo());
+      rerender(withNewParent());
       act(() => {
         vi.advanceTimersByTime(100);
       });
-      rerender(comPaiNovo());
+      rerender(withNewParent());
       act(() => {
         vi.advanceTimersByTime(50);
       });
-      rerender(comPaiNovo());
+      rerender(withNewParent());
 
-      await avancarRelogio(50);
+      await advanceClock(50);
       expect(onFilterChange).toHaveBeenCalledTimes(1);
       expect(onFilterChange).toHaveBeenCalledWith("a");
 
-      await avancarRelogio(1000);
+      await advanceClock(1000);
       expect(onFilterChange).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -330,7 +330,7 @@ describe("DataTable — o debounce sobrevive ao pai", () => {
     try {
       const antes = vi.fn();
       const depois = vi.fn();
-      const props = { columns: COLUNAS, data: LINHAS };
+      const props = { columns: COLUNAS, data: ROWS };
       const { rerender } = render(<DataTable {...props} onFilterChange={antes} />);
 
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item" } });
@@ -339,7 +339,7 @@ describe("DataTable — o debounce sobrevive ao pai", () => {
       });
       rerender(<DataTable {...props} onFilterChange={depois} />);
 
-      await avancarRelogio(100);
+      await advanceClock(100);
       expect(antes).not.toHaveBeenCalled();
       expect(depois).toHaveBeenCalledTimes(1);
       expect(depois).toHaveBeenCalledWith("Item");
@@ -356,29 +356,29 @@ describe("DataTable — paginação client-side", () => {
 
     expect(titulos()).toEqual(["Item 01", "Item 02", "Item 03", "Item 04", "Item 05"]);
     expect(screen.getByText("Mostrando 1–5 de 12 itens")).toBeTruthy();
-    expect(estaDesabilitado(botao("Anterior"))).toBe(true);
-    expect(estaDesabilitado(botao("Próxima"))).toBe(false);
+    expect(isDisabled(button("Anterior"))).toBe(true);
+    expect(isDisabled(button("Próxima"))).toBe(false);
 
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(titulos()).toEqual(["Item 06", "Item 07", "Item 08", "Item 09", "Item 10"]);
     expect(screen.getByText("Mostrando 6–10 de 12 itens")).toBeTruthy();
     expect(onPageChange).toHaveBeenLastCalledWith(1);
-    expect(estaDesabilitado(botao("Anterior"))).toBe(false);
+    expect(isDisabled(button("Anterior"))).toBe(false);
 
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(titulos()).toEqual(["Item 11", "Item 12"]);
     expect(screen.getByText("Mostrando 11–12 de 12 itens")).toBeTruthy();
     expect(onPageChange).toHaveBeenLastCalledWith(2);
-    expect(estaDesabilitado(botao("Próxima"))).toBe(true);
+    expect(isDisabled(button("Próxima"))).toBe(true);
 
     // ponytail: o clique e disparado MESMO com o botao `disabled`. Num botao
     // nativo o `disabled` e o que segura o handler, entao se a trava sumir do
     // atributo o handler dispara e esta assercao acusa.
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(titulos()).toEqual(["Item 11", "Item 12"]);
     expect(onPageChange).toHaveBeenCalledTimes(2);
 
-    fireEvent.click(botao("Anterior"));
+    fireEvent.click(button("Anterior"));
     expect(titulos()).toEqual(["Item 06", "Item 07", "Item 08", "Item 09", "Item 10"]);
     expect(onPageChange).toHaveBeenLastCalledWith(1);
     expect(onPageChange).toHaveBeenCalledTimes(3);
@@ -392,7 +392,7 @@ describe("DataTable — paginação client-side", () => {
   it("oferece no Select o tamanho em uso mesmo fora da lista padrao", () => {
     render(<DataTable columns={COLUNAS} data={DOZE} pageSize={3} />);
 
-    expect(linhasDoCorpo()).toHaveLength(3);
+    expect(bodyRows()).toHaveLength(3);
     fireEvent.click(screen.getByRole("combobox", { name: "Linhas por página" }));
     expect(screen.getAllByRole("option").map((opcao) => opcao.textContent)).toEqual([
       "3",
@@ -419,8 +419,8 @@ describe("DataTable — paginação client-side", () => {
       />,
     );
 
-    fireEvent.click(botao("Próxima"));
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(titulos()).toEqual(["Item 11", "Item 12"]);
 
     fireEvent.click(screen.getByRole("combobox", { name: "Linhas por página" }));
@@ -446,13 +446,13 @@ describe("DataTable — paginação client-side", () => {
     const props = { columns: COLUNAS, data: DOZE };
     const { rerender } = render(<DataTable {...props} pageSize={5} />);
 
-    fireEvent.click(botao("Próxima"));
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(titulos()).toEqual(["Item 11", "Item 12"]);
 
     rerender(<DataTable {...props} pageSize={10} />);
 
-    expect(mensagemDeVazio()).toBeNull();
+    expect(emptyMessage()).toBeNull();
     expect(titulos()).toEqual(["Item 11", "Item 12"]);
     expect(screen.getByText("Mostrando 11–12 de 12 itens")).toBeTruthy();
   });
@@ -466,7 +466,7 @@ describe("DataTable — paginação client-side", () => {
     const props = { columns: COLUNAS, data: CEM };
     const { rerender } = render(<DataTable {...props} pageSize={5} />);
 
-    for (let pagina = 0; pagina < 9; pagina += 1) fireEvent.click(botao("Próxima"));
+    for (let page = 0; page < 9; page += 1) fireEvent.click(button("Próxima"));
     expect(titulos()[0]).toBe("Item 046");
 
     rerender(<DataTable {...props} pageSize={10} />);
@@ -477,7 +477,7 @@ describe("DataTable — paginação client-side", () => {
 });
 
 describe("DataTable — paginação controlada (manualPagination)", () => {
-  const PAGINA_DO_SERVIDOR: Linha[] = [
+  const SERVER_PAGE: Row[] = [
     { id: "31", titulo: "Item 31" },
     { id: "32", titulo: "Item 32" },
   ];
@@ -486,7 +486,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
   // numa ordem, e o que o componente nao pode fazer e reordena-la sozinho: no
   // modo servidor quem ordena e o servidor, e reordenar aqui mostraria um
   // fragmento ordenado que nao corresponde a nenhum conjunto de dados.
-  const PAGINA_DESORDENADA: Linha[] = [
+  const UNSORTED_PAGE: Row[] = [
     { id: "1", titulo: "C" },
     { id: "2", titulo: "A" },
   ];
@@ -496,7 +496,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={PAGINA_DO_SERVIDOR}
+        data={SERVER_PAGE}
         manualPagination
         pageIndex={1}
         pageSize={2}
@@ -509,8 +509,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
 
     expect(titulos()).toEqual(["Item 31", "Item 32"]);
     expect(screen.getByText("Mostrando 3–4 de 10 itens")).toBeTruthy();
-    expect(estaDesabilitado(botao("Anterior"))).toBe(false);
-    expect(estaDesabilitado(botao("Próxima"))).toBe(false);
+    expect(isDisabled(button("Anterior"))).toBe(false);
+    expect(isDisabled(button("Próxima"))).toBe(false);
   });
 
   it("so notifica a troca de pagina: quem decide a pagina renderizada e o pai", () => {
@@ -518,7 +518,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={PAGINA_DO_SERVIDOR}
+        data={SERVER_PAGE}
         manualPagination
         pageIndex={1}
         pageSize={2}
@@ -529,11 +529,11 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       />,
     );
 
-    fireEvent.click(botao("Próxima"));
+    fireEvent.click(button("Próxima"));
     expect(onPageChange).toHaveBeenLastCalledWith(2);
     expect(titulos()).toEqual(["Item 31", "Item 32"]);
 
-    fireEvent.click(botao("Anterior"));
+    fireEvent.click(button("Anterior"));
     expect(onPageChange).toHaveBeenLastCalledWith(0);
     expect(onPageChange).toHaveBeenCalledTimes(2);
     expect(titulos()).toEqual(["Item 31", "Item 32"]);
@@ -544,7 +544,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={PAGINA_DO_SERVIDOR}
+        data={SERVER_PAGE}
         manualPagination
         pageIndex={0}
         pageSize={2}
@@ -555,8 +555,8 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       />,
     );
 
-    expect(estaDesabilitado(botao("Anterior"))).toBe(true);
-    expect(estaDesabilitado(botao("Próxima"))).toBe(false);
+    expect(isDisabled(button("Anterior"))).toBe(true);
+    expect(isDisabled(button("Próxima"))).toBe(false);
     expect(screen.getByText("Mostrando 1–2 de 10 itens")).toBeTruthy();
   });
 
@@ -566,7 +566,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={PAGINA_DO_SERVIDOR}
+        data={SERVER_PAGE}
         manualPagination
         pageIndex={2}
         pageSize={2}
@@ -591,7 +591,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       render(
         <DataTable
           columns={COLUNAS}
-          data={PAGINA_DO_SERVIDOR}
+          data={SERVER_PAGE}
           manualPagination
           pageIndex={2}
           pageSize={2}
@@ -606,7 +606,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item" } });
       expect(onPageChange).not.toHaveBeenCalled();
 
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenCalledWith("Item");
       expect(onPageChange).toHaveBeenLastCalledWith(0);
     } finally {
@@ -627,7 +627,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       render(
         <DataTable
           columns={COLUNAS}
-          data={PAGINA_DO_SERVIDOR}
+          data={SERVER_PAGE}
           manualPagination
           pageIndex={0}
           pageSize={2}
@@ -639,11 +639,11 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
       );
 
       fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Item 01" } });
-      await avancarRelogio(300);
+      await advanceClock(300);
 
       expect(onFilterChange).toHaveBeenCalledWith("Item 01");
       expect(titulos()).toEqual(["Item 31", "Item 32"]);
-      expect(mensagemDeVazio()).toBeNull();
+      expect(emptyMessage()).toBeNull();
       expect(screen.getByText("Mostrando 1–2 de 10 itens")).toBeTruthy();
     } finally {
       vi.useRealTimers();
@@ -655,7 +655,7 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={PAGINA_DESORDENADA}
+        data={UNSORTED_PAGE}
         manualPagination
         pageSize={2}
         totalCount={2}
@@ -683,19 +683,19 @@ describe("DataTable — paginação controlada (manualPagination)", () => {
 // ao mesmo tempo o valor que ordena e o que a busca casa — e o par
 // "1.234,56" / "1.000,00" / "50,00" e o dado que quebra o cancelamento de erros:
 // como texto, "1.000,00" < "1.234,56" < "50,00" e a lista comeca em "Mil".
-interface LinhaComValor extends Linha {
-  valor: number;
+interface MoneyRow extends Row {
+  value: number;
 }
 
-const COLUNAS_COM_VALOR: DataTableColumn<LinhaComValor>[] = [
+const VALUE_COLUMNS: DataTableColumn<MoneyRow>[] = [
   { id: "titulo", header: "Título", accessorFn: (l) => l.titulo, cell: (l) => l.titulo },
-  { id: "valor", header: "Valor", accessorFn: (l) => l.valor, cell: (l) => `R$ ${l.valor}` },
+  { id: "valor", header: "Valor", accessorFn: (l) => l.value, cell: (l) => `R$ ${l.value}` },
 ];
 
-const DINHEIRO: LinhaComValor[] = [
-  { id: "1", titulo: "Mil", valor: 100000 },
-  { id: "2", titulo: "Duzentos", valor: 123456 },
-  { id: "3", titulo: "Cinquenta", valor: 5000 },
+const DINHEIRO: MoneyRow[] = [
+  { id: "1", titulo: "Mil", value: 100000 },
+  { id: "2", titulo: "Duzentos", value: 123456 },
+  { id: "3", titulo: "Cinquenta", value: 5000 },
 ];
 
 describe("DataTable — ordenação e busca controladas pelo pai", () => {
@@ -707,7 +707,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={LINHAS}
+        data={ROWS}
         manualPagination
         totalCount={10}
         sort={{ id: "titulo", desc: true }}
@@ -721,7 +721,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
   it("troca a seta quando o pai devolve outra ordenacao", () => {
     const props = {
       columns: COLUNAS,
-      data: LINHAS,
+      data: ROWS,
       manualPagination: true,
       totalCount: 10,
       filter: "",
@@ -745,7 +745,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
   it("preserva o clique pendente enquanto o pai nao devolve outra ordenacao", () => {
     const props = {
       columns: COLUNAS,
-      data: LINHAS,
+      data: ROWS,
       manualPagination: true,
       totalCount: 10,
       filter: "",
@@ -771,7 +771,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
   it("preserva o clique pendente quando o pai devolve a mesma ordenacao em outro objeto", () => {
     const props = {
       columns: COLUNAS,
-      data: LINHAS,
+      data: ROWS,
       manualPagination: true,
       totalCount: 10,
       filter: "",
@@ -796,7 +796,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
     render(
       <DataTable
         columns={COLUNAS}
-        data={LINHAS}
+        data={ROWS}
         manualPagination
         totalCount={10}
         sort={null}
@@ -808,7 +808,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
   });
 
   it("acompanha o termo novo que chega do pai", () => {
-    const props = { columns: COLUNAS, data: LINHAS, manualPagination: true, totalCount: 10, sort: null } as const;
+    const props = { columns: COLUNAS, data: ROWS, manualPagination: true, totalCount: 10, sort: null } as const;
     const { rerender } = render(<DataTable {...props} filter="Item 02" />);
     expect((screen.getByLabelText("Buscar") as HTMLInputElement).value).toBe("Item 02");
 
@@ -828,26 +828,26 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
       const onFilterChange = vi.fn();
       const props = {
         columns: COLUNAS,
-        data: LINHAS,
+        data: ROWS,
         manualPagination: true,
         totalCount: 10,
         sort: null,
         onFilterChange,
       } as const;
       const { rerender } = render(<DataTable {...props} filter="" />);
-      const busca = screen.getByLabelText("Buscar");
+      const search = screen.getByLabelText("Buscar");
 
-      fireEvent.change(busca, { target: { value: "con" } });
-      await avancarRelogio(300);
+      fireEvent.change(search, { target: { value: "con" } });
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenLastCalledWith("con");
 
       // o usuario continua digitando e so AGORA o servidor responde o "con"
-      fireEvent.change(busca, { target: { value: "cons" } });
+      fireEvent.change(search, { target: { value: "cons" } });
       rerender(<DataTable {...props} filter="con" />);
 
-      expect((busca as HTMLInputElement).value).toBe("cons");
+      expect((search as HTMLInputElement).value).toBe("cons");
 
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenLastCalledWith("cons");
     } finally {
       vi.useRealTimers();
@@ -865,26 +865,26 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
       const onFilterChange = vi.fn();
       const props = {
         columns: COLUNAS,
-        data: LINHAS,
+        data: ROWS,
         manualPagination: true,
         totalCount: 10,
         sort: null,
         onFilterChange,
       } as const;
       const { rerender } = render(<DataTable {...props} filter="" />);
-      const busca = screen.getByLabelText("Buscar");
+      const search = screen.getByLabelText("Buscar");
 
-      fireEvent.change(busca, { target: { value: "con" } });
-      await avancarRelogio(300);
+      fireEvent.change(search, { target: { value: "con" } });
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenLastCalledWith("con");
       rerender(<DataTable {...props} filter="con" />);
 
       // o "voltar": um termo que a tabela nunca notificou
       rerender(<DataTable {...props} filter="Item 02" />);
-      expect((busca as HTMLInputElement).value).toBe("Item 02");
+      expect((search as HTMLInputElement).value).toBe("Item 02");
 
       // e o "voltar" nao pode virar eco de volta para a URL
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).toHaveBeenLastCalledWith("con");
     } finally {
       vi.useRealTimers();
@@ -901,18 +901,18 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
       const onFilterChange = vi.fn();
       const props = {
         columns: COLUNAS,
-        data: LINHAS,
+        data: ROWS,
         manualPagination: true,
         totalCount: 10,
         sort: null,
         onFilterChange,
       } as const;
       const { rerender } = render(<DataTable {...props} filter="Item 02" />);
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).not.toHaveBeenCalled();
 
       rerender(<DataTable {...props} filter="Item 03" />);
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -926,7 +926,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
       render(
         <DataTable
           columns={COLUNAS}
-          data={LINHAS}
+          data={ROWS}
           manualPagination
           totalCount={10}
           sort={null}
@@ -935,7 +935,7 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
         />,
       );
 
-      await avancarRelogio(300);
+      await advanceClock(300);
       expect(onFilterChange).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -950,15 +950,15 @@ describe("DataTable — ordenação e busca controladas pelo pai", () => {
   // como errada. E o primeiro clique desce (`getAutoSortDir` do TanStack desce
   // para numero e sobe para texto), entao as duas direcoes aparecem.
   it("ordena a coluna de dinheiro por numero, e nao pelo texto formatado", () => {
-    render(<DataTable columns={COLUNAS_COM_VALOR} data={DINHEIRO} />);
-    const colunaValor = () =>
-      linhasDoCorpo().map((linha) => within(linha).getAllByRole("cell")[0]?.textContent ?? "");
+    render(<DataTable columns={VALUE_COLUMNS} data={DINHEIRO} />);
+    const valueColumn = () =>
+      bodyRows().map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
 
     fireEvent.click(within(cabecalho("Valor")).getByRole("button", { name: "Valor" }));
-    expect(colunaValor()).toEqual(["Duzentos", "Mil", "Cinquenta"]);
+    expect(valueColumn()).toEqual(["Duzentos", "Mil", "Cinquenta"]);
 
     fireEvent.click(within(cabecalho("Valor")).getByRole("button", { name: "Valor" }));
-    expect(colunaValor()).toEqual(["Cinquenta", "Mil", "Duzentos"]);
+    expect(valueColumn()).toEqual(["Cinquenta", "Mil", "Duzentos"]);
   });
 });
 
@@ -970,15 +970,15 @@ describe("DataTable — o contrato de props", () => {
   // o compilador deixa de reclamar, o comentario vira "unused" e o `tsc` falha.
   it("proibe manualPagination sem totalCount", () => {
     // @ts-expect-error `manualPagination` sem `totalCount` renderiza uma tabela morta
-    const propsMortas: DataTableProps<Linha> = {
+    const deadProps: DataTableProps<Row> = {
       columns: COLUNAS,
-      data: LINHAS,
+      data: ROWS,
       manualPagination: true,
       sort: null,
       filter: "",
     };
 
-    expect(propsMortas.manualPagination).toBe(true);
+    expect(deadProps.manualPagination).toBe(true);
   });
 
   // ponytail: `sort` e `filter` no ramo servidor nao sao exigencia estetica. Sem
@@ -989,13 +989,13 @@ describe("DataTable — o contrato de props", () => {
   // compilacao.
   it("proibe manualPagination sem sort e sem filter", () => {
     // @ts-expect-error no modo servidor, `sort` e `filter` fazem parte do contrato
-    const propsSemOrdenacao: DataTableProps<Linha> = {
+    const propsWithoutSort: DataTableProps<Row> = {
       columns: COLUNAS,
-      data: LINHAS,
+      data: ROWS,
       manualPagination: true,
       totalCount: 10,
     };
 
-    expect(propsSemOrdenacao.manualPagination).toBe(true);
+    expect(propsWithoutSort.manualPagination).toBe(true);
   });
 });

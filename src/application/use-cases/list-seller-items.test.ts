@@ -17,8 +17,8 @@ const MARCA_COMBINANTE = /\p{Diacritic}/gu;
 // uma tabela fechada de 25 caracteres. Se um dia os dois divergirem, o teste de
 // SQL (`strpos(lower(translate(...)))` dos dois lados) e o teste do termo com
 // acento sao os dois alarme.
-function semAcento(texto: string): string {
-  return texto.normalize("NFD").replace(MARCA_COMBINANTE, "").toLowerCase();
+function stripAccents(text: string): string {
+  return text.normalize("NFD").replace(MARCA_COMBINANTE, "").toLowerCase();
 }
 
 function makeItem(overrides: Partial<Item> = {}): Item {
@@ -40,7 +40,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
   };
 }
 
-const LINHAS: Item[] = [
+const ROWS: Item[] = [
   makeItem({
     id: "i1",
     title: "Console raro de 1989",
@@ -71,14 +71,14 @@ const LINHAS: Item[] = [
 // collacao do banco, e o `localeCompare("pt-BR")` traria uma ordem que o banco
 // nao garante. Os titulos dos fixtures de ordenacao sao sem acento por isso — o
 // contrato deste teste e a coluna e a direcao, nao a collacao do servidor.
-const COLUNAS: Record<ItemOrderBy, (linha: Item) => number | string> = {
-  createdAt: (linha) => linha.createdAt.getTime(),
-  title: (linha) => linha.title,
-  minInitialBid: (linha) => linha.minInitialBid,
-  bidDeadline: (linha) => linha.bidDeadline.getTime(),
+const COLUNAS: Record<ItemOrderBy, (row: Item) => number | string> = {
+  createdAt: (row) => row.createdAt.getTime(),
+  title: (row) => row.title,
+  minInitialBid: (row) => row.minInitialBid,
+  bidDeadline: (row) => row.bidDeadline.getTime(),
 };
 
-function comparar(a: number | string, b: number | string): number {
+function compare(a: number | string, b: number | string): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
   if (a === b) return 0;
   return a < b ? -1 : 1;
@@ -87,35 +87,35 @@ function comparar(a: number | string, b: number | string): number {
 // ponytail: sem `orderBy`, o padrao e `createdAt desc` — e nao "asc" como em
 // qualquer outra coluna. Nao e assimetria por acidente: e a ordem que a
 // listagem ja tinha (`orderBy(desc(items.createdAt))`) e que a vitrine publica
-// depende. Ver o `ponytail:` de `DEFAULT_ORDEM` no repositorio Drizzle.
-function ordenar(linhas: Item[], filter?: ItemListFilter): Item[] {
-  const coluna = COLUNAS[filter?.orderBy ?? "createdAt"];
+// depende. Ver o `ponytail:` de `DEFAULT_SORT_BY` no repositorio Drizzle.
+function sort(linhas: Item[], filter?: ItemListFilter): Item[] {
+  const column = COLUNAS[filter?.orderBy ?? "createdAt"];
   const direcao = filter?.orderBy === undefined || filter?.direction === "desc" ? -1 : 1;
   return [...linhas].sort((a, b) => {
-    const diferenca = comparar(coluna(a), coluna(b));
+    const diferenca = compare(column(a), column(b));
     return diferenca !== 0 ? diferenca * direcao : a.id < b.id ? -1 : 1;
   });
 }
 
-class RepositorioDeMentira implements ItemLister {
-  vendedorRecebido?: string;
-  filtroRecebido?: ItemListFilter;
-  constructor(private readonly linhas: Item[] = LINHAS) {}
+class FakeRepository implements ItemLister {
+  receivedSeller?: string;
+  receivedFilter?: ItemListFilter;
+  constructor(private readonly linhas: Item[] = ROWS) {}
   async listBySellerId(sellerId: string, filter?: ItemListFilter): Promise<ItemListResult> {
-    this.vendedorRecebido = sellerId;
-    this.filtroRecebido = filter;
-    const termo = semAcento(filter?.q?.trim() ?? "");
-    const filtradas = this.linhas.filter((linha) => {
-      if (filter?.status && linha.status !== filter.status) return false;
-      if (termo && !semAcento(linha.title).includes(termo)) return false;
+    this.receivedSeller = sellerId;
+    this.receivedFilter = filter;
+    const termo = stripAccents(filter?.q?.trim() ?? "");
+    const filtradas = this.linhas.filter((row) => {
+      if (filter?.status && row.status !== filter.status) return false;
+      if (termo && !stripAccents(row.title).includes(termo)) return false;
       return true;
     });
-    const ordenadas = ordenar(filtradas, filter);
-    const inicio = filter?.offset ?? 0;
+    const ordenadas = sort(filtradas, filter);
+    const start = filter?.offset ?? 0;
     const limite = filter?.limit;
-    const pagina =
-      limite === undefined ? ordenadas.slice(inicio) : ordenadas.slice(inicio, inicio + limite);
-    return { items: pagina, total: filtradas.length };
+    const page =
+      limite === undefined ? ordenadas.slice(start) : ordenadas.slice(start, start + limite);
+    return { items: page, total: filtradas.length };
   }
 }
 
@@ -125,36 +125,36 @@ function ids(items: Item[]): string[] {
 
 describe("listSellerItems", () => {
   it("repassa o sellerId e devolve itens e total", async () => {
-    const repo = new RepositorioDeMentira();
-    const resultado = await listSellerItems(repo, "u1");
-    expect(resultado.items).toHaveLength(3);
-    expect(resultado.total).toBe(3);
-    expect(repo.vendedorRecebido).toBe("u1");
+    const repo = new FakeRepository();
+    const result = await listSellerItems(repo, "u1");
+    expect(result.items).toHaveLength(3);
+    expect(result.total).toBe(3);
+    expect(repo.receivedSeller).toBe("u1");
   });
 
   it("filtra por status quando informado", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { status: "active" });
     expect(ids(items)).toEqual(["i2"]);
     expect(total).toBe(1);
-    expect(repo.filtroRecebido).toEqual({ status: "active" });
+    expect(repo.receivedFilter).toEqual({ status: "active" });
   });
 
   it("ordena por lance mínimo quando solicitado", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items } = await listSellerItems(repo, "u1", { orderBy: "minInitialBid", direction: "asc" });
     expect(items.map((i) => i.minInitialBid)).toEqual([1000, 2000, 5000]);
   });
 
   it("filtra por busca textual no título", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { q: "raro" });
     expect(ids(items)).toEqual(["i1"]);
     expect(total).toBe(1);
   });
 
   it("pagina com limit e offset", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const primeira = await listSellerItems(repo, "u1", { limit: 1, offset: 0 });
     const segunda = await listSellerItems(repo, "u1", { limit: 1, offset: 1 });
     expect(primeira.items).toHaveLength(1);
@@ -164,37 +164,37 @@ describe("listSellerItems", () => {
   });
 
   it("devolve o total do conjunto filtrado, e não o total da tabela", async () => {
-    const repo = new RepositorioDeMentira();
-    const porStatus = await listSellerItems(repo, "u1", { status: "draft" });
-    const porBusca = await listSellerItems(repo, "u1", { q: "raro", limit: 1 });
-    expect(ids(porStatus.items)).toEqual(["i1"]);
-    expect(porStatus.total).toBe(1);
-    expect(porBusca.total).toBe(1);
+    const repo = new FakeRepository();
+    const byStatus = await listSellerItems(repo, "u1", { status: "draft" });
+    const bySearch = await listSellerItems(repo, "u1", { q: "raro", limit: 1 });
+    expect(ids(byStatus.items)).toEqual(["i1"]);
+    expect(byStatus.total).toBe(1);
+    expect(bySearch.total).toBe(1);
   });
 
   it("total ignora o limit: a página conta contra o conjunto filtrado inteiro", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { limit: 1 });
     expect(items).toHaveLength(1);
     expect(total).toBe(3);
   });
 
   it("busca que não casa com nada devolve lista vazia e total zero", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { q: "teclado" });
     expect(items).toEqual([]);
     expect(total).toBe(0);
   });
 
   it("busca casa sem acento, como o usuário digita", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const sem = await listSellerItems(repo, "u1", { q: "acao" });
-    const com = await listSellerItems(repo, "u1", { q: "Ação" });
+    const withView = await listSellerItems(repo, "u1", { q: "Ação" });
     expect(ids(sem.items)).toEqual(["i3"]);
-    expect(ids(com.items)).toEqual(["i3"]);
+    expect(ids(withView.items)).toEqual(["i3"]);
   });
   it("inverte a ordem quando a direção é desc", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const crescente = await listSellerItems(repo, "u1", { orderBy: "minInitialBid", direction: "asc" });
     const decrescente = await listSellerItems(repo, "u1", { orderBy: "minInitialBid", direction: "desc" });
     expect(ids(crescente.items)).toEqual(["i1", "i3", "i2"]);
@@ -202,19 +202,19 @@ describe("listSellerItems", () => {
   });
 
   it("ordena por prazo, a coluna que não tem accessFn de servidor na union do brief", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items } = await listSellerItems(repo, "u1", { orderBy: "bidDeadline", direction: "asc" });
     expect(ids(items)).toEqual(["i2", "i1", "i3"]);
   });
 
   it("sem orderBy vem o mais recente primeiro, como a listagem já fazia", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items } = await listSellerItems(repo, "u1");
     expect(ids(items)).toEqual(["i1", "i2", "i3"]);
   });
 
   it("sem direção explícita, a coluna pedida vem em asc", async () => {
-    const repo = new RepositorioDeMentira([
+    const repo = new FakeRepository([
       makeItem({ id: "i9", title: "Bbb" }),
       makeItem({ id: "i7", title: "Aaa" }),
       makeItem({ id: "i8", title: "Ccc" }),
@@ -225,7 +225,7 @@ describe("listSellerItems", () => {
 
   it("desempata pelo id quando o valor da coluna é igual", async () => {
     const mesmo = new Date("2026-01-01T00:00:00Z");
-    const repo = new RepositorioDeMentira([
+    const repo = new FakeRepository([
       makeItem({ id: "i9", title: "Bbb", minInitialBid: 500, createdAt: mesmo }),
       makeItem({ id: "i7", title: "Aaa", minInitialBid: 500, createdAt: mesmo }),
     ]);
@@ -234,62 +234,62 @@ describe("listSellerItems", () => {
   });
 
   it("offset além do fim devolve lista vazia, sem perder o total", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { limit: 2, offset: 99 });
     expect(items).toEqual([]);
     expect(total).toBe(3);
   });
 
   it("sem limit, devolve o conjunto inteiro e o total bate com items", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { status: "draft" });
     expect(items).toHaveLength(total);
   });
 
   it("trunca limit e offset fracionários", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     await listSellerItems(repo, "u1", { limit: 2.9, offset: 10.7 });
-    expect(repo.filtroRecebido).toEqual({ limit: 2, offset: 10 });
+    expect(repo.receivedFilter).toEqual({ limit: 2, offset: 10 });
   });
 
   it("trunca limit para baixo, e apaga o que não é número", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     await listSellerItems(repo, "u1", { limit: 2.9 });
-    expect(repo.filtroRecebido).toEqual({ limit: 2 });
+    expect(repo.receivedFilter).toEqual({ limit: 2 });
     await listSellerItems(repo, "u1", { limit: -5 });
-    expect(repo.filtroRecebido).toEqual({});
+    expect(repo.receivedFilter).toEqual({});
     await listSellerItems(repo, "u1", { limit: Number.NaN, offset: Number.POSITIVE_INFINITY });
-    expect(repo.filtroRecebido).toEqual({});
+    expect(repo.receivedFilter).toEqual({});
   });
 
   it("offset negativo vira a primeira página, e offset zero sobrevive", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     await listSellerItems(repo, "u1", { offset: -1 });
-    expect(repo.filtroRecebido).toEqual({ offset: 0 });
+    expect(repo.receivedFilter).toEqual({ offset: 0 });
     const primeira = await listSellerItems(repo, "u1", { offset: 0 });
-    expect(repo.filtroRecebido).toEqual({ offset: 0 });
+    expect(repo.receivedFilter).toEqual({ offset: 0 });
     expect(ids(primeira.items)).toEqual(["i1", "i2", "i3"]);
   });
 
   it("apaga q em branco ou só com espaços, em vez de procurar por espaços", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items, total } = await listSellerItems(repo, "u1", { q: "   ", status: "active" });
-    expect(repo.filtroRecebido).toEqual({ status: "active" });
+    expect(repo.receivedFilter).toEqual({ status: "active" });
     expect(ids(items)).toEqual(["i2"]);
     expect(total).toBe(1);
   });
 
   it("normaliza q com espaços em volta antes de repassar", async () => {
-    const repo = new RepositorioDeMentira();
+    const repo = new FakeRepository();
     const { items } = await listSellerItems(repo, "u1", { q: "  raro  " });
-    expect(repo.filtroRecebido).toEqual({ q: "raro" });
+    expect(repo.receivedFilter).toEqual({ q: "raro" });
     expect(ids(items)).toEqual(["i1"]);
   });
 
   it("repassa o filtro intacto quando não há nada para normalizar", async () => {
-    const repo = new RepositorioDeMentira();
-    const filtro: ItemListFilter = { status: "closed", orderBy: "title", direction: "asc", limit: 5, offset: 0 };
-    await listSellerItems(repo, "u1", filtro);
-    expect(repo.filtroRecebido).toBe(filtro);
+    const repo = new FakeRepository();
+    const itemFilter: ItemListFilter = { status: "closed", orderBy: "title", direction: "asc", limit: 5, offset: 0 };
+    await listSellerItems(repo, "u1", itemFilter);
+    expect(repo.receivedFilter).toBe(itemFilter);
   });
 });

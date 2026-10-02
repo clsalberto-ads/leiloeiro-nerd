@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
-import type { ItemDaTabela } from "./item-da-tabela";
+import type { DashboardItemRow } from "./dashboard-item-row";
 
 const mocks = vi.hoisted(() => ({
   BidCountdown: vi.fn<(props: { deadline: Date }) => null>(),
@@ -17,14 +17,14 @@ vi.mock("@/presentation/actions/item-actions", () => ({
 }));
 
 import { ItemsList } from "./items-list";
-import { VISTA_PADRAO } from "./estado-da-tabela";
+import { DEFAULT_TABLE_VIEW } from "./dashboard-table-state";
 
 // ponytail: o item deste arquivo tem os SEIS campos do DTO e nao os doze do
 // `Item`. Renderizar a lista com um `Item` completo nao provaria nada sobre a
 // fronteira de serializacao — o ponto do DTO e que a lista funciona com o
 // minimo, e um item de 12 campos aceito aqui seria o mesmo codigo funcionando
 // com 6.
-function makeItem(overrides: Partial<ItemDaTabela> = {}): ItemDaTabela {
+function makeItem(overrides: Partial<DashboardItemRow> = {}): DashboardItemRow {
   return {
     id: "i1",
     title: "Console retrô",
@@ -36,15 +36,15 @@ function makeItem(overrides: Partial<ItemDaTabela> = {}): ItemDaTabela {
   };
 }
 
-function lista(item: ItemDaTabela): string {
+function list(item: DashboardItemRow): string {
   return renderToString(
-    <ItemsList items={[item]} vista={VISTA_PADRAO} totalCount={1} navegar={() => {}} />,
+    <ItemsList items={[item]} view={DEFAULT_TABLE_VIEW} totalCount={1} navigate={() => {}} />,
   );
 }
 
 describe("ItemsList", () => {
   it("renderiza BidCountdown com bidDeadline quando o item está ativo", () => {
-    lista(makeItem());
+    list(makeItem());
     expect(mocks.BidCountdown.mock.calls[0][0]).toMatchObject({ deadline: expect.any(Date) });
   });
 
@@ -53,7 +53,7 @@ describe("ItemsList", () => {
   // antiga em `<li>`, onde o texto aparecia no parágrafo "Lance mínimo: R$ …" —
   // o teste ficaria verde com a coluna inexistente.
   it("renderiza Lance mínimo como cabeçalho de coluna", () => {
-    expect(lista(makeItem())).toMatch(/<th[\s\S]*?Lance mínimo/);
+    expect(list(makeItem())).toMatch(/<th[\s\S]*?Lance mínimo/);
   });
 
   // ponytail: a outra metade do fuso, e a que fecha o ciclo da hidratacao: o
@@ -66,14 +66,14 @@ describe("ItemsList", () => {
   // "01/10/2026"; o vendedor que digitou "30/09 22:00" no `item-form` veria o
   // prazo que cadastrou.
   it("renderiza o prazo no fuso do produto, e nao no fuso do processo", () => {
-    const fusoOriginal = process.env.TZ;
+    const originalTimezone = process.env.TZ;
     try {
       process.env.TZ = "UTC";
-      const html = lista(makeItem());
+      const html = list(makeItem());
       expect(html).toContain("30/09/2026");
     } finally {
-      if (fusoOriginal === undefined) delete process.env.TZ;
-      else process.env.TZ = fusoOriginal;
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
     }
   });
 });

@@ -10,8 +10,8 @@ const mocks = vi.hoisted(() => ({
 // so registra deixaria a action seguir para o `return { ok: true }` e o teste
 // passaria a testar o mock. Lanca, como o Next.
 vi.mock("next/navigation", () => ({
-  redirect: mocks.redirect.mockImplementation((destino: string): never => {
-    throw new Error(`NEXT_REDIRECT:${destino}`);
+  redirect: mocks.redirect.mockImplementation((target: string): never => {
+    throw new Error(`NEXT_REDIRECT:${target}`);
   }),
 }));
 
@@ -23,12 +23,12 @@ import { signInAction, signUpAction } from "./auth-actions";
 
 function form(dados: Record<string, string>) {
   const fd = new FormData();
-  for (const [chave, valor] of Object.entries(dados)) fd.append(chave, valor);
+  for (const [key, value] of Object.entries(dados)) fd.append(key, value);
   return fd;
 }
 
-const LOGIN_VALIDO = { email: "ana@ex.com", password: "SenhaForte123!" };
-const CADASTRO_VALIDO = { email: "ana@ex.com", password: "SenhaForte123!", name: "Ana" };
+const VALID_LOGIN = { email: "ana@ex.com", password: "SenhaForte123!" };
+const VALID_REGISTRATION = { email: "ana@ex.com", password: "SenhaForte123!", name: "Ana" };
 
 // ponytail: sem redirect, o login/cadastro deixa o usuario parado numa pagina
 // que so oferece um link para o painel. A action precisa empurrar: e o que
@@ -37,18 +37,18 @@ const CADASTRO_VALIDO = { email: "ana@ex.com", password: "SenhaForte123!", name:
 describe("auth-actions — depois de autenticar, o usuario vai para o painel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.redirect.mockImplementation((destino: string): never => {
-      throw new Error(`NEXT_REDIRECT:${destino}`);
+    mocks.redirect.mockImplementation((target: string): never => {
+      throw new Error(`NEXT_REDIRECT:${target}`);
     });
   });
 
   it("login com credenciais validas redireciona para /dashboard", async () => {
-    await expect(signInAction({}, form(LOGIN_VALIDO))).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+    await expect(signInAction({}, form(VALID_LOGIN))).rejects.toThrow("NEXT_REDIRECT:/dashboard");
     expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
   });
 
   it("cadastro valido redireciona para /dashboard", async () => {
-    await expect(signUpAction({}, form(CADASTRO_VALIDO))).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+    await expect(signUpAction({}, form(VALID_REGISTRATION))).rejects.toThrow("NEXT_REDIRECT:/dashboard");
     expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
   });
 
@@ -58,21 +58,21 @@ describe("auth-actions — depois de autenticar, o usuario vai para o painel", (
   it("credenciais invalidas nao redirecionam: erro fica na pagina", async () => {
     mocks.signInEmail.mockRejectedValue(new Error("bad"));
 
-    await expect(signInAction({}, form(LOGIN_VALIDO))).resolves.toEqual({ error: "Credenciais inválidas" });
+    await expect(signInAction({}, form(VALID_LOGIN))).resolves.toEqual({ error: "Credenciais inválidas" });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
   it("cadastro com e-mail ja existente nao redireciona", async () => {
     mocks.signUpEmail.mockRejectedValue(new Error("duplicate"));
 
-    await expect(signUpAction({}, form(CADASTRO_VALIDO))).resolves.toMatchObject({ error: expect.any(String) });
+    await expect(signUpAction({}, form(VALID_REGISTRATION))).resolves.toMatchObject({ error: expect.any(String) });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
   it("dados invalidos por zod nao chega ao auth nem redireciona", async () => {
-    const resultado = await signInAction({}, form({ email: "nao-e-email", password: "" }));
+    const result = await signInAction({}, form({ email: "nao-e-email", password: "" }));
 
-    expect(resultado).toMatchObject({ error: expect.any(String) });
+    expect(result).toMatchObject({ error: expect.any(String) });
     expect(mocks.signInEmail).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

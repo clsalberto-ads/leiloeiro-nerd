@@ -8,7 +8,7 @@ import { ItemCardSkeleton } from "./skeletons";
 // teste lesse a constante da implementacao, mudar 6 para 3 — ou para 1 — deixaria
 // o teste verde com o esqueleto do tamanho errado, que e o defeito que este
 // arquivo existe para pegar.
-const CARTAS_DO_ESQUELETO = 6;
+const SKELETON_CARDS = 6;
 
 // ponytail: o esqueleto e ESTATICO por definicao — ele existe para parecer com o
 // card enquanto o card nao chegou, entao `renderToString` diz tudo o que ha para
@@ -22,10 +22,10 @@ describe("ItemCardSkeleton", () => {
   // justo o que um esqueleto nao pode ter. E o que permite contar as barras
   // abaixo, que e a forma.
   it("e identificavel pelo data-slot, sem depender de texto", () => {
-    const saida = html();
+    const output = html();
 
-    expect(saida).toContain('data-slot="item-card-skeleton"');
-    expect(saida).toContain('data-slot="skeleton"');
+    expect(output).toContain('data-slot="item-card-skeleton"');
+    expect(output).toContain('data-slot="skeleton"');
   });
 
   // ponytail: QUATRO barras por card, e a forma do `PublicItemCard` novo: imagem
@@ -35,11 +35,11 @@ describe("ItemCardSkeleton", () => {
   // porque o card mudou, e nao porque o teste cedesse: e a MESMA relacao que o
   // teste sempre affirms, com a forma nova.
   it("desenha quatro barras por card: a imagem, o titulo e os dois valores do lance", () => {
-    const saida = html();
-    const cards = saida.match(/data-slot="item-card-skeleton"/g) ?? [];
+    const output = html();
+    const cards = output.match(/data-slot="item-card-skeleton"/g) ?? [];
 
-    expect(cards).toHaveLength(CARTAS_DO_ESQUELETO);
-    expect(saida.match(/data-slot="skeleton"/g)).toHaveLength(CARTAS_DO_ESQUELETO * 4);
+    expect(cards).toHaveLength(SKELETON_CARDS);
+    expect(output.match(/data-slot="skeleton"/g)).toHaveLength(SKELETON_CARDS * 4);
   });
 
   // ponytail: o que NAO pode aparecer e o conteudo do card. Um esqueleto que
@@ -48,11 +48,11 @@ describe("ItemCardSkeleton", () => {
   // chegasse, e o `<a>` do `PublicItemCard` viraria um link para um item que
   // ainda nao existe.
   it("nao vaza o conteudo do item que ele substitui", () => {
-    const saida = html();
+    const output = html();
 
-    expect(saida).not.toContain("<a");
-    expect(saida).not.toContain("Lance mínimo");
-    expect(saida).not.toContain("R$");
+    expect(output).not.toContain("<a");
+    expect(output).not.toContain("Lance mínimo");
+    expect(output).not.toContain("R$");
   });
 
   // ponytail: o anuncio e do CONTAINER, e nao de cada card. Seis `role="status"`
@@ -61,13 +61,13 @@ describe("ItemCardSkeleton", () => {
   // descer ate eles procurando texto. O rotulo em pt-BR porque e o que o usuario
   // ouvira.
   it("anuncia o carregamento uma vez, no container", () => {
-    const saida = html();
+    const output = html();
 
-    expect(saida).toContain('role="status"');
-    expect(saida).toContain('aria-label="Carregando itens"');
-    expect(saida.match(/role="status"/g)).toHaveLength(1);
-    expect(saida.match(/data-slot="item-card-skeleton"[^>]*aria-hidden="true"/g)).toHaveLength(
-      CARTAS_DO_ESQUELETO,
+    expect(output).toContain('role="status"');
+    expect(output).toContain('aria-label="Carregando itens"');
+    expect(output.match(/role="status"/g)).toHaveLength(1);
+    expect(output.match(/data-slot="item-card-skeleton"[^>]*aria-hidden="true"/g)).toHaveLength(
+      SKELETON_CARDS,
     );
   });
 });

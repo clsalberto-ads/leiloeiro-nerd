@@ -11,7 +11,7 @@ export function DashboardSidebar() {
           <LayoutDashboard className="h-4 w-4" /> Painel
         </Button>
         <Button nativeButton={false} render={<Link href="/dashboard/items" />} variant="ghost" className="justify-start gap-2">
-          <Package className="h-4 w-4" /> Meus itens
+          <Package className="h-4 w-4" /> Meus items
         </Button>
         <Button nativeButton={false} render={<Link href="/dashboard/settings" />} variant="ghost" className="justify-start gap-2">
           <Settings className="h-4 w-4" /> Configurações

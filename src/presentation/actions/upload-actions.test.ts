@@ -47,13 +47,15 @@ describe("uploadItemImagesAction", () => {
     ).resolves.toEqual({ urls: ["https://ut.ex/a.jpg"] });
   });
 
-  it("filtra uploads com erro e retorna erro se nenhum teve sucesso", async () => {
+    it("filtra uploads com erro e sinaliza falha parcial", async () => {
     mocks.utapi.uploadFiles.mockResolvedValue([
       { data: { ufsUrl: "https://ut.ex/a.jpg" }, error: null },
       { data: null, error: "boom" },
     ]);
     await expect(uploadItemImagesAction(null, filesWith([file(1024), file(2048)]))).resolves.toEqual({
       urls: ["https://ut.ex/a.jpg"],
+      partial: true,
+      falhas: 1,
     });
 
     mocks.utapi.uploadFiles.mockResolvedValue([{ data: null, error: "boom" }]);

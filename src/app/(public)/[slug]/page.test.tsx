@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToPipeableStream } from "react-dom/server";
 import type { ReactElement } from "react";
 
-const espiao = vi.hoisted(() => {
-  class NaoEncontrado extends Error {}
+const spy = vi.hoisted(() => {
+  class NotFound extends Error {}
   return {
-    NaoEncontrado,
-    vendedor: vi.fn(),
-    itens: vi.fn(),
+    NotFound,
+    seller: vi.fn(),
+    items: vi.fn(),
   };
 });
 
@@ -19,19 +19,19 @@ const espiao = vi.hoisted(() => {
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   notFound: (): never => {
-    throw new espiao.NaoEncontrado();
+    throw new spy.NotFound();
   },
 }));
 
 vi.mock("@/presentation/actions/public-actions", () => ({
-  getVitrineSellerAction: espiao.vendedor,
-  listVitrineItemsAction: espiao.itens,
+  getStorefrontSellerAction: spy.seller,
+  listStorefrontItemsAction: spy.items,
 }));
 
-import VitrinePage from "./page";
-import type { ItemDaVitrine } from "@/domain/repositories/item-repository";
+import StorefrontPage from "./page";
+import type { StorefrontItem } from "@/domain/repositories/item-repository";
 
-function item(overrides: Partial<ItemDaVitrine> = {}): ItemDaVitrine {
+function item(overrides: Partial<StorefrontItem> = {}): StorefrontItem {
   return {
     id: "i1",
     title: "Console retrô",
@@ -39,16 +39,16 @@ function item(overrides: Partial<ItemDaVitrine> = {}): ItemDaVitrine {
     imageUrl: null,
     minInitialBid: 5000,
     bidDeadline: new Date("2026-10-01T12:00:00Z"),
-    totalDeLances: 0,
-    maiorLance: null,
-    criadoEm: new Date("2026-01-01T00:00:00Z"),
+    totalBids: 0,
+    highestBid: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
 
-type PropsDaPagina = Parameters<typeof VitrinePage>[0];
+type PageProps = Parameters<typeof StorefrontPage>[0];
 
-function props(slug: string): PropsDaPagina {
+function props(slug: string): PageProps {
   return { params: Promise.resolve({ slug }), searchParams: Promise.resolve({}) };
 }
 
@@ -62,11 +62,11 @@ function props(slug: string): PropsDaPagina {
 // existe no HTML do servidor e a recuperacao (se houver) acontece no cliente.
 // Nos dois, um teste de "o esqueleto aparece" escrito assim passaria na posicao
 // decorativa: seria um teste que nao prova nada.
-function streamar(elemento: ReactElement) {
-  const partes: string[] = [];
-  const erros: string[] = [];
-  let acorda!: () => void;
-  // ponytail: `primeiroFlush` espera o FIM DO SHELL, e nao o primeiro `data` do
+function streamar(element: ReactElement) {
+  const parts: string[] = [];
+  const errors: string[] = [];
+  let wake!: () => void;
+  // ponytail: `firstFlush` espera o FIM DO SHELL, e nao o primeiro `data` do
   // stream. Sao coisas diferentes, e a distincao e o que faz este teste medir o que
   // o nome diz. O React pode partir o shell em VARIOS chunks — medido nesta suite:
   // com o hero e os controles no shell, o primeiro chunk sao 1.532 bytes e termina
@@ -80,38 +80,38 @@ function streamar(elemento: ReactElement) {
   // e o que separa o fallback do conteudo que sobe depois. Se a fronteira nao
   // fechar, o `end` resolve assim mesmo, para o caso virar uma falha com mensagem
   // em vez de um travamento.
-  const primeiroFlush = new Promise<string>((resolve) => {
-    acorda = () => {
-      if (partes.join("").includes("<!--/$-->")) resolve(partes.join(""));
+  const firstFlush = new Promise<string>((resolve) => {
+    wake = () => {
+      if (parts.join("").includes("<!--/$-->")) resolve(parts.join(""));
     };
   });
-  const fim = new Promise<string[]>((resolve) => {
-    const saida = new PassThrough();
-    saida.setEncoding("utf8");
-    saida.on("data", (pedaco: string) => {
-      partes.push(pedaco);
-      acorda();
+  const end = new Promise<string[]>((resolve) => {
+    const output = new PassThrough();
+    output.setEncoding("utf8");
+    output.on("data", (chunk: string) => {
+      parts.push(chunk);
+      wake();
     });
-    saida.on("end", () => {
-      acorda();
-      resolve(partes);
+    output.on("end", () => {
+      wake();
+      resolve(parts);
     });
-    const { pipe } = renderToPipeableStream(elemento, {
+    const { pipe } = renderToPipeableStream(element, {
       onShellReady() {
-        pipe(saida);
+        pipe(output);
       },
-      onError(erro) {
-        erros.push(String(erro));
+      onError(error) {
+        errors.push(String(error));
       },
       // ponytail: o `onShellError` e o que impede um erro no shell de virar a MESMA
       // espera silenciosa de "nada suspendeu". Sem ele o `pipe` nunca e chamado, o
       // fluxo nao produz chunk nenhum e a falha se apresenta como travamento.
-      onShellError(erro) {
-        erros.push(String(erro));
+      onShellError(error) {
+        errors.push(String(error));
       },
     });
   });
-  return { partes, erros, primeiroFlush, fim };
+  return { parts, errors, firstFlush, end };
 }
 
 // ponytail: o prazo existe porque o modo de falha natural desta fronteira e a
@@ -122,46 +122,46 @@ function streamar(elemento: ReactElement) {
 // prazo o teste morre no timeout de 5s do vitest, que se le como "teste lento" e
 // nao como "a fronteira parou de esperar". O `erros` entra na mensagem porque o
 // outro caminho para o mesmo silencio e um erro no shell.
-const PRAZO_MS = 2000;
+const DEADLINE_MS = 2000;
 
-async function antesDoPrazo<T>(oQue: string, promessa: Promise<T>, erros: string[] = []): Promise<T> {
-  let relogio!: ReturnType<typeof setTimeout>;
+async function beforeDeadline<T>(what: string, promise: Promise<T>, errors: string[] = []): Promise<T> {
+  let timer!: ReturnType<typeof setTimeout>;
   const prazo = new Promise<never>((_, rejeita) => {
-    relogio = setTimeout(
+    timer = setTimeout(
       () =>
         rejeita(
           new Error(
-            `a vitrine nao entregou ${oQue} em ${PRAZO_MS}ms${erros.length > 0 ? ` — erros: ${erros.join(" | ")}` : ""}`,
+            `a vitrine nao entregou ${what} em ${DEADLINE_MS}ms${errors.length > 0 ? ` — erros: ${errors.join(" | ")}` : ""}`,
           ),
         ),
-      PRAZO_MS,
+      DEADLINE_MS,
     );
   });
   try {
-    return await Promise.race([promessa, prazo]);
+    return await Promise.race([promise, prazo]);
   } finally {
-    clearTimeout(relogio);
+    clearTimeout(timer);
   }
 }
 
 // ponytail: o React separa texto estatico de dinamico com `<!-- -->` no HTML do
 // servidor (`Vitrine de <!-- -->Ana`), entao comparar a frase inteira no HTML
 // bruto falharia por um detalhe de serializacao, nao por falta do nome.
-function texto(html: string): string {
+function text(html: string): string {
   return html.replaceAll("<!-- -->", "");
 }
 
 // ponytail: o `vendedor` grew porque a action trocou de porta: `getSellerBySlug`
-// devolvia `{id, name, slug}` e o HERO precisa de `image`, `criadoEm` e
-// `totalDeItensAtivos`. Os tres `it` nao mudaram de intencao — o que mudou foi a
+// devolvia `{id, name, slug}` e o HERO precisa de `image`, `createdAt` e
+// `activeItemCount`. Os tres `it` nao mudaram de intencao — o que mudou foi a
 // forma do dado que o spy devolve.
-const VENDEDOR = {
+const SELLER = {
   id: "u1",
   name: "Ana",
   slug: "ana",
   image: null,
-  criadoEm: new Date("2026-01-15T12:00:00Z"),
-  totalDeItensAtivos: 1,
+  createdAt: new Date("2026-01-15T12:00:00Z"),
+  activeItemCount: 1,
 };
 
 // ponytail: os espioes sao zerados entre os `it` porque o `it` do 404 afirma que a
@@ -179,18 +179,18 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
   // A prova e comportamental e nao estrutural: enquanto os itens nao chegam, o
   // primeiro flush e o esqueleto; quando chegam, e o segundo.
   it("o primeiro flush é o esqueleto e os cards vêm no flush seguinte", async () => {
-    espiao.vendedor.mockResolvedValue(VENDEDOR);
-    let chega!: (valor: ItemDaVitrine[]) => void;
-    espiao.itens.mockReturnValue(new Promise<ItemDaVitrine[]>((resolve) => { chega = resolve; }));
+    spy.seller.mockResolvedValue(SELLER);
+    let arrive!: (value: StorefrontItem[]) => void;
+    spy.items.mockReturnValue(new Promise<StorefrontItem[]>((resolve) => { arrive = resolve; }));
 
-    const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
-    const fluxo = streamar(elemento);
+    const element = await beforeDeadline("o shell", StorefrontPage(props("ana")));
+    const fluxo = streamar(element);
 
-    const primeiro = await antesDoPrazo("o primeiro flush", fluxo.primeiroFlush, fluxo.erros);
-    chega([item()]);
-    const partes = await antesDoPrazo("o conteudo", fluxo.fim, fluxo.erros);
+    const first = await beforeDeadline("o primeiro flush", fluxo.firstFlush, fluxo.errors);
+    arrive([item()]);
+    const parts = await beforeDeadline("o conteudo", fluxo.end, fluxo.errors);
 
-    expect(fluxo.erros).toEqual([]);
+    expect(fluxo.errors).toEqual([]);
     // ponytail: o titulo fica FORA da fronteira, e e ele que faz o esqueleto
     // aparecer. Medido nesta suite: uma fronteira sozinha, sem nada em volta,
     // recebe `onShellReady` sem nunca despejar o fallback — o React espera e
@@ -205,13 +205,13 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
     // por isso que o esqueleto aparece. O marcador do hero e a forma mais forte de
     // dizer isso — ele falha se o hero sair do shell, e a string passaria a passar
     // por acidente se o nome aparecesse em qualquer outro lugar do HTML.
-    expect(primeiro).toContain('data-slot="vitrine-hero"');
-    expect(texto(primeiro)).toContain("Ana");
-    expect(primeiro).toContain('data-slot="item-card-skeleton"');
-    expect(texto(primeiro)).not.toContain("Console retrô");
+    expect(first).toContain('data-slot="storefront-hero"');
+    expect(text(first)).toContain("Ana");
+    expect(first).toContain('data-slot="item-card-skeleton"');
+    expect(text(first)).not.toContain("Console retrô");
 
-    expect(partes.join("")).toContain("Console retrô");
-    expect(espiao.itens).toHaveBeenCalledWith("u1", { q: "", ordenar: "prazo" });
+    expect(parts.join("")).toContain("Console retrô");
+    expect(spy.items).toHaveBeenCalledWith("u1", { q: "", sort: "prazo" });
   });
 
   // ponytail: a fronteira e um placeholder, nao um manto. O esqueleto SAI no
@@ -221,17 +221,17 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
   // esqueleto que continuasse ali seria a vitrine mostrando duas coisas ao mesmo
   // tempo, e o usuario nunca saberia qual delas e a dele.
   it("a vitrine sem itens termina no estado vazio, sem esqueleto", async () => {
-    espiao.vendedor.mockResolvedValue(VENDEDOR);
-    espiao.itens.mockResolvedValue([]);
+    spy.seller.mockResolvedValue(SELLER);
+    spy.items.mockResolvedValue([]);
 
-    const elemento = await antesDoPrazo("o shell", VitrinePage(props("ana")));
-    const partes = await antesDoPrazo("o fim do fluxo", streamar(elemento).fim);
-    const ultimo = partes[partes.length - 1] ?? "";
+    const element = await beforeDeadline("o shell", StorefrontPage(props("ana")));
+    const parts = await beforeDeadline("o fim do fluxo", streamar(element).end);
+    const last = parts[parts.length - 1] ?? "";
 
-    expect(texto(partes.join(""))).toContain('data-slot="empty-state"');
-    expect(texto(partes.join(""))).toContain("Nenhum item em leilão");
-    expect(ultimo).not.toContain('data-slot="item-card-skeleton"');
-    expect(ultimo).toContain('data-slot="empty-state"');
+    expect(text(parts.join(""))).toContain('data-slot="empty-state"');
+    expect(text(parts.join(""))).toContain("Nenhum item em leilão");
+    expect(last).not.toContain('data-slot="item-card-skeleton"');
+    expect(last).toContain('data-slot="empty-state"');
   });
 
   // ponytail: o 404 e decidido no SHELL, antes de qualquer flush, e e por isso que
@@ -241,10 +241,10 @@ describe("[slug]/page — o esqueleto da vitrine", () => {
   // status 200 e uma vitrine publica errada sairia como pagina valida. Este `it`
   // trava essa ordem — e trava tambem que a listagem nem chega a rodar.
   it("slug inexistente responde 404 sem chegar a listar itens", async () => {
-    espiao.vendedor.mockResolvedValue(null);
-    espiao.itens.mockResolvedValue([]);
+    spy.seller.mockResolvedValue(null);
+    spy.items.mockResolvedValue([]);
 
-    await expect(VitrinePage(props("ninguem"))).rejects.toBeInstanceOf(espiao.NaoEncontrado);
-    expect(espiao.itens).not.toHaveBeenCalled();
+    await expect(StorefrontPage(props("ninguem"))).rejects.toBeInstanceOf(spy.NotFound);
+    expect(spy.items).not.toHaveBeenCalled();
   });
 });

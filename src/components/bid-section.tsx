@@ -70,7 +70,7 @@ export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement
   // `key={minBid}`, entao o `min` do input ja sobe para o novo piso no mesmo
   // render — o que mantem o lance seguinte valido, em vez de o cliente recusar
   // por ate 10s com o piso velho.
-  const registrarLance = (bid: Bid) => {
+  const placeBid = (bid: Bid) => {
     setBids((atuais) => [bid, ...atuais.filter((b) => b.id !== bid.id)]);
   };
 
@@ -79,7 +79,7 @@ export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement
       {encerrado ? (
         <p className="text-sm text-muted-foreground">Leilão encerrado — não aceita mais lances.</p>
       ) : (
-        <BidForm key={minBid} itemId={itemId} minBid={minBid} onBid={registrarLance} />
+        <BidForm key={minBid} itemId={itemId} minBid={minBid} onBid={placeBid} />
       )}
       <BidHistory bids={bids} />
     </div>

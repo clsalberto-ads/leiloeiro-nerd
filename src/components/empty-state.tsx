@@ -11,8 +11,8 @@ import Link from "next/link";
 //
 // Um `onSelect` como segunda forma da acao custaria o preco disso para nao
 // ganhar nada: a acao de quem esta dentro da tabela (`navegar(vista)`) e
-// equivalente, e ela nao e uma segunda fonte da URL — o `hrefDaVista` vira
-// string num lugar so, e o `hrefDaVista(vistaSemFiltro(vista))` nao e uma segunda
+// equivalente, e ela nao e uma segunda fonte da URL — o `buildStorefrontHref` vira
+// string num lugar so, e o `buildStorefrontHref(vistaSemFiltro(vista))` nao e uma segunda
 // copia do endereco, e o mesmo contrato de URL chamado com outra vista.
 export type EmptyStateAction = { label: string; href: string };
 

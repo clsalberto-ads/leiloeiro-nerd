@@ -1,5 +1,6 @@
 import type { Item, ItemRepository, UpdateItemInput } from "@/domain/repositories/item-repository";
 import { createItemImages } from "./create-item-images";
+import { invalidMoney, invalidPaymentDays } from "./money-guards";
 
 export async function updateItem(
   itemRepo: ItemRepository,
@@ -26,10 +27,13 @@ export async function updateItem(
     throw new Error("Prazo de lances deve ser no futuro");
   }
   if (
-    (input.minInitialBid !== undefined && input.minInitialBid < 100) ||
-    (input.minBidIncrement !== undefined && input.minBidIncrement < 100)
+    (input.minInitialBid !== undefined && invalidMoney(input.minInitialBid)) ||
+    (input.minBidIncrement !== undefined && invalidMoney(input.minBidIncrement))
   ) {
     throw new Error("Lance mínimo deve ser de pelo menos R$ 1,00");
+  }
+  if (invalidPaymentDays(input.paymentDeadlineDays)) {
+    throw new Error("Prazo de pagamento deve ser entre 1 e 30 dias");
   }
   const result = await itemRepo.update(itemId, input);
   if (!result) throw new Error("Item não encontrado");

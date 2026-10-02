@@ -56,7 +56,7 @@ export interface BidRepository {
 // primeiro e descartaria depois — e o numero que a vitrine mostra ja estaria
 // errado antes de qualquer comparacao. Nao e "filtro do SELECT e nao do GROUP BY"
 // (que sao a mesma query): e "filtro antes do agregado, e nao depois".
-export interface EstatisticasDeLance {
+export interface BidStats {
   total: number;
   maior: number | null;
 }
@@ -66,8 +66,8 @@ export interface EstatisticasDeLance {
 // `maior` e `number | null` e nao `number` — o card da vitrine le `mapa.get(id)`
 // e usa a ausencia para escrever "ainda ninguem deu lance", que nao e a mesma
 // coisa que um maior lance de R$ 0.
-export interface EstatisticasDeLances {
+export interface BidStatsList {
   // ponytail: `ids` vazio devolve `Map` vazio SEM tocar no banco. A vitrine sem
   // itens nao deve abrir uma consulta so para receber zero linhas.
-  deVariosItens(itemIds: string[]): Promise<Map<string, EstatisticasDeLance>>;
+  ofManyItems(itemIds: string[]): Promise<Map<string, BidStats>>;
 }

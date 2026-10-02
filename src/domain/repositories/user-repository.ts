@@ -37,20 +37,20 @@ export interface UserRepository {
 // `toEqual(sellerRow)` sobre `{id, name, slug}`, e 7 fakes de `UserRepository`
 // implementam esse retorno (contados em `grep -rn "implements UserRepository"
 // src/ --include=*.test.ts` -> 7 classes, nenhuma com `findVitrineBySlug`).
-// Acrescentar `image`/`createdAt`/`totalDeItensAtivos` ali quebraria os sete.
+// Acrescentar `image`/`createdAt`/`activeItemCount` ali quebraria os sete.
 // E o mesmo motivo do `ItemLister`.
 //
 // Os tres campos novos sao os que `user` JA tem (`image`, `created_at`) ou o que
-// se deriva com um `count` (`total_de_itens_ativos`) — nenhum exige migration.
-export interface VitrineDeVendedor {
+// se deriva com um `count` (`activeItemCount`) — nenhum exige migration.
+export interface SellerStorefront {
   id: string;
   name: string;
   slug: string;
   image: string | null;
-  criadoEm: Date;
-  totalDeItensAtivos: number;
+  createdAt: Date;
+  activeItemCount: number;
 }
 
-export interface VitrineDeVendedorRepository {
-  findVitrineBySlug(slug: string): Promise<VitrineDeVendedor | null>;
+export interface SellerStorefrontRepository {
+  findVitrineBySlug(slug: string): Promise<SellerStorefront | null>;
 }

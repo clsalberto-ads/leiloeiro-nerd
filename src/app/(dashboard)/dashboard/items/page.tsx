@@ -4,11 +4,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listSellerItems } from "@/application/use-cases/list-seller-items";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
-import { ItensDaUrl } from "./items-list";
-import { filtroDaVista, interpretarParametros, ultimaPagina, hrefDaVista } from "./estado-da-tabela";
-import { paraItemDaTabela } from "./item-da-tabela";
+import { ItemsUrl } from "./items-list";
+import { toDashboardFilter, parseDashboardParams, lastPage, buildDashboardHref } from "./dashboard-table-state";
+import { toDashboardItemRow } from "./dashboard-item-row";
 import { BecomeSellerForm } from "@/components/become-seller-form";
-import { primeiroValor } from "@/lib/primeiro-valor";
+import { firstValue } from "@/lib/first-value";
 import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 // que quebrariam.
 
 //
-// `primeiroValor` (o parametro repetido) vem de `@/lib/primeiro-valor`, e nao e
+// `firstValue` (o parametro repetido) vem de `@/lib/primeiro-valor`, e nao e
 // uma funcao local: o `?periodo` do dashboard usa a MESMA decisao ("o primeiro
 // vence"), e duas copias divergiriam no primeiro parametro duplicado.
 
@@ -57,11 +57,11 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   }
 
   const params = await searchParams;
-  const vista = interpretarParametros((nome) => primeiroValor(params[nome]));
+  const view = parseDashboardParams((name) => firstValue(params[name]));
   const { items, total } = await listSellerItems(
     drizzleItemRepository,
     session.user.id,
-    filtroDaVista(vista),
+    toDashboardFilter(view),
   );
 
   // ponytail: o `redirect` vem DEPOIS da consulta, e nao antes, porque a ultima
@@ -77,8 +77,8 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   // ultima pagina com piso 1 (em `ultimaPagina`) cobre o outro caso, que e o
   // unico que faria laco: filtro sem nenhum item levaria a `page=0`, que a
   // leitura rejeitaria e trocaria por 1 de novo.
-  if (vista.page > 1 && items.length === 0) {
-    redirect(hrefDaVista({ ...vista, page: ultimaPagina(total, vista.pageSize) }));
+  if (view.page > 1 && items.length === 0) {
+    redirect(buildDashboardHref({ ...view, page: lastPage(total, view.pageSize) }));
   }
 
   return (
@@ -91,7 +91,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
           </Button>
         }
       />
-      <ItensDaUrl items={items.map(paraItemDaTabela)} vista={vista} totalCount={total} />
+      <ItemsUrl items={items.map(toDashboardItemRow)} view={view} totalCount={total} />
     </div>
   );
 }

@@ -130,7 +130,7 @@ describe("paridade do lance entre o bidFormSchema (reais) e o placeBidSchema (ce
   const ITEM_ID = "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a";
 
   // ponytail: `minBid` e sempre em CENTAVOS, igual ao `amount` do servidor. Os
-  // valores sao literais de proposito: se o `MIN_BID_CENTAVOS` do servidor subir,
+  // valores sao literais de proposito: se o `MIN_BID_CENTS` do servidor subir,
   // a linha de 100 (o piso que o `itemSchema` ainda permite) quebra aqui em vez
   // de deixar o cliente aceitar um lance que a action vai rejeitar.
   const MIN_BIDS = [100, 5000, 123456];
@@ -142,9 +142,9 @@ describe("paridade do lance entre o bidFormSchema (reais) e o placeBidSchema (ce
   });
 
   it("rejeita no cliente o lance que o servidor rejeita: abaixo do piso canonico", () => {
-    const abaixo = 99;
-    expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: abaixo / 100 }).success).toBe(false);
-    expect(placeBidSchema.safeParse({ itemId: ITEM_ID, amount: abaixo }).success).toBe(false);
+    const below = 99;
+    expect(bidFormSchema(100).safeParse({ itemId: ITEM_ID, amountReais: below / 100 }).success).toBe(false);
+    expect(placeBidSchema.safeParse({ itemId: ITEM_ID, amount: below }).success).toBe(false);
   });
 
   // ponytail: um `minBid` de 50 nao existe (o `itemSchema` ja exige R$ 1,00),
@@ -152,9 +152,9 @@ describe("paridade do lance entre o bidFormSchema (reais) e o placeBidSchema (ce
   // SERVIDOR e nao o do item, senao aceita R$ 0,50 e a action rejeita.
   it("usa o piso canonico do servidor quando o minBid do item esta abaixo dele", () => {
     expect(bidFormSchema(50).safeParse({ itemId: ITEM_ID, amountReais: 1 }).success).toBe(true);
-    const abaixo = bidFormSchema(50).safeParse({ itemId: ITEM_ID, amountReais: 0.5 });
-    expect(abaixo.success).toBe(false);
-    if (!abaixo.success) expect(abaixo.error.issues[0]?.message).toBe("Lance mínimo R$ 1,00");
+    const below = bidFormSchema(50).safeParse({ itemId: ITEM_ID, amountReais: 0.5 });
+    expect(below.success).toBe(false);
+    if (!below.success) expect(below.error.issues[0]?.message).toBe("Lance mínimo R$ 1,00");
   });
 
   // ponytail: o `amountReais` em mais de 2 casas e o `step="0.01"` do input no

@@ -16,12 +16,12 @@ import { Button } from "@/components/ui/button";
 // O aviso sai num `useEffect`, ou seja, so no cliente — por isso jsdom e
 // `render()` da testing-library. Um `renderToStaticMarkup` (o padrao dos outros
 // testes deste repo) passa batido e nao pega nada.
-const AVISO = "expected a native <button>";
+const WARNING = "expected a native <button>";
 
 let espiar: ReturnType<typeof vi.spyOn>;
 
 function avisou() {
-  return espiar.mock.calls.some(([arg]) => String(arg).includes(AVISO));
+  return espiar.mock.calls.some(([arg]) => String(arg).includes(WARNING));
 }
 
 describe("Button que renderiza Link precisa declarar nativeButton={false}", () => {

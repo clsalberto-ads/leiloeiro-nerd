@@ -14,10 +14,10 @@ export async function resolveBidderNames(bids: Bid[], userRepo: UserRepository):
   if (bids.length === 0) return bids;
   const ids = [...new Set(bids.map((b) => b.bidderId))];
   const users = await userRepo.findByIds(ids);
-  const nomePorId = new Map(users.map((u) => [u.id, u.name]));
+  const nameById = new Map(users.map((u) => [u.id, u.name]));
   return bids.map((bid) => {
-    const nome = nomePorId.get(bid.bidderId);
-    return nome ? { ...bid, bidderName: nome } : bid;
+    const name = nameById.get(bid.bidderId);
+    return name ? { ...bid, bidderName: name } : bid;
   });
 }
 

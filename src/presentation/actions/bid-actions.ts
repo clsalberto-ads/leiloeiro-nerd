@@ -2,9 +2,10 @@
 
 import { getSession } from "./auth-actions";
 import { formToObject, placeBidSchema } from "@/lib/validators";
-import { mensagemDeErro } from "@/lib/erro-de-action";
+import { toActionError } from "@/lib/action-error";
+import { isUuid } from "@/lib/uuid";
 import { placeBid } from "@/application/use-cases/place-bid";
-import { getItemBids } from "@/application/use-cases/get-item-bids";
+import { getItemBids, resolveBidderNames } from "@/application/use-cases/get-item-bids";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
@@ -31,9 +32,19 @@ export async function placeBidAction(_prev: BidActionResult | null, formData: Fo
       parsed.data.itemId,
       parsed.data.amount,
     );
-    return { ok: true, bid: result.bid };
+    // ponytail: o `placeBid` devolve o lance COMO o repositorio gravou, e o
+    // repositorio de lances nao sabe o nome — poe o `bidderId` no lugar do
+    // `bidderName` (ver `bid-repository.ts`). Quem troca pelo nome e o
+    // `resolveBidderNames`, que a vitrine ja chama pelo `bidderName`. Sem
+    // repetir a resolucao aqui, o lance que o usuario ACABOU de dar voltava para
+    // o `bid` com o UUID no lugar do nome e aparecia no historico publico
+    // como "0b61e95c-…", ao lado dos lances antigos que mostravam "Ana" — o
+    // proprio Lanceador vazando o id de quem acabou de licitar, num item
+    // publico, para qualquer visitante.
+    const [bid] = await resolveBidderNames([result.bid], drizzleUserRepository);
+    return { ok: true, bid };
   } catch (err) {
-    return { error: mensagemDeErro(err, "Erro ao registrar lance") };
+    return { error: toActionError(err, "Erro ao registrar lance") };
   }
 }
 
@@ -48,7 +59,7 @@ export async function placeBidAction(_prev: BidActionResult | null, formData: Fo
 // pelo mesmo motivo do `placeBidAction` acima.
 export async function getItemBidsAction(_prev: BidActionResult | null, formData: FormData): Promise<BidActionResult> {
   const itemId = String(formData.get("itemId") ?? "");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId)) {
+  if (!isUuid(itemId)) {
     return { error: "Item ID inválido" };
   }
   try {

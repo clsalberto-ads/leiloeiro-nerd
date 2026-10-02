@@ -5,8 +5,8 @@ import type {
   Bid,
   BidRepository,
   CreateBidInput,
-  EstatisticasDeLance,
-  EstatisticasDeLances,
+  BidStats,
+  BidStatsList,
 } from "@/domain/repositories/bid-repository";
 
 export function nextRank(highestRank: number | null): number {
@@ -104,10 +104,10 @@ export const drizzleBidRepository: BidRepository = {
 
 // ponytail: `total: number | string` e o que torna o `Number()` LOAD-BEARING.
 // `count(*)` volta `bigint` do Postgres e o `pg` entrega `bigint`/`numeric` como
-// TEXTO (o mesmo que o `drizzle-analise-repository.ts` trata com
+// TEXTO (o mesmo que o `drizzle-analytics-repository.ts` trata com
 // `Number(ativos[0]?.soma ?? 0)`). Com o parametro tipado `number`, a coercia
 // ficava INVISIVEL para o compilador: `sql<number>` afirma ao `tsc` que ja e
-// numero, entao apagar o `Number()` nao dava erro de tipo — e um `maiorLance`
+// numero, entao apagar o `Number()` nao dava erro de tipo — e um `highestBid`
 // string viraria `NaN` silencioso na posicao de ordenacao, sem teste vermelho.
 // Tipando a fronteira como `number | string`, remover a coercia passa a ser erro
 // de compilacao, e o unico `Number` defensivo do arquivo e o que sobrevive.
@@ -115,12 +115,12 @@ export const drizzleBidRepository: BidRepository = {
 // ponytail: `maior` continua `number | null` e NAO foi alargado, porque `max()`
 // de `integer` volta inteiro de verdade — o `Number` no corpo dele e o par do
 // `total`, e nao ha evidencia de que ele algum dia venha texto.
-export function paraEstatisticas(
+export function toStats(
   linhas: { itemId: string; total: number | string; maior: number | null }[],
-): Map<string, EstatisticasDeLance> {
-  const mapa = new Map<string, EstatisticasDeLance>();
-  for (const linha of linhas) {
-    mapa.set(linha.itemId, { total: Number(linha.total), maior: linha.maior === null ? null : Number(linha.maior) });
+): Map<string, BidStats> {
+  const mapa = new Map<string, BidStats>();
+  for (const row of linhas) {
+    mapa.set(row.itemId, { total: Number(row.total), maior: row.maior === null ? null : Number(row.maior) });
   }
   return mapa;
 }
@@ -132,8 +132,8 @@ export function paraEstatisticas(
 // de um `explain` com `SET enable_seqscan = off`, onde o plano mostra
 // `Index Only Scan using bids_item_id_amount_idx`. E o `inArray` com a lista de
 // ids, e nao a tabela de lances inteira, que mantem o plano em index scan.
-export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
-  async deVariosItens(itemIds) {
+export const drizzleBidStatsList: BidStatsList = {
+  async ofManyItems(itemIds) {
     if (itemIds.length === 0) return new Map();
     const linhas = await db
       .select({
@@ -144,6 +144,6 @@ export const drizzleEstatisticasDeLances: EstatisticasDeLances = {
       .from(bids)
       .where(inArray(bids.itemId, itemIds))
       .groupBy(bids.itemId);
-    return paraEstatisticas(linhas);
+    return toStats(linhas);
   },
 };

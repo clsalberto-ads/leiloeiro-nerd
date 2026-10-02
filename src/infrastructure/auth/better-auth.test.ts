@@ -12,13 +12,13 @@ import { describe, expect, it } from "vitest";
  * dentro e fragil da maneira mais chata (quebra na proxima assinatura que mudar),
  * e nao provaria nada a mais do que os dois `it` abaixo.
  */
-async function trechoDoCallback(): Promise<string> {
+async function callbackExcerpt(): Promise<string> {
   const { readFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
   const txt = await readFile(join(process.cwd(), "src/infrastructure/auth/better-auth.ts"), "utf8");
-  const inicio = txt.indexOf("sendResetPassword");
-  if (inicio < 0) throw new Error("sendResetPassword nao encontrado em better-auth.ts");
-  return txt.slice(inicio, inicio + 700);
+  const start = txt.indexOf("sendResetPassword");
+  if (start < 0) throw new Error("sendResetPassword nao encontrado em better-auth.ts");
+  return txt.slice(start, start + 700);
 }
 
 describe("link de redefinição de senha não vaza para o log em produção", () => {
@@ -27,7 +27,7 @@ describe("link de redefinição de senha não vaza para o log em produção", ()
     // processo toma conta da conta de quem pediu a redefinição. O prefixo "[DEV]"
     // não protegia nada — não havia guard. Este `it` falha no instante em que o
     // guard sair ou passar para depois do log.
-    const trecho = await trechoDoCallback();
+    const trecho = await callbackExcerpt();
     const guard = trecho.indexOf("NODE_ENV");
     const log = trecho.indexOf("console.log");
 
@@ -41,7 +41,7 @@ describe("link de redefinição de senha não vaza para o log em produção", ()
     // O "sem link nenhum e com erro na tela" incomoda menos que "um token de
     // redefinicao inteiro no log de um servidor de producao". O upgrade path e o
     // Resend na Fase 3, que troca o `throw` por um `send`.
-    const trecho = await trechoDoCallback();
+    const trecho = await callbackExcerpt();
     expect(trecho).toMatch(/NODE_ENV\s*===\s*"production"/);
     expect(trecho).toMatch(/throw new Error\(/);
     // o `throw` tem que estar no ramo de producao, e nao num `catch` ou depois do log
@@ -53,7 +53,7 @@ describe("link de redefinição de senha não vaza para o log em produção", ()
   });
 
   it("o guard é sobre produção, e não sobre 'não é dev' (o placeholder roda em teste)", async () => {
-    const trecho = await trechoDoCallback();
+    const trecho = await callbackExcerpt();
     // ponytail: trocar por `NODE_ENV === "development"` faz o link deixar de sair
     // em CI, onde nenhum humano esta olhando o stdout — o placeholder vira um beco
     // sem saida. Este `it` trava a forma do guard sem travar o valor.

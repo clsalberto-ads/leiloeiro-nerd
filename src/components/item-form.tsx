@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { createItemAction, updateItemAction } from "@/presentation/actions/item-actions";
 import { uploadItemImagesAction } from "@/presentation/actions/upload-actions";
 import { itemSchema } from "@/lib/validators";
-import { paraInputDeData } from "@/lib/fuso";
+import { toInputDateString } from "@/lib/timezone";
 import type { Item } from "@/domain/repositories/item-repository";
 
 type ItemInput = z.input<typeof itemSchema>;
@@ -25,7 +25,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
   const [state, formAction, pending] = useActionState(action, null as { error?: string; ok?: boolean } | null);
   const [uploadState, uploadAction, uploadPending] = useActionState(
     uploadItemImagesAction,
-    null as { urls?: string[]; error?: string } | null,
+    null as { urls?: string[]; error?: string; partial?: boolean; falhas?: number } | null,
   );
   const [urls, setUrls] = useState<string[]>([]);
   const [absorbedUpload, setAbsorbedUpload] = useState<string[]>([]);
@@ -41,6 +41,15 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
     // ponytail: accessibility constraint (DOM alert must stay) - the toast is visual-only, in-DOM alert for screen readers
   }, [state, router, mode]);
 
+  // ponytail: a action agora sinaliza falha parcial com . Se o
+  // usuario subiu 4 imagens e 1 falhou, ele ve 3 previews e um toast avisando
+  // "1 de 4 imagens falhou". Sem isso, ele achava que todas tinham subido.
+  useEffect(() => {
+    if (uploadState?.partial && uploadState.falhas) {
+      toast.warning(`${uploadState.falhas} de ${uploadState.falhas + uploadState.urls!.length} imagem(ns) falhou(ram) ao subir.`);
+    }
+  }, [uploadState]);
+
   const uploaded = uploadState?.urls;
   if (uploaded?.length && uploaded !== absorbedUpload) {
     setAbsorbedUpload(uploaded);
@@ -49,13 +58,13 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
 
   const removeUrl = (url: string) => setUrls((prev) => prev.filter((u) => u !== url));
 
-  // ponytail: `paraInputDeData` (e nao o `getTimezoneOffset()` que estava aqui)
-  // porque o input e uma HORA DE PAREDE sem fuso: o `getTimezoneOffset()` usava o
+  // ponytail: `fromInputDateString` (e nao o `toISOString` que estava aqui)
+  // porque o input e uma HORA DE PAREDE sem fuso: o `toISOString()` usava o
   // fuso do PROCESSO, e num servidor em UTC o vendedor via 01/10 02:59 no lugar
-  // dos 30/09 23:59 que ele digitou. A volta (ler de volta) e `deInputDeData`, em
+  // dos 30/09 23:59 que ele digitou. A volta (ler de volta) e `fromInputDateString`, em
   // `@/lib/validators` — os dois lados leem `FUSO`, entao o round-trip e exato em
-  // qualquer maquina. Ver o ponytail de `deInputDeData`.
-  const formattedDate = item?.bidDeadline ? paraInputDeData(item.bidDeadline) : undefined;
+  // qualquer maquina. Ver o ponytail de `fromInputDateString`.
+  const formattedDate = item?.bidDeadline ? toInputDateString(item.bidDeadline) : undefined;
 
   const form = useForm<ItemInput, unknown, ItemOutput>({
     resolver: zodResolver(itemSchema),
@@ -157,13 +166,13 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
               <option value="service">Serviço</option>
               <option value="piece">Peça colecionável</option>
               {/* ponytail: as tres `<option>` sao o ultimo lugar onde o rotulo de
-               tipo aparece depois que `ROTULO_TIPO` virou o vocabulario canonico
+               tipo aparece depois que `TYPE_LABELS` virou o vocabulario canonico
                (o badge, a coluna da tabela, a aba e a busca server-side leem o
                mapa; aqui o texto ainda esta escrito a mao). A divergencia e o mesmo
                defeito silencioso dos outros: o `<option>` diz "Serviço" e a tabela
                diz outra coisa.
                A correcao e
-               `Object.entries(ROTULO_TIPO).map(([value, rotulo]) => <option …>)`, e
+               `Object.entries(TYPE_LABELS).map(([value, rotulo]) => <option …>)`, e
                ela nao tem NENHUMA decisao de produto pendente: a ordem do mapa
                (`product`, `service`, `piece`) ja e a ordem das opcoes, e a chave do
                mapa ja e o `value` gravado. O que falta e escopo, nao decisao — este

@@ -10,7 +10,7 @@ vi.mock("@/presentation/actions/bid-actions", () => ({
   placeBidAction: vi.fn(async () => ({ ok: true })),
 }));
 
-const LANCE: Bid = {
+const BID: Bid = {
   id: "b1",
   itemId: "i1",
   bidderId: "u2",
@@ -28,7 +28,7 @@ const LANCE: Bid = {
 // "Dar lance" HABILITADO: o usuario preenchia o valor, enviava, e so recebia
 // "Leilao encerrado" do servidor. Duas camadas da mesma tela discordando.
 describe("BidSection — leilao encerrado", () => {
-  const props = { itemId: "i1", initialBids: [LANCE], minInitialBid: 5000, minBidIncrement: 500 };
+  const props = { itemId: "i1", initialBids: [BID], minInitialBid: 5000, minBidIncrement: 500 };
 
   it("esconde o formulario e diz que nao aceita mais lances quando o prazo passou", () => {
     render(<BidSection {...props} deadline={new Date(Date.now() - 1000)} />);

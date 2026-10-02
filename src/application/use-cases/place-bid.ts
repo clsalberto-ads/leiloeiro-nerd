@@ -3,7 +3,8 @@ import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
 import { renderOutbidEmail } from "@/lib/email-templates";
-import { formatReais } from "@/lib/format-reais";
+import { formatBRL } from "@/lib/format-brl";
+import { invalidMoney } from "./money-guards";
 
 export interface ResendClient {
   emails: {
@@ -21,6 +22,14 @@ export async function placeBid(
   itemId: string,
   amount: number,
 ): Promise<{ bid: Bid; outbidUserId?: string }> {
+  // ponytail: `amount` nunca era validado aqui. Todo o resto do lance e
+  // re-checado dentro da transacao justamente para nao confiar no schema — e o
+  // `placeBidSchema` da action cobre o caminho HTTP, mas o use case nao e o
+  // unico chamador: um `NaN` de outra origem passava pelos
+  // quatro portoes e ia para a coluna `bids.amount`. O guard fica ANTES de qualquer
+  // consulta porque nao ha item carregado para compare aqui: um valor nao-finito nao
+  // e "lance abaixo do minimo", e um erro proprio que nao mente sobre o piso.
+  if (invalidMoney(amount)) throw new Error("Lance inválido");
   const item = await itemRepo.findById(itemId);
   if (!item) throw new Error("Item não encontrado");
   if (item.status !== "active") throw new Error("Item não está em leilão");
@@ -35,8 +44,14 @@ export async function placeBid(
     if (ctx.item.bidDeadline.getTime() <= Date.now()) throw new Error("Leilão encerrado");
     if (ctx.item.sellerId === bidderId) throw new Error("Você não pode dar lance no próprio item");
     const minBid = ctx.highestBid ? ctx.highestBid.amount + ctx.item.minBidIncrement : ctx.item.minInitialBid;
+    // ponytail: o piso vem do ITEM, entao um `minBidIncrement` fracionario ou
+    // `NaN` gravado antes derruba o lance tambem. Sem esta checagem, o
+    // `formatBRL` da mensagem de erro imprimia um valor que o `invalidMoney`
+    // jamais aceitaria, e a comparacao `amount < minBid` ficava comparando
+    // float com float num dominio que e centavo inteiro.
+    if (invalidMoney(minBid)) throw new Error("Lance inválido");
     if (amount < minBid) {
-      throw new Error(`Lance deve ser ≥ R$ ${formatReais(minBid)}`);
+      throw new Error(`Lance deve ser ≥ R$ ${formatBRL(minBid)}`);
     }
   });
 
@@ -48,7 +63,7 @@ export async function placeBid(
         userId: outbidUserId,
         type: "outbid",
         title: "Lance superado",
-        content: `Seu lance de R$ ${formatReais(previousHighestBid.amount)} em ${item.title} foi superado por R$ ${formatReais(amount)}`,
+        content: `Seu lance de R$ ${formatBRL(previousHighestBid.amount)} em ${item.title} foi superado por R$ ${formatBRL(amount)}`,
       });
     } catch (e) {
       // ponytail: a notificacao no banco e o que a UI le; o e-mail e o extra.
@@ -69,7 +84,7 @@ export async function placeBid(
       // `undefined/maria-seller/item1` tambem contem `/maria-seller/item1`.
       const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       try {
-        const resposta = await resend.emails.send({
+        const sendResult = await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL ?? "Leiloeiro Nerd <noreply@leiloeironerd.com>",
           to: outbidUser.email,
           subject: "Seu lance foi superado!",
@@ -89,8 +104,8 @@ export async function placeBid(
         // no banco continuava chegando, entao a falha nao aparecia em lugar
         // nenhum. O envelope e `{ data, error }` (o `ResendClient` local e
         // frouxo de proposito, para nao acoplar o use case ao SDK).
-        if (resposta && typeof resposta === "object" && "error" in resposta && resposta.error) {
-          console.error("[bid] Resend recusou o e-mail de lance superado:", resposta.error);
+        if (sendResult && typeof sendResult === "object" && "error" in sendResult && sendResult.error) {
+          console.error("[bid] Resend recusou o e-mail de lance superado:", sendResult.error);
         }
       } catch (e) {
         console.error("[bid] falha ao enviar e-mail de lance superado:", e);
