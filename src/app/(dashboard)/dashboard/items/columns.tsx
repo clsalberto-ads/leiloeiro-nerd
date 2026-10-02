@@ -7,7 +7,6 @@ import { STATUS_LABELS, TYPE_LABELS } from "@/domain/repositories/item-repositor
 import type { DataTableColumn } from "@/components/data-table";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { BidCountdown } from "@/components/bid-countdown";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,

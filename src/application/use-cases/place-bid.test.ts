@@ -3,7 +3,7 @@ import { placeBid } from "./place-bid";
 import type { Bid, BidRepository, CreateBidInput, LockedBidItem, BidPlacement } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository, ItemStatus, CreateItemInput, UpdateItemInput, ItemImage, ItemListFilter } from "@/domain/repositories/item-repository";
 import type { UserProfile, UserRepository, UserRole, UpdateProfileInput } from "@/domain/repositories/user-repository";
-import type { NotificationRepository, CreateNotificationInput, Notification, NotificationType } from "@/domain/repositories/notification-repository";
+import type { NotificationRepository, CreateNotificationInput, Notification } from "@/domain/repositories/notification-repository";
 
 interface ResendClient {
   emails: {

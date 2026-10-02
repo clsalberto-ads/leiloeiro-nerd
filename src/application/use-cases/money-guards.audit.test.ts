@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createItem } from "./create-item";
 import { placeBid } from "./place-bid";
@@ -19,7 +19,7 @@ const BASE = {
   paymentDeadlineDays: 3,
 };
 
-function emptyRepo(user = SELLER) {
+function emptyRepo() {
   const repo = {
     async create(input: Record<string, unknown>) {
       return { ...BASE, id: "i1", sellerId: "u1", status: "draft", imageUrl: null, createdAt: new Date(), ...input } as never;

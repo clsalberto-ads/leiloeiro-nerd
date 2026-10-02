@@ -1,5 +1,5 @@
 // ponytail: o CONTRATO DA URL do dashboard. Existe pelo mesmo motivo do
-// `dashboard-table-state.ts` do lado dele: a pagina (servidor) e o `<PeriodoSelect>`
+// `dashboard-table-state.ts` do lado dele: a pagina (servidor) e o `<PeriodSelect>`
 // (cliente) leem e escrevem a MESMA escolha pelas MESMAS funcoes, e um parametro
 // nao pode virar duas respostas diferentes dependendo de quem leu.
 //
@@ -7,15 +7,15 @@
 // desta tela — o dashboard nao tem busca, nem pagina, nem ordenacao — entao o
 // href e a string simples com um parametro, e nao ha ordem fixa de campos.
 //
-// O `firstValue` (parametro repetido) e o MESMO de `items/page.tsx`, e foi
-// extraido para `@/lib/primeiro-valor` justamente para nao haver duas copias do
-// "o primeiro vence".
+// O parametro REPETIDO (`?periodo=7d&periodo=90d` chega no Next como array) e
+// resolvido pelo `firstValue` de `@/lib/first-value`, aplicado na pagina ANTES de
+// chegar aqui: `parsePeriod(firstValue(params.periodo))`. O "o primeiro vence" e a
+// unica politica coerente com o `URLSearchParams.get` do cliente, e ele mora em um
+// modulo so justamente para nao haver duas copias.
 //
 // Nenhum deste arquivo importa `next/*`, `react` ou qualquer componente: e por
 // isso que roda no servidor E no cliente, e que o teste acima nao precisa de
 // jsdom.
-
-import { firstValue } from "@/lib/first-value";
 
 export const DASHBOARD_PATH = "/dashboard";
 
@@ -32,7 +32,7 @@ export interface Period {
 }
 
 // ponytail: `Object.hasOwn` e nao `in` nem `includes`. `?periodo=toString`
-// passaria num `in DIAS_POR_PERIODO` (todo objeto herda de `Object.prototype`)
+// passaria num `in DAYS_PER_PERIOD` (todo objeto herda de `Object.prototype`)
 // e viraria `undefined` no `dias`, que seguiria para o `useCase` e para o
 // `date_trunc` do Postgres. A lista aqui e um `Record` de chaves fixas, entao
 // a propria checagem resolve.
@@ -42,8 +42,8 @@ const KEYS = new Set<string>(Object.keys(DAYS_PER_PERIOD));
  * Le `?periodo` e devolve a janela.
  *
  * ponytail: valor invalido NAO vira 404 e NAO e ignorado em silencio — cai no
- * padrao, a mesma decisao do `interpretarParametros` do `dashboard-table-state.ts`
- * (veja o `ponytail:` la sobre `?orderBy;drop`). Um `?periodo` malformado e erro
+ * padrao, a mesma decisao do `parseDashboardParams` do `dashboard-table-state.ts`
+ * (veja o `ponytail:` la sobre `?orderBy=;drop`). Um `?periodo` malformado e erro
  * de digitacao ou link de uma versao antiga da tela; transformar isso em "esta
  * pagina nao existe" seria a resposta errada para uma tela que existe e
  * funciona. Por isso o retorno NUNCA e um `dias` arbitrario: a funcao so pode

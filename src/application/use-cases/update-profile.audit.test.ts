@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { updateProfile } from "./update-profile";
-import type { UpdateProfileInput, UserProfile, UserRepository } from "@/domain/repositories/user-repository";
+import type { UpdateProfileInput, UserProfile } from "@/domain/repositories/user-repository";
 
 const SLUG_LONGO = "x".repeat(70);
 
 type Role = UserProfile["role"];
 
 function repo(role: Role = "bidder") {
-  const updateProfile = vi.fn(async (userId: string, input: UpdateProfileInput) => ({
+  const updateProfile = vi.fn(async (userId: string, _input: UpdateProfileInput) => ({
     id: userId, name: "Ana", email: "ana@ex.com", phone: null, slug: null, address: null, role: role,
   }));
   const findById = vi.fn(async (_id: string): Promise<UserProfile> => ({

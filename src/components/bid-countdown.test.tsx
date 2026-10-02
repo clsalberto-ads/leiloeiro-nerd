@@ -2,12 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { BidCountdown } from "./bid-countdown";
 
-// Mock Date.now() to control time in tests
-const realDateNow = Date.now;
+// Congela o relogio para os casos de contagem regressiva.
 vi.spyOn(global.Date, "now").mockReturnValue(new Date("2026-09-20T10:00:00Z").getTime());
 
 describe("BidCountdown", () => {
-  // ponytail: o teste anterior exigia `aria-live="polite"` e therefore fixava o
+  // ponytail: o teste anterior exigia `aria-live="polite"` e portanto fixava o
   // defeito. `role="timer"` implica `aria-live="off"`; o `polite` sobrescrevia
   // e o leitor de tela anunciava o relogio 1x/segundo pelo leilao inteiro. Este
   // e o teste que trava o NAO-anuncio: o `role="timer"` sozinho ja e o
