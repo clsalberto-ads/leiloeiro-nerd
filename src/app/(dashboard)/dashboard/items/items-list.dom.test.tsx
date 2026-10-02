@@ -84,10 +84,10 @@ const BOUNDARY_DEADLINE = new Date("2026-10-01T01:00:00Z");
 
 type Navigate = (view: DashboardTableView) => void;
 
-// ponytail: `navegar` e um `vi.fn()` e nao um `useRouter` mockado porque o
+// ponytail: `navigate` e um `vi.fn()` e nao um `useRouter` mockado porque o
 // contrato da lista e a VISTA, e nao a string que o Next receberia. O roteador
 // so aparece na pagina, e la a assercao e sobre `router.push` (ver
-// `ItensDaUrl — o clique vira URL`, no fim deste arquivo).
+// `ItemsUrl — o clique vira URL`, no fim deste arquivo).
 //
 // `responder` devolve a mesma arvore com outra prop `vista`, que e o que o servidor
 // faz depois de um `router.push` (e o que o "voltar" do navegador faz sem navegacao
@@ -650,7 +650,7 @@ describe("ItemsList — a paginação é do servidor", () => {
   // a prop de volta dispara o `push`, e o browser consome renderizacao sem ninguem
   // ter clicado. A garantia e o oposto do que o nome sugere — a prop NUNCA navega,
   // so RECONTA. Por isso o teste empurra a prop que o servidor devolveria e exige
-  // que `navegar` continue com uma unica chamada.
+  // que `navigate` continue com uma unica chamada.
   it("nao navega de novo quando a vista que o pai devolve e a que foi pedida", async () => {
     const { navigate, responder } = renderList({ totalCount: 100 });
 
@@ -691,9 +691,9 @@ describe("ItemsList — a paginação é do servidor", () => {
 // ponytail: aqui a assercao e sobre a STRING, e nao sobre a vista. E o unico teste
 // da cadeia inteira que fecha no roteador: ate aqui os outros provam "o clique
 // produz a vista certa" e "a pagina lê a URL", e este prova a emenda — a string
-// que sai daqui e a mesma que a `ItemsPage` vai ler de volta. Um `buildStorefrontHref` com
+// que sai daqui e a mesma que a `ItemsPage` vai ler de volta. Um `buildDashboardHref` com
 // os parametros fora de ordem, ou com `page=1` escrito, quebraria a equivalencia
-// `le(buildStorefrontHref(v)) === v` sem nenhum teste de vista notar.
+// `le(buildDashboardHref(v)) === v` sem nenhum teste de vista notar.
 describe("ItemsUrl — o clique vira URL", () => {
   // ponytail: a string tem que ser `?orderBy=title` e nao `?orderBy=title&direction=asc`
   // — a direcao `asc` e omitida porque e a que o leitor assume quando `orderBy`

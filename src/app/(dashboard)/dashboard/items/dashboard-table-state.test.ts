@@ -142,7 +142,7 @@ describe("dashboard-table-state — o termo de busca", () => {
   // ponytail: o `q` nao tem teto, e este e o teste que trava essa decisao. Cortar
   // o termo no meio mudaria o CONJUNTO que a busca devolve (o item com o titulo
   // inteiro deixaria de casar), que e a mesma mentira do `total` contado antes do
-  // filtro. Um teto aqui viraria um `slice` silencioso no meio do `buildStorefrontHref`.
+  // filtro. Um teto aqui viraria um `slice` silencioso no meio do `buildDashboardHref`.
   it("não trunca um termo longo: a URL é o que o usuario escreveu", () => {
     const termo = "c".repeat(300);
     expect(le(queryOf(withView({ q: termo })).toString()).q).toBe(termo);
@@ -211,7 +211,7 @@ describe("dashboard-table-state — número de URL que não é número de tela",
 
   it("page nao tem teto: link colado de uma lista que encolheu e inofensivo", () => {
     // ponytail: um `page=99999` devolve um `OFFSET` vazio, e quem trata disso e a
-    // pagina, com o `redirect` para a ultima pagina (ver `page.test.ts`). Um teto
+    // pagina, com o `redirect` para a ultima pagina (ver `page.test.tsx`). Um teto
     // aqui seria mais um numero para lembrar sem impedir nada.
     expect(le("?page=99999").page).toBe(99999);
   });
@@ -352,7 +352,7 @@ describe("dashboard-table-state — a ponte entre a coluna da tela e a coluna do
   //
   // O `it.each<[...]>` declara o tipo de cada coluna da tabela, e a anotacao nao e
   // decorativa: sem ela o `it.each` widenaria as duas celulas para `string`, e o
-  // `colunaDaOrdenacao(orderBy)` viraria um `as` — que e o que apagaria deste
+  // `sortColumnByOrder(orderBy)` viraria um `as` — que e o que apagaria deste
   // teste a unica verificacao que o compilador faz sobre o par (o `orderBy`
   // precisa ser membro da union para o segundo sentido compilar).
   it.each<[string, ItemOrderBy]>([
@@ -388,7 +388,7 @@ describe("dashboard-table-state — a última página", () => {
   });
 
   // ponytail: o piso 1 e o que impede o laco. Com `total = 0` nao existe ultima
-  // pagina, e `buildStorefrontHref({ page: 0 })` devolveria uma URL que a leitura troca
+  // pagina, e `buildDashboardHref({ page: 0 })` devolveria uma URL que a leitura troca
   // por `page=1` — o `redirect` apontaria para a propria URL de origem e o
   // navegador ficaria redirecionando para sempre. Uma tela vazia e a PRIMEIRA
   // pagina vazia.
@@ -402,8 +402,8 @@ describe("dashboard-table-state — a última página", () => {
 // `encodeQuery` em `dashboard-table-state.ts`, que afirmava `ler(emitir(v)) === emitir(v)`
 // para TODA vista. A equacao e FALSA: com `q` suja, ler volta o valor aparado, que
 // nao e a `DashboardTableView` original. A propriedade verdadeira e o ponto fixo do
-// HREF — `buildStorefrontHref(ler(buildStorefrontHref(v))) === buildStorefrontHref(v)` — e ela vale porque
-// a NORMALIZACAO e da escrita: o `buildStorefrontHref` apara o `q` antes de codificar.
+// HREF — `buildDashboardHref(ler(buildDashboardHref(v))) === buildDashboardHref(v)` — e ela vale porque
+// a NORMALIZACAO e da escrita: o `buildDashboardHref` apara o `q` antes de codificar.
 //
 // A frase vivia num comentario, entao o `tsc` nao a via e nenhum teste a negava.
 // E o mesmo defeito que a vitrine corrigiu no modulo irmao; os dois arquivos

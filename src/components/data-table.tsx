@@ -244,7 +244,7 @@ export function DataTable<T>({
   // acabou de ler dela.
   //
   // E o que NAO entra e o valor que a propria tabela acabou de notificar
-  // (`filtroNotificado.current`): esse e o ECO do pai, nao novidade dele, e
+  // (`notifiedFilter.current`): esse e o ECO do pai, nao novidade dele, e
   // escreve-lo de volta na caixa apagaria a tecla que o usuario deu depois do
   // pedido. A janela e a do debounce mais a do servidor — e por isso que o defeito
   // piora em conexao lenta, que e a situacao em que o usuario ainda esta digitando

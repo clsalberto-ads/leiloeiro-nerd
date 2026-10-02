@@ -58,7 +58,7 @@ async function StorefrontList({
             <GavelIcon aria-hidden="true" className="size-6 text-muted-foreground" />
           )
         }
-        // ponytail: o "voltar" e um LINK, e nao um botao que chama `navegar`: um
+        // ponytail: o "voltar" e um LINK, e nao um botao que chama `navigate`: um
         // link tem as afinidades que o botao nao tem (abrir em nova aba, clique do
         // meio, ctrl-clique, copiar endereco, rastreamento) sem ganhar nada em
         // troca, porque a propriedade que importa e "a URL e escrita num lugar so" —

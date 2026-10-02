@@ -21,7 +21,7 @@ export const items = pgTable("items", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 // ponytail: `items_seller_id_idx` e o indice da tela principal do app.
-// `listarPorVendedor` filtra por `seller_id` e o unico indice que havia
+// `listBySeller` filtra por `seller_id` e o unico indice que havia
 // (`bid_deadline, status`) comeca por outra coluna, entao o Postgres nao o
 // aproveita: o dashboard do vendedor — a query mais executada do produto, e
 // re-executada a cada tecla digitada na busca — fazia seq scan + sort da tabela

@@ -26,7 +26,7 @@ export const DASHBOARD_ITEMS_PATH = "/dashboard/items";
 //
 //   `DEFAULT_SORT_DIRECTION` ("desc") e a direcao da VISTA padrao — a tela sem
 //   nenhum parametro, que e "do mais recente para o mais antigo". E o que o
-//   `buildStorefrontHref` NAO escreve: a vista padrao e a string vazia.
+//   `buildDashboardHref` NAO escreve: a vista padrao e a string vazia.
 //
 //   `ASSUMED_SORT_DIRECTION` ("asc") e o que o LEITOR assume quando `orderBy` foi
 //   escrito e `direction` nao, e coincide com o default do `ItemListFilter`
@@ -40,7 +40,7 @@ export const DASHBOARD_ITEMS_PATH = "/dashboard/items";
 // inteira cabe numa frase: **`orderBy` escrito e `direction` ausente = "a ordem
 // natural daquela coluna"; nada escrito = a tela padrao**.
 //
-// A consequencia pratica e a unica regra nao obvia do `buildStorefrontHref`: `direction`
+// A consequencia pratica e a unica regra nao obvia do `buildDashboardHref`: `direction`
 // pode ser omitido quando `orderBy` foi escrito (o leitor assume "asc"), e NUNCA
 // quando `orderBy` e a vista padrao `createdAt` (o leitor assume "desc", que e a
 // tela). Sem essa distincao, `?direction=asc` — "dos mais antigos para os mais
@@ -246,14 +246,14 @@ export function parseDashboardParams(searchParams: SearchParamGetter): Dashboard
 // sobrevivesse na URL apareceria nela depois de um back/forward — e o campo de
 // texto e a unica parte da tela que o usuario pode REESCREVER, entao o que ele ve
 // precisa ser o que o servidor filtrou. Aparar nas duas pontes torna o
-// `buildStorefrontHref` ponto fixo: `buildStorefrontHref(interpretarParametros(ler(buildStorefrontHref(v))))`
-// devolve a MESMA string de `buildStorefrontHref(v)`, para toda `v`.
+// `buildDashboardHref` ponto fixo: `buildDashboardHref(parseDashboardParams(ler(buildDashboardHref(v))))`
+// devolve a MESMA string de `buildDashboardHref(v)`, para toda `v`.
 //
 // ponytail: a propriedade e do HREF e nao da VISTA, e a distincao e o que evita
 // um comentario que mente. `ler(emitir(v)) === emitir(v)` compara uma
 // `DashboardTableView` com uma `string` e e FALSO: com `q` suja (`"  console  "`), ler
 // volta o valor aparado, que nao e a `DashboardTableView` original. O que vale e que a
-// NORMALIZACAO e da escrita — o `buildStorefrontHref` apara antes de codificar (linha
+// NORMALIZACAO e da escrita — o `buildDashboardHref` apara antes de codificar (linha
 // abaixo) — e por isso que reescrever o endereco lido devolve o endereco. O mesmo
 // vale no modulo irmao da vitrine (`[slug]/storefront-state.ts`), e o caso de
 // teste com `q` suja esta em `dashboard-table-state.test.ts`.
@@ -302,7 +302,7 @@ export function toDashboardFilter(view: DashboardTableView): ItemListFilter {
 }
 
 // ponytail: a ultima pagina tem piso 1, e o piso e o caso que a divisao sozinha nao
-// cobre: com `total = 0` nao existe ultima pagina, e sem o piso o `buildStorefrontHref`
+// cobre: com `total = 0` nao existe ultima pagina, e sem o piso o `buildDashboardHref`
 // receberia `page = 0` — que a leitura rejeitaria e trocaria por 1 de novo, entao
 // a URL do redirecionamento seria a mesma que a de origem e o browser entraria em
 // laco. Uma tela vazia e a PRIMEIRA pagina vazia.

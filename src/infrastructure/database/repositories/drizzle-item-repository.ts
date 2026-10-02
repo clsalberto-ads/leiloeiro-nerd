@@ -238,7 +238,7 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
     return row ? toItem(row) : null;
   },
 
-  // ponytail: `findBySellerId` virou uma linha sobre `listarPorVendedor`, e nao o
+  // ponytail: `findBySellerId` virou uma linha sobre `listBySeller`, e nao o
   // contrario. Quem chama este metodo (a vitrine publica, via
   // `listActiveItemsBySellerId`) quer o conjunto INTEIRO, sem pagina e sem total — e
   // essa e a unica forma de ele continuar sendo "tudo o que casar com o filtro". A

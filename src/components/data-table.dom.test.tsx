@@ -288,7 +288,7 @@ describe("DataTable — o debounce sobrevive ao pai", () => {
     vi.useFakeTimers();
     try {
       const onFilterChange = vi.fn();
-      // `comPaiNovo()` cria uma arrow nova a cada chamada — e o que um pai que
+      // `withNewParent()` cria uma arrow nova a cada chamada — e o que um pai que
       // escreve `onFilterChange={(q) => ...}` no JSX produz a cada render.
       const withNewParent = () => (
         <DataTable columns={COLUNAS} data={ROWS} onFilterChange={(q) => onFilterChange(q)} />

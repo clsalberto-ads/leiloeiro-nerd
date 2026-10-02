@@ -37,9 +37,9 @@ export function StatusTabs({ view }: { view: DashboardTableView }) {
       {TABS.map((tab) => (
         <Link
           key={tab.key}
-          // ponytail: a aba e um link comum, e nao um `navegar` por callback, por
+          // ponytail: a aba e um link comum, e nao um `navigate` por callback, por
           // dois motivos. O primeiro e o prefetch: um `<Link>` traz o RSC quando o
-          // mouse passa, e a aba fica pronta. O segundo e o historico: `navegar` nao
+          // mouse passa, e a aba fica pronta. O segundo e o historico: `navigate` nao
           // e chamado, entao nao ha `queueMicrotask` no meio e nao se registra duas
           // entradas iguais para o mesmo destino.
           //

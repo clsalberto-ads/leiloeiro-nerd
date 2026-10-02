@@ -34,7 +34,7 @@ describe("BidCountdown", () => {
     expect(html).toContain('<span class="sr-only">Prazo: 20/09/2026, 08:00</span>');
   });
 
-  // O prazo que o LEITOR DE TELA ouve, em FUSO do produto. Antes desta correção
+  // O prazo que o LEITOR DE TELA ouve, em `APP_TIMEZONE` do produto. Antes desta correção
   // o `sr-only` formatava com `getUTCDate()`, e um deadline de 30/09 23:59 (fuso
   // de Sao Paulo) aparecia como "1/10 2:59" — um dia e tres horas errado. O
   // countdown numerico contava certo, entao o bug era invisivel olhando o numero.

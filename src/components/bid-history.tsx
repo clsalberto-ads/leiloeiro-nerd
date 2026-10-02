@@ -35,7 +35,7 @@ export function BidHistory({ bids }: { bids: Bid[] }) {
                 agrupa por dia no `drizzle-analytics-repository.ts` (grafico de
                 "lances por dia"); o outro leitor de data, `columns.tsx`, repete o
                 argumento por `bidDeadline`. O por que do fuso esta na casa
-                canonica, `@/lib/fuso`. Nao remova o `timeZone` achando que e
+                canonica, `@/lib/timezone`. Nao remova o `timeZone` achando que e
                 redundante: dev roda em America/Fortaleza (UTC-3, mesmo offset de
                 Sao Paulo hoje), onde o bug passa reto e so quebra em servidor UTC. */}
             <td className="py-2">{new Date(bid.createdAt).toLocaleDateString("pt-BR", { timeZone: APP_TIMEZONE })}</td>

@@ -7,7 +7,7 @@
 // faz. O servidor e o cliente concordam em vez de divergir no parametro
 // duplicado, que e um link malformado de qualquer jeito.
 //
-// Nasceu em `items/page.tsx` e foi copiado para `dashboard/period/periodo.ts`
+// Nasceu em `items/page.tsx` e foi copiado para `dashboard/period/period.ts`
 // quando a pagina do dashboard ganhou o `?periodo` — e a copia foi ate
 // documentada como tal, que e o jeito de dizer "aqui esta a duplicacao". Com dois
 // call sites, um modulo so.

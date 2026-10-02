@@ -7,7 +7,7 @@ import type { SearchParamGetter } from "@/app/(dashboard)/dashboard/items/dashbo
 // `Vista`, escrever de volta), e um modulo unico com dois formatos de vista
 // seria um tipo `Vista` com seis campos opcionais e nenhuma combinacao valida.
 // `SearchParamGetter` e IMPORTADO, e nao re-declarado — duas definicoes do mesmo
-// contrato e o mesmo defeito que `FUSO` e `firstValue` resolveram.
+// contrato e o mesmo defeito que `APP_TIMEZONE` e `firstValue` resolveram.
 //
 // ponytail: `ordenar` e `lance` e nao `preco` porque o que a vitrine ordena e o
 // lance ATUAL (`max(bids.amount)`), nao o lance inicial (`items.min_initial_bid`,

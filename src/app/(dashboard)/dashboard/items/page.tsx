@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // ponytail: esta pagina NAO tem `<Suspense>` nem `loading.tsx`, e a ausencia e uma
 // decisao medida, nao uma pendencia (o `TableSkeleton` que as duas usariam tambem
 // nao existe — a nota esta em `components/skeletons.tsx`). Envolver o trecho
-// `<ItensDaUrl>` em uma fronteira aqui seria decorativo: o `await` da sessao e o
+// `<ItemsUrl>` em uma fronteira aqui seria decorativo: o `await` da sessao e o
 // `await` da listagem acontecem no corpo desta pagina, antes de o JSX existir, entao
 // nada abaixo da fronteira suspende e o fallback nunca e despejado.
 //
@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 // que quebrariam.
 
 //
-// `firstValue` (o parametro repetido) vem de `@/lib/primeiro-valor`, e nao e
+// `firstValue` (o parametro repetido) vem de `@/lib/first-value`, e nao e
 // uma funcao local: o `?periodo` do dashboard usa a MESMA decisao ("o primeiro
 // vence"), e duas copias divergiriam no primeiro parametro duplicado.
 
@@ -74,7 +74,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   // primeira pagina": `?page=1` com filtro que nao devolve nada e a PRIMEIRA
   // pagina vazia, e mandando o usuario para ela a URL nao muda de nada, o
   // historico ganha uma entrada a toa e o botao "voltar" parece quebrado. A
-  // ultima pagina com piso 1 (em `ultimaPagina`) cobre o outro caso, que e o
+  // ultima pagina com piso 1 (em `lastPage`) cobre o outro caso, que e o
   // unico que faria laco: filtro sem nenhum item levaria a `page=0`, que a
   // leitura rejeitaria e trocaria por 1 de novo.
   if (view.page > 1 && items.length === 0) {

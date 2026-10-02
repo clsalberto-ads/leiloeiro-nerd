@@ -39,7 +39,7 @@ function listWith(view = DEFAULT_TABLE_VIEW): string {
 }
 
 // ponytail: a regex aceita qualquer query depois de `?status=`, e nao so
-// `?status=xxx`. A aba e montada pelo `buildStorefrontHref`, que pode preservar o
+// `?status=xxx`. A aba e montada pelo `buildDashboardHref`, que pode preservar o
 // `pageSize` escolhido pelo usuario — e um regex que so reconhecesse a forma
 // "limpa" silenciosamente ignoraria a aba na hora de trocar a ordem, com o teste
 // passando e a URL errada na tela. O segundo grupo (`[^"]*`) e o que garante que

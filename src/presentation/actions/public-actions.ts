@@ -30,7 +30,7 @@ export async function getStorefrontSellerAction(slug: string): Promise<SellerSto
 // objeto por construcao. A leitura da URL tem uma porta so
 // (`parseStorefrontView`), e ela fica no shell.
 //
-// ponytail: `drizzleEstatisticasDeLances` e NAO `drizzleBidRepository`. Sao duas
+// ponytail: `drizzleBidStatsList` e NAO `drizzleBidRepository`. Sao duas
 // portas diferentes de proposito: `BidRepository` GRAVA lances (`placeBid`) e a
 // vitrine so LE um agregado. Passar o repositorio inteiro aqui da certo por
 // acaso hoje e quebra no dia em que os fakes de `placeBid` receberem um metodo a

@@ -49,14 +49,14 @@ const SEARCH_PLACEHOLDER = "Buscar item";
 // antigo, uma string) e `emptyAction` (para onde ir). Nenhuma das duas muda de
 // tipo, entao nenhum consumidor existente precisou ser reescrito.
 //
-// O "voltar" e um LINK cujo `href` nasce do `buildStorefrontHref`, e nao um botao que
-// chama `navegar`. Um botao perderia as afinidades que so um link tem — abrir em
+// O "voltar" e um LINK cujo `href` nasce do `buildDashboardHref`, e nao um botao que
+// chama `navigate`. Um botao perderia as afinidades que so um link tem — abrir em
 // nova aba, clique do meio, ctrl-clique, copiar endereco, a URL na barra de status,
 // o rastreamento — sem ganhar nada em troca: a propriedade que importa aqui e
 // "a URL e escrita num lugar so", e ela continua valendo, porque quem escreve a
-// URL continua sendo o `buildStorefrontHref` (aqui chamado com a vista sem filtro, que e
+// URL continua sendo o `buildDashboardHref` (aqui chamado com a vista sem filtro, que e
 // a MESMA frase de URL com outra vista — nao uma segunda copia do endereco). A
-// costura `navegar(vista)` continua existindo para o resto da tela, onde o
+// costura `navigate(vista)` continua existindo para o resto da tela, onde o
 // destino depende de um clique e nao de um link: pagina, ordenacao, busca e
 // tamanho.
 //
@@ -112,7 +112,7 @@ export interface ItemsListProps {
   // travaria. O preco da obrigatoriedade e um `totalCount` a mais em cada teste
   // desta lista, e ele e justo: quem monta a tela tem o total.
   totalCount: number;
-  // ponytail: `navegar` e uma funcao e nao o `router` porque a lista nao deve
+  // ponytail: `navigate` e uma funcao e nao o `router` porque a lista nao deve
   // saber QUE roteador existe. E o que mantem os testes de DOM sem `vi.mock` de
   // `next/navigation`: eles passam um `vi.fn()` e conferem a VISTA que saiu, e nao a
   // string que o Next receberia. Um `useRouter()` dentro daqui jogaria fora essa

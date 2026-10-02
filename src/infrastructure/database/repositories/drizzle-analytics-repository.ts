@@ -14,7 +14,7 @@ import type {
   SellerSeries,
 } from "@/domain/repositories/analytics-repository";
 
-// ponytail: FUSO. Todo dia aqui e um dia em `America/Sao_Paulo`, agrupado no SQL
+// ponytail: fuso. Todo dia aqui e um dia em `America/Sao_Paulo`, agrupado no SQL
 // e nao no JavaScript, por dois motivos que so o SQL resolve:
 //
 //   1. O agrupamento tem de acontecer ANTES de a linha chegar no Node: agrupar em
@@ -25,13 +25,13 @@ import type {
 //      lance de 22h de sexta viraria sabado.
 //
 // `sql.raw` e nao `${FUSO}` de prop: o `'...'` entre aspas e o que o Postgres
-// espera em `AT TIME ZONE`, e `FUSO` e uma constante de compilacao (nada do
+// espera em `AT TIME ZONE`, e `APP_TIMEZONE` e uma constante de compilacao (nada do
 // usuario entra), entao inlinar por `sql.raw` e seguro e evita o parametro tipado
 // do driver.
 //
 // O ponto de usar a CONSTANTE e nao a string: a mesma `America/Sao_Paulo` ja e
 // lida pela celula de prazo da tabela de itens (`columns.tsx`), via
-// `@/lib/fuso`. Se os dois divergirem, o grafico de "lances por dia" contaria
+// `@/lib/timezone`. Se os dois divergirem, o grafico de "lances por dia" contaria
 // dias diferentes dos que a lista de itens mostra — e nada accuse isso, porque
 // os dois continuam "funcionando".
 const LOCAL_DAY = sql`date_trunc('day', ${bids.createdAt} at time zone ${sql.raw(`'${APP_TIMEZONE}'`)})`;
@@ -57,7 +57,7 @@ function fillDays(rows: { day: string; total: number }[], days: number, until: D
   for (let i = days - 1; i >= 0; i--) {
     // ponytail: a CHAVE do dia vem de `localDateOf`, e nao de `toISOString().slice`.
     // A janela e uma lista de dias do fuso do produto, e ela tem de casar com as
-    // chaves que o SQL agrupa (`date_trunc` em `at time zone FUSO`). Entre 18h e
+    // chaves que o SQL agrupa (`date_trunc` em `at time zone APP_TIMEZONE`). Entre 18h e
     // 21h BRT, `toISOString()` devolve a data de amanha e o ultimo ponto do
     // grafico saia rotulado com o dia errado.
     const day = localDateOf(startOfLocalDay(i, until));

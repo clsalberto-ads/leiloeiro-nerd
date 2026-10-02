@@ -22,7 +22,7 @@
 // `APP_TIMEZONE` no `.env.example` lido aqui, com este valor como default.
 export const APP_TIMEZONE = "America/Sao_Paulo";
 
-// ponytail: estes dois conversores sao o OUTRO LADO do `FUSO`, e existem porque o
+// ponytail: estes dois conversores sao o OUTRO LADO do `APP_TIMEZONE`, e existem porque o
 // `<input type="datetime-local">` manda uma "hora de parede" sem fuso nenhum
 // ("2026-09-30T23:59"). O par `new Date(essaString)` / `toISOString()` do
 // `item-form` e do `z.coerce.date()` interpreta essa string no fuso do PROCESSO, e

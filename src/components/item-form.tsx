@@ -62,7 +62,7 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
   // porque o input e uma HORA DE PAREDE sem fuso: o `toISOString()` usava o
   // fuso do PROCESSO, e num servidor em UTC o vendedor via 01/10 02:59 no lugar
   // dos 30/09 23:59 que ele digitou. A volta (ler de volta) e `fromInputDateString`, em
-  // `@/lib/validators` — os dois lados leem `FUSO`, entao o round-trip e exato em
+  // `@/lib/validators` — os dois lados leem `APP_TIMEZONE`, entao o round-trip e exato em
   // qualquer maquina. Ver o ponytail de `fromInputDateString`.
   const formattedDate = item?.bidDeadline ? toInputDateString(item.bidDeadline) : undefined;
 

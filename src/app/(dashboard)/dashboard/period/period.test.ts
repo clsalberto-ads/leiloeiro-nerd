@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { DAYS_PER_PERIOD, DEFAULT_PERIOD, buildPeriodHref, parsePeriod, periodLabel } from "./period";
 
 // ponytail: este arquivo e o CONTRATO DA URL do dashboard, e ele existe pelo
-// mesmo motivo do `estado-da-tabla.ts` do lado dele: a pagina (servidor) e o
-// `<PeriodoSelect>` (cliente) precisam ler e escrever a MESMA escolha pelas
+// mesmo motivo do `dashboard-table-state.ts` do lado dele: a pagina (servidor) e o
+// `<PeriodSelect>` (cliente) precisam ler e escrever a MESMA escolha pelas
 // MESMAS funcoes, e nenhum parametro pode virar duas respostas diferentes
 // dependendo de quem leu.
 //

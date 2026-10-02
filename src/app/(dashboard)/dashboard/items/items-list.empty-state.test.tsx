@@ -23,8 +23,8 @@ import { DEFAULT_TABLE_VIEW, type DashboardTableView } from "./dashboard-table-s
 // ONDE. O resto (as duas frases, a ausencia de acao sem filtro) continua sendo
 // leitura de tela, e para isso o DOM e o instrumento certo.
 //
-// O `navegar` e um espiao sem assertiva: com a saida virando link, o que a lista
-// NAO faz e chamar `navegar` para o estado vazio — e o `href` e a prova de que o
+// O `navigate` e um espiao sem assertiva: com a saida virando link, o que a lista
+// NAO faz e chamar `navigate` para o estado vazio — e o `href` e a prova de que o
 // gesto virou navegacao de verdade.
 function montar(view: DashboardTableView) {
   render(<ItemsList items={[]} view={view} totalCount={0} navigate={vi.fn()} />);
@@ -86,10 +86,10 @@ describe("ItemsList — os dois estados vazios", () => {
   });
 
   // ponytail: o que importa no "voltar" e PARA ONDE ele leva, e esse "onde" e a
-  // VISTA sem filtro traduzida pelo `buildStorefrontHref` (que mora em um lugar so). Um
+  // VISTA sem filtro traduzida pelo `buildDashboardHref` (que mora em um lugar so). Um
   // `/dashboard/items` escrito a mao passaria neste `it` — por isso a segunda
   // asercao, com a ordenacao e o tamanho preservados, que e exatamente o caso em
-  // que a segunda copia da frase divergiria do `buildStorefrontHref`.
+  // que a segunda copia da frase divergiria do `buildDashboardHref`.
   it("limpar filtros volta para a lista sem busca, sem aba e na primeira página", () => {
     montar({ ...DEFAULT_TABLE_VIEW, q: "nada", status: "active", page: 3 });
 
@@ -97,7 +97,7 @@ describe("ItemsList — os dois estados vazios", () => {
   });
 
   // ponytail: o filtro tambem muda a PAGINA, e `?page=3&q=nada` e a URL que a
-  // pagina corrige por `redirect` quando o filtro encolheu (veja `ultimaPagina`).
+  // pagina corrige por `redirect` quando o filtro encolheu (veja `lastPage`).
   // O "voltar" tem de manter o que o filtro NAO mudou: a ordenacao escolhida e o
   // tamanho da pagina foram cliques do usuario, e um "limpar filtros" que
   // devolvesse a tabela para `createdAt desc` de 10 em 10 apagaria os dois.

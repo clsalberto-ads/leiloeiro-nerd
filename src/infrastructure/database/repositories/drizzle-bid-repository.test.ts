@@ -13,7 +13,7 @@ describe("drizzleBidRepository", () => {
 });
 
 // ponytail: `paraEstatisticas` e a funcao pura que o teste alcanca, e ela existe
-// por um motivo concreto: `deVariosItens` faz I/O, e um teste de I/O aqui
+// por um motivo concreto: `ofManyItems` faz I/O, e um teste de I/O aqui
 // precisaria de banco. A transformacao "linhas do GROUP BY -> Map" e a parte que
 // tem regra (a ABSENCAO no mapa e o `highestBid === null`, e nao uma linha com
 // zero), entao e ela que o teste trava.
