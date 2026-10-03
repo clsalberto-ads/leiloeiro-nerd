@@ -116,13 +116,14 @@ export async function listStorefront(
 ): Promise<StorefrontItem[]> {
   const itemFilter: ItemListFilter = { status: "active" };
   if (view.q !== "") itemFilter.q = view.q;
+  if (view.type) itemFilter.type = view.type;
   const items: Item[] = await itemRepo.findBySellerId(sellerId, itemFilter);
   if (items.length === 0) return [];
 
   const ids = items.map((i) => i.id);
   const estatisticas: Map<string, BidStats> = await bidRepo.ofManyItems(ids);
 
-  const dtos: StorefrontItem[] = items.map((item) => {
+  let dtos: StorefrontItem[] = items.map((item) => {
     const stat = estatisticas.get(item.id);
     return {
       id: item.id,
@@ -136,6 +137,15 @@ export async function listStorefront(
       createdAt: item.createdAt,
     };
   });
+
+  if (typeof view.minPrice === "number" || typeof view.maxPrice === "number") {
+    const min = typeof view.minPrice === "number" ? view.minPrice : 0;
+    const max = typeof view.maxPrice === "number" ? view.maxPrice : Number.POSITIVE_INFINITY;
+    dtos = dtos.filter((d) => {
+      const price = d.highestBid ?? d.minInitialBid;
+      return price >= min && price <= max;
+    });
+  }
 
   return sortForStorefront(dtos, view.sort);
 }

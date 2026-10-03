@@ -38,7 +38,11 @@ export type StorefrontSort = (typeof STOREFRONT_SORT_OPTIONS)[number];
 export interface StorefrontView {
   q: string;
   sort: StorefrontSort;
+  type?: "product" | "service" | "piece";
+  minPrice?: number;
+  maxPrice?: number;
 }
+
 
 // ponytail: o padrao e "Termina em breve", e nao "Mais recentes". A vitrine e a
 // rota onde o visitante esta com dinheiro na mao e o item na tela: o que decide a
@@ -62,9 +66,18 @@ function isValidStorefrontSort(raw: string): raw is StorefrontSort {
 // e a `v` original com os espacos: e o `q` que o servidor filtrou.
 export function parseStorefrontView(searchParams: SearchParamGetter): StorefrontView {
   const sort = searchParams("ordenar");
+  const type = searchParams("tipo") ?? searchParams("type");
+  const minPrice = searchParams("min");
+  const maxPrice = searchParams("max");
+  const validType = type === "product" || type === "service" || type === "piece" ? type : undefined;
+  const min = minPrice ? Number(minPrice) : undefined;
+  const max = maxPrice ? Number(maxPrice) : undefined;
   return {
     q: (searchParams("q") ?? "").trim(),
     sort: sort !== null && isValidStorefrontSort(sort) ? sort : DEFAULT_STOREFRONT_VIEW.sort,
+    type: validType,
+    minPrice: Number.isFinite(min) && (min ?? 0) >= 0 ? Math.round(min as number) : undefined,
+    maxPrice: Number.isFinite(max) && (max ?? 0) >= 0 ? Math.round(max as number) : undefined,
   };
 }
 
@@ -81,5 +94,8 @@ export function buildStorefrontHref(slug: string, view: StorefrontView): string 
   const searchTerm = view.q.trim();
   if (searchTerm !== "") parts.push(`q=${encodeURIComponent(searchTerm)}`);
   if (view.sort !== DEFAULT_STOREFRONT_VIEW.sort) parts.push(`ordenar=${view.sort}`);
+  if (view.type) parts.push(`tipo=${view.type}`);
+  if (typeof view.minPrice === "number") parts.push(`min=${view.minPrice}`);
+  if (typeof view.maxPrice === "number") parts.push(`max=${view.maxPrice}`);
   return parts.length === 0 ? `/${slug}` : `/${slug}?${parts.join("&")}`;
 }

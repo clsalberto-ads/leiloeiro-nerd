@@ -146,6 +146,7 @@ export type ItemSortDirection = "asc" | "desc";
 // "Nenhum resultado".
 export interface ItemListFilter {
   status?: ItemStatus;
+  type?: ItemType;
   // ponytail: `q` e substring do TITULO e dos rotulos canonicos de status e de
   // tipo (`STATUS_LABELS`/`TYPE_LABELS`, mais acima), insensivel a caixa e a
   // acento. Ja foi mais estreito — so o titulo — e a Task 8 tinha consertado o
