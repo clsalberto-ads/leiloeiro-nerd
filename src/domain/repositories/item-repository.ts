@@ -227,7 +227,22 @@ export interface ItemLister {
 
 export interface ItemRepository {
   create(input: CreateItemInput): Promise<Item>;
-  update(id: string, input: UpdateItemInput): Promise<Item | null>;
+  /**
+   * Atualiza um item **que ainda seja rascunho**, e so esse.
+   *
+   * ponytail: o nome carrega o invariante de proposito. O `updateItem` le o item
+   * para checar `status === "draft"` e so entao escreve — e entre a leitura e a
+   * escrita o item pode ter sido publicado em outra aba. Com o `WHERE` so por
+   * `id`, essa edicao aterrissava em um item `active`, capaz de reescrever
+   * `minInitialBid`/`bidDeadline` DEPOIS de lances jaExistentes. O predicado de
+   * status no `WHERE` (e nao um segundo `if` no TypeScript) e o que fecha a
+   * corrida: as duas escritas competem pela mesma linha e o Postgres serializa.
+   *
+   * Nao ha `update` genérico atrás deste: o único caller é o `updateItem`, e um
+   * método que so atualiza rascunho nao pode ser chamado por engano no status
+   * errado.
+   */
+  updateDraft(id: string, input: UpdateItemInput): Promise<Item | null>;
   findById(id: string): Promise<Item | null>;
   findBySellerId(sellerId: string, filter?: ItemListFilter): Promise<Item[]>;
   delete(id: string): Promise<void>;

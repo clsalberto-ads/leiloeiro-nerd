@@ -215,7 +215,10 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
     return toItem(row!);
   },
 
-  async update(id, input) {
+  // O `eq(items.status, "draft")` NAO e repeticao do `if` do `updateItem`: e a
+  // unica forma de o banco recusar a escrita quando o status mudou entre a
+  // leitura do use case e este UPDATE. Ver `updateDraft` no contrato.
+  async updateDraft(id, input) {
     const [row] = await db
       .update(items)
       .set({
@@ -228,7 +231,7 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
         ...(input.paymentDeadlineDays !== undefined ? { paymentDeadlineDays: input.paymentDeadlineDays } : {}),
         updatedAt: new Date(),
       })
-      .where(eq(items.id, id))
+      .where(and(eq(items.id, id), eq(items.status, "draft")))
       .returning();
     return row ? toItem(row) : null;
   },

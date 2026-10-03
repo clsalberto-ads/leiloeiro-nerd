@@ -35,8 +35,14 @@ export async function updateItem(
   if (invalidPaymentDays(input.paymentDeadlineDays)) {
     throw new Error("Prazo de pagamento deve ser entre 1 e 30 dias");
   }
-  const result = await itemRepo.update(itemId, input);
-  if (!result) throw new Error("Item não encontrado");
+  const result = await itemRepo.updateDraft(itemId, input);
+  // ponytail: `updateDraft` devolve `null` quando o item sumiu OU quando ele nao
+  // e mais rascunho — e a segunda e o caminho normal depois do `if` acima, que
+  // so protege o caso em que o status ja tinha mudado ANTES desta leitura. A
+  // corrida que sobrou (publicado entre o `if` e o UPDATE) chega aqui, e a
+  // mensagem e a mesma de propósito: para o usuario o resultado e o mesmo
+  // item, nao editavel.
+  if (!result) throw new Error("Item publicado não pode ser editado");
   if (input.imageUrls?.length) {
     await createItemImages(itemRepo, itemId, input.imageUrls);
   }

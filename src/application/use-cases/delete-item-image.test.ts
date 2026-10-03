@@ -36,6 +36,9 @@ class FakeItemRepository implements ItemRepository {
   async closeExpired() {
     return [];
   }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
   deleted: string[] = [];
   constructor(private image: ItemImage | null, private item: Item | null = null) {}
   async findImageById() {

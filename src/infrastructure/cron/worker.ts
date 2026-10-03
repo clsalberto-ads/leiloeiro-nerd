@@ -40,7 +40,24 @@ worker.on("failed", (job, err) => console.error(`[worker] falha no job ${job?.id
 // permite top-level await) e mesmo assim o `node` recusa em CommonJS — um
 // gate que nao pegaria. Entao tudo que precisa esperar mora aqui dentro.
 async function main(): Promise<void> {
-  const fila = new Queue(AUCTION_QUEUE, { connection: { url: process.env.REDIS_URL } });
+  // ponytail: falha alto e logo, em vez de deixar o BullMQ e o drizzle caírem no
+  // `localhost:6379` / no banco local sem dizer nada. O `watch` que este script
+  // usava antes tornava isso pior a cada save: reiniciar o worker reexecutava
+  // este `main()`, re-registrava o agendador e escrevia de novo. Um worker que
+  // "funciona" apontando para o banco errado é o pior modo de falha possível
+  // aqui — ele encerra itens de verdade e reporta sucesso no console.
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) throw new Error("REDIS_URL ausente: o worker fecharia itens de expirados no Redis local");
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL ausente: o worker fecharia itens no banco local");
+
+  // O host no log e o que permite enxergar o alvo antes do primeiro `UPDATE`.
+  const host = (url: string) => new URL(url).host;
+  console.log(
+    `[worker] alvo: redis=${host(redisUrl)} banco=${host(process.env.DATABASE_URL)} ` +
+      `| expirados a cada ${CLOSE_EXPIRED_EVERY_MS / 1000}s`,
+  );
+
+  const fila = new Queue(AUCTION_QUEUE, { connection: { url: redisUrl } });
   await fila.upsertJobScheduler(
     CLOSE_EXPIRED_JOB,
     { every: CLOSE_EXPIRED_EVERY_MS },

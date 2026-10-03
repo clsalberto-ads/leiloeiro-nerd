@@ -13,7 +13,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
-    "worker": "tsx watch src/infrastructure/cron/worker.ts"
+    "worker": "tsx src/infrastructure/cron/worker.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

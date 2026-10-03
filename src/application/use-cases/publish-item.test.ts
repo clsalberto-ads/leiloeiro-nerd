@@ -36,6 +36,9 @@ class FakeItemRepository implements ItemRepository {
   async closeExpired() {
     return [];
   }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
 
   async setStatus(_: string, status: Item["status"]) {
     if (!this.item) return null;
