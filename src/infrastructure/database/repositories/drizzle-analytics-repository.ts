@@ -76,18 +76,40 @@ function windowStart(days: number): Date {
 }
 
 /**
- * `date_trunc` devolve `timestamp sem fuso`; o `pg` o entrega como `Date`
- * interpretado no fuso do processo (UTC no container), entao ler o
- * ano/mes/dia em UTC devolve a data que o Postgres agrupou — e nao "o mesmo
- * instante em Brasil", que trocaria o dia para quem agrupa por horario local.
+ * `date_trunc` devolve `timestamp SEM fuso`, e o `pg` parseia esse tipo
+ * construindo um `Date` a partir dos componentes DELE MESMO — ou seja, o
+ * `getFullYear`/`getMonth`/`getDate` desse `Date` sao a hora de parede que o
+ * Postgres agrupou, que aqui ja e `America/Sao_Paulo` porque o SQL aplicou
+ * `at time zone` antes do `date_trunc` (ver `LOCAL_DAY`).
+ *
+ * ponytail: ler `toISOString()` — o que esta funcao fazia — le os mesmos
+ * componentes EM UTC, e so dava a mesma coisa por acidente: o servidor de nuvem
+ * roda em UTC, entao "componentes locais" e "UTC" coincidem e o teste passava.
+ * Medido aqui com o `pg-types` de verdade, no mesmo parse do driver:
+ *
+ *     parede "2026-10-02 21:30"   TZ=UTC               -> asDayKey "2026-10-02"  ok
+ *                                  TZ=America/Sao_Paulo -> asDayKey "2026-10-03"  ERRADO
+ *
+ * Em `America/Sao_Paulo` (offset -03:00, sem horario de verao desde 2019), toda
+ * hora de parede entre 21:00 e 23:59 cai no dia seguinte em UTC. A chave do SQL
+ * deixava de casar com a chave da janela, que vem de `localDateOf`, e o
+ * `map.get(day)` devolvia `undefined`: o grafico mostrava ZERO onde havia lances
+ * e jogava o valor para o bucket do dia seguinte. Lendo os componentes LOCAIS o
+ * resultado fica identico em qualquer `TZ` do processo.
+ *
+ * Nao se usa `localDateOf` aqui de proposito: ele aplicaria `APP_TIMEZONE` uma
+ * segunda vez sobre um `Date` que ja carrega a hora de parede — o que seria a
+ * mesma dupla conversao de `toISOString()`, so que com o erro trocado de lado.
  */
-function asDayKey(value: unknown): string {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "string") return new Date(value).toISOString().slice(0, 10);
+export function asDayKey(value: unknown): string {
+  const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
   // `date_trunc` sobre `timestamptz` pode voltar como Date ou como string,
   // dependendo do tipo declarado do driver; um `Number` aqui seria um `NaN`
   // silencioso virando chave de grafico.
-  throw new Error("data_trunc devolveu um dia ilegível");
+  if (!date || Number.isNaN(date.getTime())) throw new Error("data_trunc devolveu um dia ilegível");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 export const drizzleAnalyticsRepository: AnalyticsRepository = {
