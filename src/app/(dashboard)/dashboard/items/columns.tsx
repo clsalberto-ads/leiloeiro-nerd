@@ -18,7 +18,7 @@ import { APP_TIMEZONE } from "@/lib/timezone";
 import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
 import type { DashboardItemRow } from "./dashboard-item-row";
 
-// ponytail: as COLUNAS moram no proprio arquivo porque e assim que o guia de
+// ponytail: as colunas moram no proprio arquivo porque e assim que o guia de
 // data-table do shadcn organiza a coisa: `columns.tsx` separado do componente
 // da tabela, com as ROW ACTIONS dentro dele (secao "Row Actions", que edita a
 // definicao das colunas para a coluna `actions` devolver um `<DropdownMenu>`).
@@ -146,9 +146,9 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
 // Postgres casa com o valor gravado, nao com o formatado), e o `filterValue` so
 // voltaria a valer no ramo cliente do `DataTable`, que nenhum consumidor desta
 // tela usa.
-export const COLUNAS: DataTableColumn<DashboardItemRow>[] = [
+export const ITEM_COLUMNS: DataTableColumn<DashboardItemRow>[] = [
   {
-    id: "titulo",
+    id: "title",
     header: "Título",
     accessorFn: (item) => item.title,
     cell: (item) => (
@@ -158,7 +158,7 @@ export const COLUNAS: DataTableColumn<DashboardItemRow>[] = [
     ),
   },
   {
-    id: "tipo",
+    id: "type",
     header: "Tipo",
     sortable: false,
     accessorFn: (item) => TYPE_LABELS[item.type],
@@ -172,13 +172,13 @@ export const COLUNAS: DataTableColumn<DashboardItemRow>[] = [
     cell: (item) => <ItemStatusBadge status={item.status} />,
   },
   {
-    id: "lanceMinimo",
+    id: "minInitialBid",
     header: "Lance mínimo",
     accessorFn: (item) => item.minInitialBid,
     cell: (item) => `R$ ${formatBRL(item.minInitialBid)}`,
   },
   {
-    id: "prazo",
+    id: "bidDeadline",
     header: "Deadline",
     accessorFn: (item) => item.bidDeadline.getTime(),
     cell: (item) => (
@@ -194,7 +194,7 @@ export const COLUNAS: DataTableColumn<DashboardItemRow>[] = [
     // ponytail: a coluna de acoes NAO tem `accessorFn` — e assim que a coluna
     // fica fora da ordenacao sem precisar de `sortable: false`: sem valor de
     // acesso nao ha o que comparar, e botao e link nao tem ordem.
-    id: "acoes",
+    id: "actions",
     header: "Ações",
     cell: (item) => <ItemActions item={item} />,
   },

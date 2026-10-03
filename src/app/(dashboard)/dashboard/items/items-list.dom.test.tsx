@@ -351,7 +351,7 @@ describe("ItemsList — as colunas que ordenam", () => {
   });
 
   // ponytail: o `it.each` e o que amarra a COLUNA DA TELA ao `orderBy` DO SERVIDOR,
-  // que e o par que o click atravessa. Um mapeamento trocado (id "prazo" indo para
+  // que e o par que o click atravessa. Um mapeamento trocado (id "bidDeadline" indo para
   // `minInitialBid`) e silencioso: a seta aparece, a URL muda, e so quem sabe o
   // mapeamento le o resultado. E `Lance mínimo -> minInitialBid` e o caso que
   // importa: e a coluna que precisa dizer "dinheiro" para o `ORDER BY` classificar

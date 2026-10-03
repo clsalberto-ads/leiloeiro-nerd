@@ -145,17 +145,25 @@ const VALID_STATUSES = new Set<string>(keysOf(STATUS_LABELS));
 // coluna que o `DataTable` inventou. Um `id` de coluna errado e o unico erro que
 // o compilador NAO pega (o valor continua sendo um `ItemOrderBy` valido), e quem
 // pega e o teste de DOM que clica em cada cabecalho ordenavel e ve a URL que sai.
+// ponytail: com o id de coluna em ingles, estas duas tabelas viraram quase
+// identidade — e mesmo assim NAO viraram `orderBy === column`. Elas sao a
+// WHITELIST de colunas ordenaveis: `status`, `type` e `actions` nao aparecem
+// aqui, e e por isso que `sortOrderByColumn` devolve `undefined` para elas e o
+// `items-list.tsx` ignora o clique em vez de escrever `?orderBy=status`, que o
+// leitor rejeitaria e trocaria pelo padrao (a URL mentindo sobre o que esta
+// ordenado). `createdAt: null` e o mesmo acordo pelo outro lado: ordenavel na
+// URL, sem coluna na tela.
 const SORT_COLUMN_BY_ORDER: Record<ItemOrderBy, string | null> = {
   createdAt: null,
-  title: "titulo",
-  minInitialBid: "lanceMinimo",
-  bidDeadline: "prazo",
+  title: "title",
+  minInitialBid: "minInitialBid",
+  bidDeadline: "bidDeadline",
 };
 
 const SORT_ORDER_BY_COLUMN: Record<string, ItemOrderBy | undefined> = {
-  titulo: "title",
-  lanceMinimo: "minInitialBid",
-  prazo: "bidDeadline",
+  title: "title",
+  minInitialBid: "minInitialBid",
+  bidDeadline: "bidDeadline",
 };
 
 export function sortColumnByOrder(order: ItemOrderBy): string | null {

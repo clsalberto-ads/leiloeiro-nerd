@@ -132,7 +132,7 @@ export async function listStorefront(
       bidDeadline: item.bidDeadline,
       imageUrl: item.imageUrl,
       totalBids: stat?.total ?? 0,
-      highestBid: stat?.maior ?? null,
+      highestBid: stat?.highestBid ?? null,
       createdAt: item.createdAt,
     };
   });

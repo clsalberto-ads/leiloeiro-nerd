@@ -112,15 +112,15 @@ export const drizzleBidRepository: BidRepository = {
 // Tipando a fronteira como `number | string`, remover a coercia passa a ser erro
 // de compilacao, e o unico `Number` defensivo do arquivo e o que sobrevive.
 //
-// ponytail: `maior` continua `number | null` e NAO foi alargado, porque `max()`
+// ponytail: `highestBid` continua `number | null` e NAO foi alargado, porque `max()`
 // de `integer` volta inteiro de verdade — o `Number` no corpo dele e o par do
 // `total`, e nao ha evidencia de que ele algum dia venha texto.
 export function toStats(
-  linhas: { itemId: string; total: number | string; maior: number | null }[],
+  linhas: { itemId: string; total: number | string; highestBid: number | null }[],
 ): Map<string, BidStats> {
   const mapa = new Map<string, BidStats>();
   for (const row of linhas) {
-    mapa.set(row.itemId, { total: Number(row.total), maior: row.maior === null ? null : Number(row.maior) });
+    mapa.set(row.itemId, { total: Number(row.total), highestBid: row.highestBid === null ? null : Number(row.highestBid) });
   }
   return mapa;
 }
@@ -139,7 +139,7 @@ export const drizzleBidStatsList: BidStatsList = {
       .select({
         itemId: bids.itemId,
         total: sql<number>`count(*)::int`,
-        maior: max(bids.amount),
+        highestBid: max(bids.amount),
       })
       .from(bids)
       .where(inArray(bids.itemId, itemIds))

@@ -356,9 +356,9 @@ describe("dashboard-table-state — a ponte entre a coluna da tela e a coluna do
   // teste a unica verificacao que o compilador faz sobre o par (o `orderBy`
   // precisa ser membro da union para o segundo sentido compilar).
   it.each<[string, ItemOrderBy]>([
-    ["titulo", "title"],
-    ["lanceMinimo", "minInitialBid"],
-    ["prazo", "bidDeadline"],
+    ["title", "title"],
+    ["minInitialBid", "minInitialBid"],
+    ["bidDeadline", "bidDeadline"],
   ])("a coluna %s volta para %s", (column, orderBy) => {
     expect(sortOrderByColumn(column)).toBe(orderBy);
     expect(sortColumnByOrder(orderBy)).toBe(column);
@@ -370,7 +370,7 @@ describe("dashboard-table-state — a ponte entre a coluna da tela e a coluna do
 
   it("coluna que não está no contrato não vira orderBy", () => {
     expect(sortOrderByColumn("status")).toBeUndefined();
-    expect(sortOrderByColumn("acoes")).toBeUndefined();
+    expect(sortOrderByColumn("actions")).toBeUndefined();
   });
 });
 

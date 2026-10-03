@@ -20,15 +20,15 @@ describe("drizzleBidRepository", () => {
 describe("paraEstatisticas", () => {
   it("agrupa as linhas por item", () => {
     const mapa = toStats([
-      { itemId: "i1", total: 3, maior: 28080 },
-      { itemId: "i2", total: 1, maior: 10000 },
+      { itemId: "i1", total: 3, highestBid: 28080 },
+      { itemId: "i2", total: 1, highestBid: 10000 },
     ]);
-    expect(mapa.get("i1")).toEqual({ total: 3, maior: 28080 });
-    expect(mapa.get("i2")).toEqual({ total: 1, maior: 10000 });
+    expect(mapa.get("i1")).toEqual({ total: 3, highestBid: 28080 });
+    expect(mapa.get("i2")).toEqual({ total: 1, highestBid: 10000 });
   });
 
-  it("item sem lance NAO entra no mapa — a ausencia e o maior === null", () => {
-    const mapa = toStats([{ itemId: "i1", total: 1, maior: 500 }]);
+  it("item sem lance NAO entra no mapa — a ausencia e o highestBid === null", () => {
+    const mapa = toStats([{ itemId: "i1", total: 1, highestBid: 500 }]);
     expect(mapa.has("i2")).toBe(false);
   });
 
@@ -40,13 +40,13 @@ describe("paraEstatisticas", () => {
     // o `pg` entrega `bigint` como TEXTO e a assinatura declara `number` porque e
     // o que o `sql<number>` promete — o cast forja a discrepancia que o banco
     // produz, e e ela que o `Number()` existe para absorber.
-    const linhas = [{ itemId: "i1", total: "3" as unknown as number, maior: 28080 }];
-    expect(toStats(linhas).get("i1")).toEqual({ total: 3, maior: 28080 });
+    const linhas = [{ itemId: "i1", total: "3" as unknown as number, highestBid: 28080 }];
+    expect(toStats(linhas).get("i1")).toEqual({ total: 3, highestBid: 28080 });
   });
 
-  it("`maior: null` continua null: `Number(null)` seria 0, e 0 e um lance", () => {
-    const mapa = toStats([{ itemId: "i1", total: 0, maior: null }]);
-    expect(mapa.get("i1")).toEqual({ total: 0, maior: null });
+  it("`highestBid: null` continua null: `Number(null)` seria 0, e 0 e um lance", () => {
+    const mapa = toStats([{ itemId: "i1", total: 0, highestBid: null }]);
+    expect(mapa.get("i1")).toEqual({ total: 0, highestBid: null });
   });
 });
 

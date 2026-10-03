@@ -16,11 +16,11 @@ function item(id: string, over: Partial<Item> = {}): Item {
   };
 }
 
-function vitrineItem(id: string, maior: number | null, over: Partial<StorefrontItem> = {}): StorefrontItem {
+function vitrineItem(id: string, highestBid: number | null, over: Partial<StorefrontItem> = {}): StorefrontItem {
   return {
     id, title: `Item ${id}`, type: "product", minInitialBid: 1000,
     bidDeadline: new Date("2026-10-10T12:00:00Z"), imageUrl: null,
-    totalBids: maior === null ? 0 : 1, highestBid: maior,
+    totalBids: highestBid === null ? 0 : 1, highestBid: highestBid,
     createdAt: new Date("2026-01-01T00:00:00Z"), ...over,
   };
 }
@@ -142,7 +142,7 @@ describe("listStorefront", () => {
   it("carrega as estatisticas dos itens numa unica chamada em lote", async () => {
     const pedidos: string[][] = [];
     const bids: BidStatsList = {
-      async ofManyItems(ids) { pedidos.push(ids); return new Map([["i1", { total: 2, maior: 700 }]]); },
+      async ofManyItems(ids) { pedidos.push(ids); return new Map([["i1", { total: 2, highestBid: 700 }]]); },
     };
     const itemRepo = { async findBySellerId() { return [item("i1"), item("i2")]; } };
     await listStorefront(itemRepo as never, bids, "u1", VISTA);
@@ -151,7 +151,7 @@ describe("listStorefront", () => {
   });
 
   it("projeta no DTO: o maior lance do mapa entra no card", async () => {
-    const bids = { async ofManyItems() { return new Map([["i1", { total: 2, maior: 700 }]]); } };
+    const bids = { async ofManyItems() { return new Map([["i1", { total: 2, highestBid: 700 }]]); } };
     const itemRepo = { async findBySellerId() { return [item("i1")]; } };
     const [first] = await listStorefront(itemRepo as never, bids, "u1", VISTA);
     expect(first.highestBid).toBe(700);
