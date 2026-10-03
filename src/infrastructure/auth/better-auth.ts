@@ -31,9 +31,9 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: { type: "string", required: false, defaultValue: "bidder", input: false },
-      slug: { type: "string", required: false, unique: true },
-      phone: { type: "string", required: false },
-      address: { type: "string", required: false },
+      slug: { type: "string", required: false, unique: true, input: false },
+      phone: { type: "string", required: false, input: false },
+      address: { type: "string", required: false, input: false },
     },
   },
   database: drizzleAdapter(db, {

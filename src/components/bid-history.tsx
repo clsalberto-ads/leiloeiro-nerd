@@ -1,8 +1,8 @@
-import type { Bid } from "@/domain/repositories/bid-repository";
+import type { BidView } from "@/domain/repositories/bid-repository";
 import { formatBRL } from "@/lib/format-brl";
 import { APP_TIMEZONE } from "@/lib/timezone";
 
-export function BidHistory({ bids }: { bids: Bid[] }) {
+export function BidHistory({ bids }: { bids: BidView[] }) {
   if (bids.length === 0) {
     return <p className="text-sm text-muted-foreground">Nenhum lance ainda.</p>;
   }

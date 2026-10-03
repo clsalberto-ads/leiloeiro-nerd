@@ -8,6 +8,22 @@ export interface Bid {
   createdAt: Date;
 }
 
+/**
+ * `Bid` sem o `bidderId`: a forma que pode ATRAVESSAR a fronteira
+ * server -> client.
+ *
+ * ponytail: `bid-section.tsx` e `bid-history.tsx` sao `"use client"` e recebem
+ * a lista de lances como prop, entao cada `bidderId` e serializado no payload do
+ * RSC e fica no IndexedDB/React DevTools de qualquer visitante da vitrine. Nenhum
+ * componente do cliente USA o campo — e o `bidderName` sozinho ja resolve o que
+ * a tela precisa mostrar. Um conserto anterior trocou o UUID visivel por nome mas
+ * deixou o campo no objeto, que e o vazamento de verdade: o id interno do
+ * arrematante nao tem nada de util na vitrine e permite correlacionar a mesma
+ * pessoa entre itens. Por isso o DTO e um tipo, e nao um `delete` no mapper: o
+ * `Bid` completo continua existindo para o servidor (notificacoes, e-mail).
+ */
+export type BidView = Omit<Bid, "bidderId">;
+
 export interface CreateBidInput {
   itemId: string;
   bidderId: string;
@@ -58,12 +74,12 @@ export interface BidRepository {
 // (que sao a mesma query): e "filtro antes do agregado, e nao depois".
 export interface BidStats {
   total: number;
-  maior: number | null;
+  highestBid: number | null;
 }
 
 // ponytail: AUSENCIA no `Map` e o "sem lance": so entra item que apareceu no
 // `GROUP BY`, e nao uma linha de zero para todo item pedido. E por isso que
-// `maior` e `number | null` e nao `number` — o card da vitrine le `mapa.get(id)`
+// `highestBid` e `number | null` e nao `number` — o card da vitrine le `mapa.get(id)`
 // e usa a ausencia para escrever "ainda ninguem deu lance", que nao e a mesma
 // coisa que um maior lance de R$ 0.
 export interface BidStatsList {
