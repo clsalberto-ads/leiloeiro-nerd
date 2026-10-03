@@ -20,8 +20,12 @@ const reaisToCents = (v: number) => Math.round(v * CENTS_PER_REAL);
 // porta na fronteira, que é onde ela deve ficar.
 // 2_000_000_000 centavos = R$ 20.000.000,00: muito acima de qualquer leilão, com
 // folga para o teto do int4.
-const MAX_CENTS = 2_000_000_000;
+export const MAX_CENTS = 2_000_000_000;
 const MONEY_LIMIT_MSG = "Valor acima do máximo permitido";
+// Teto do `integer` do Postgres. O `MAX_CENTS` acima e o teto de NEGOCIO (e fica
+// abaixo deste de proposito, para o int4 ser o limite final); a soma dos dois campos
+// de dinheiro e medida contra este, porque e a soma que o `placeBid` faz.
+const INT4_MAX = 2_147_483_647;
 
 export const signUpSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
@@ -77,8 +81,21 @@ export const itemSchema = z.object({
         return undefined;
       }
     })
-    .pipe(z.array(z.string().url()).max(10).optional()),
-});
+    .pipe(z.array(z.url({ protocol: /^https?$/ })).max(10).optional()),
+})
+  // ponytail: o teto acima fecha cada campo, mas o `placeBid` soma
+  // `highestBid.amount + minBidIncrement` para chegar no piso do proximo lance.
+  // Dois campos cada um no teto dao uma soma de 4_000_000_000, que passa em cada
+  // `.max`, passa no `invalidMoney` do piso e NAO tem nenhum valor valido de
+  // lance: o item aceitava o primeiro lance e ficava para sempre sem segundo,
+  // sem erro visivel. O limite da SOMA e o do `int4` (2_147_483_647) e nao o
+  // `MAX_CENTS` de negocio (2_000_000_000) — `MAX_CENTS` como teto da soma
+  // rejeitaria `minInitialBid` exatamente no teto, que `validators.test.ts`
+  // fixa como valor VALIDO, e o incremento tem `.min(1)`: nunca da para zero.
+  .refine((v) => v.minInitialBid + v.minBidIncrement <= INT4_MAX, {
+    message: "Lance mínimo + incremento não pode passar do máximo permitido",
+    path: ["minBidIncrement"],
+  });
 
 export const imageUploadSchema = z.object({
   images: z

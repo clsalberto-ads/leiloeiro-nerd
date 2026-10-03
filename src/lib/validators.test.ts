@@ -205,4 +205,27 @@ describe("teto de dinheiro (limite do int4)", () => {
     expect(itemSchema.safeParse({ ...base, minBidIncrement: "20000000.01" }).success).toBe(false);
     expect(itemSchema.safeParse({ ...base, minInitialBid: "20000000.00" }).success).toBe(true);
   });
+
+  // ponytail: o `.max(2_000_000_000)` de cada campo nao diz nada sobre a SOMA, e a
+  // soma e o que o `placeBid` faz para chegar no piso do proximo lance
+  // (`highestBid.amount + minBidIncrement`). Com os dois campos perto do teto, o
+  // piso passava de 2_147_483_647 — e nao existia nenhum valor de lance que
+  // satisfizesse o piso E cabesse no int4, entao o item aceitava o primeiro lance
+  // e ficava para sempre sem segundo, sem erro em lugar nenhum.
+  it("rejeita a soma de lance minimo + incremento que estoura o int4", () => {
+    const base = {
+      title: "Action Figure rara",
+      description: "Colecionável lacrado em estojo.",
+      type: "product",
+      bidDeadline: new Date(Date.now() + 86_400_000).toISOString(),
+    };
+    // 2.000.000.000 + 200.000.000 = 2.200.000.000 > int4
+    expect(
+      itemSchema.safeParse({ ...base, minInitialBid: "20000000.00", minBidIncrement: "2000000.00" }).success,
+    ).toBe(false);
+    // a soma logo abaixo do int4 continua valida
+    expect(
+      itemSchema.safeParse({ ...base, minInitialBid: "20000000.00", minBidIncrement: "5.00" }).success,
+    ).toBe(true);
+  });
 });
