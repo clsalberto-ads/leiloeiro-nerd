@@ -1,4 +1,4 @@
-import { integer, index, pgEnum, pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { integer, index, uniqueIndex, pgEnum, pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
 import { user as userTable } from "./auth-schema";
 
 export const itemTypeEnum = pgEnum("item_type", ["product", "service", "piece"]);
@@ -84,3 +84,18 @@ export const notifications = pgTable("notifications", {
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("notifications_user_id_idx").on(t.userId)]);
+export const userFavorites = pgTable(
+  "user_favorites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("user_favorites_user_id_item_id_idx").on(table.userId, table.itemId)],
+);
+
