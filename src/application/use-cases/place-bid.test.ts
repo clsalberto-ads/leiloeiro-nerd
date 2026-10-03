@@ -97,6 +97,10 @@ class FakeItemRepository implements ItemRepository {
   async delete(_id: string): Promise<void> {
     throw new Error("não usado");
   }
+  async closeExpired() {
+    return [];
+  }
+
   async setStatus(_id: string, _status: ItemStatus): Promise<Item | null> {
     throw new Error("não usado");
   }

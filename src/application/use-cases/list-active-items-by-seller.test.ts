@@ -22,6 +22,9 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 class FakeItemRepository implements ItemRepository {
+  async closeExpired() {
+    return [];
+  }
   calls: { sellerId: string; filter?: ItemListFilter }[] = [];
   constructor(private rows: Item[]) {}
   async findBySellerId(sellerId: string, filter?: ItemListFilter) {

@@ -160,7 +160,7 @@ export interface ItemListFilter {
   // "01/10/2026"): o SQL tem 123456 e um `timestamptz`, e nenhum dos dois e o que
   // a tela mostra. Tabem por escolha: buscar "50,00" e traz o item de 1.000,00 e
   // traz o de 50,00, e o servidor nao tem como saber qual dos dois o usuario quis.
-  // A receita continua a mesma da Task 9 e esta na nota do `COLUNAS` em
+  // A receita continua a mesma da Task 9 e esta na nota do `ITEM_COLUMNS` em
   // `items-list.tsx` (`filterValue` no `DataTableColumn`) — mas ela e debito do
   // RAMO CLIENTE do `DataTable` e nao desta tela: com a lista so servidor, quem
   // busca e este `WHERE`, e nenhum consumidor de produto usa o ramo cliente.
@@ -232,6 +232,19 @@ export interface ItemRepository {
   findBySellerId(sellerId: string, filter?: ItemListFilter): Promise<Item[]>;
   delete(id: string): Promise<void>;
   setStatus(id: string, status: ItemStatus): Promise<Item | null>;
+  /**
+   * Encerra TODO item `active` cujo prazo de lances ja passou, num unico
+   * statement, e devolve os ids encerrados.
+   *
+   * ponytail: `setStatus` nao serve aqui porque o worker nao tem a lista dos ids —
+   * e o motivo de o status `closed` ser inalcancavel ate aqui: nenhum codigo
+   * produz `active -> closed`. O `UPDATE ... WHERE status = 'active' AND
+   * bid_deadline <= now` e o que faz essa transicao existir, e ser um unico
+   * statement e o que torna o worker seguro para rodar em paralelo com o
+   * `placeBid`: as duas escritas competem pela MESMA linha e o Postgres serializa,
+   * em vez de o worker ler uma lista e reaplicar em cima de uma mudanca.
+   */
+  closeExpired(now: Date): Promise<string[]>;
   countBids(itemId: string): Promise<number>;
   findImagesByItemId(itemId: string): Promise<ItemImage[]>;
   findImageById(imageId: string): Promise<ItemImage | null>;

@@ -33,6 +33,9 @@ function makeImage(overrides: Partial<ItemImage> = {}): ItemImage {
 }
 
 class FakeItemRepository implements ItemRepository {
+  async closeExpired() {
+    return [];
+  }
   deleted: string[] = [];
   constructor(private image: ItemImage | null, private item: Item | null = null) {}
   async findImageById() {

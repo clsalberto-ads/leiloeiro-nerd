@@ -33,6 +33,10 @@ class FakeItemRepository implements ItemRepository {
     return [];
   }
   async delete() {}
+  async closeExpired() {
+    return [];
+  }
+
   async setStatus(_: string, status: Item["status"]) {
     if (!this.item) return null;
     this.statuses.push(status);

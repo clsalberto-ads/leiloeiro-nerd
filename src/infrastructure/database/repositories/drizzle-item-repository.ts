@@ -1,5 +1,5 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, asc, count, desc, eq, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, lte, max, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/infrastructure/database/drizzle";
@@ -262,6 +262,20 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
       .where(eq(items.id, id))
       .returning();
     return row ? toItem(row) : null;
+  },
+
+  // ponytail: o `status = 'active'` no WHERE e o que impede o worker de
+  // REENCERRAR um item que o `placeBid` terminou entre a leitura e a escrita —
+  // um `awaiting_payment` nao volta para `closed`. Sem o predicado de status o
+  // job seria idempotente por acidente e perderia essa corrida uma vez por
+  // auction, exatamente no instante do pagamento.
+  async closeExpired(now) {
+    const rows = await db
+      .update(items)
+      .set({ status: "closed", updatedAt: now })
+      .where(and(eq(items.status, "active"), lte(items.bidDeadline, now)))
+      .returning({ id: items.id });
+    return rows.map((row) => row.id);
   },
 
   async countBids(itemId) {
