@@ -14,7 +14,7 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  role: roleEnum("role").default("bidder"),
+  role: roleEnum("role").notNull().default("bidder"),
   slug: text("slug").unique(),
   phone: text("phone"),
   address: text("address"),

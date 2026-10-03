@@ -248,7 +248,7 @@ export interface ItemRepository {
   delete(id: string): Promise<void>;
   setStatus(id: string, status: ItemStatus): Promise<Item | null>;
   /**
-   * Encerra TODO item `active` cujo prazo de lances ja passou, num unico
+   * Encerra todos os itens `active` cujo prazo de lances ja passou, num unico
    * statement, e devolve os ids encerrados.
    *
    * ponytail: `setStatus` nao serve aqui porque o worker nao tem a lista dos ids —

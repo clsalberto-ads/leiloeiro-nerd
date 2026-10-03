@@ -141,7 +141,7 @@ describe("updateItem — as mesmas regras que o createItem recheca", () => {
 
   // ponytail: `UpdateItemInput` e uma atualizacao PARCIAL — todo campo e
   // opcional e `undefined` significa "nao mexer aqui". Se a checagem tratasse
-  // `undefined` como invalido, TODO save de um item sem mexer no prazo
+  // `undefined` como invalido, o campo permanece o mesmo
   // quebraria, porque o `itemSchema` sempre manda o campo.
   it("aceita um patch que nao mexe no prazo nem no dinheiro", async () => {
     const repo = new FakeItemRepository(baseItem);

@@ -3,6 +3,8 @@ import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
 import { renderOutbidEmail } from "@/lib/email-templates";
+import { INVALID_BID } from "@/lib/validators";
+
 import { formatBRL } from "@/lib/format-brl";
 import { invalidMoney } from "./money-guards";
 
@@ -29,7 +31,7 @@ export async function placeBid(
   // quatro portoes e ia para a coluna `bids.amount`. O guard fica ANTES de qualquer
   // consulta porque nao ha item carregado para compare aqui: um valor nao-finito nao
   // e "lance abaixo do minimo", e um erro proprio que nao mente sobre o piso.
-  if (invalidMoney(amount)) throw new Error("Lance inválido");
+  if (invalidMoney(amount)) throw new Error(INVALID_BID);
   const item = await itemRepo.findById(itemId);
   if (!item) throw new Error("Item não encontrado");
   if (item.status !== "active") throw new Error("Item não está em leilão");
@@ -49,7 +51,7 @@ export async function placeBid(
     // `formatBRL` da mensagem de erro imprimia um valor que o `invalidMoney`
     // jamais aceitaria, e a comparacao `amount < minBid` ficava comparando
     // float com float num dominio que e centavo inteiro.
-    if (invalidMoney(minBid)) throw new Error("Lance inválido");
+    if (invalidMoney(minBid)) throw new Error(INVALID_BID);
     if (amount < minBid) {
       throw new Error(`Lance deve ser ≥ R$ ${formatBRL(minBid)}`);
     }

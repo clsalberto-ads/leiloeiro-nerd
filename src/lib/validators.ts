@@ -115,7 +115,7 @@ export const imageUploadSchema = z.object({
 // validators.test.ts é o que quebra se os dois divergirem.
 export const MIN_BID_CENTS = 100;
 
-const INVALID_BID = "Lance inválido";
+export const INVALID_BID = "Lance inválido";
 
 export const placeBidSchema = z.object({
   itemId: z.string().uuid(),
