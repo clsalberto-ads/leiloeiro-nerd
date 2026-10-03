@@ -1,7 +1,7 @@
-import { ROTULO_STATUS, type ItemStatus } from "@/domain/repositories/item-repository";
+import { STATUS_LABELS, type ItemStatus } from "@/domain/repositories/item-repository";
 import { Badge } from "@/components/ui/badge";
 
-// ponytail: o TEXTO do badge nao mora aqui — e `ROTULO_STATUS`, no dominio, e o
+// ponytail: o TEXTO do badge nao mora aqui — e `STATUS_LABELS`, no dominio, e o
 // mesmo texto que a coluna da tabela, que a aba e que a busca server-side casam.
 // A decisao de o rotulo ser do dominio esta escrita la. O que sobra deste lado e a
 // COR, e e a unica coisa aqui que o dominio nao tem por que saber: `emerald-100`
@@ -18,5 +18,5 @@ const CLASSES: Record<ItemStatus, string> = {
 };
 
 export function ItemStatusBadge({ status }: { status: ItemStatus }) {
-  return <Badge className={CLASSES[status]} role="status">{ROTULO_STATUS[status]}</Badge>;
+  return <Badge className={CLASSES[status]} role="status">{STATUS_LABELS[status]}</Badge>;
 }

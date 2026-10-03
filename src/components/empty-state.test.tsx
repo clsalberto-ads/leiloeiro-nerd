@@ -43,10 +43,10 @@ describe("EmptyState", () => {
   // `description` fosse obrigatoria, a tabela teria de inventar uma frase para
   // preencher um campo que o consumidor nao pediu.
   it("omite a descricao quando ela nao vem", () => {
-    const com = renderToString(<EmptyState title="Só o título" description="Some isto." />);
+    const withView = renderToString(<EmptyState title="Só o título" description="Some isto." />);
     const sem = renderToString(<EmptyState title="Só o título" />);
 
-    expect(com).toContain("Some isto.");
+    expect(withView).toContain("Some isto.");
     expect(sem).not.toContain("Some isto.");
     expect(sem).toContain("Só o título");
     // ponytail: o `data-slot` e o que mantem o estado vazio IDENTIFICAVEL no

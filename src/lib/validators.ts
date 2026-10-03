@@ -1,26 +1,31 @@
 import { z } from "zod";
 import { createSlug } from "@/domain/value-objects/slug";
-import { formatReais } from "@/lib/format-reais";
-import { deInputDeData } from "@/lib/fuso";
+import { formatBRL } from "@/lib/format-brl";
+import { fromInputDateString } from "@/lib/timezone";
 
-// ponytail: UNIDADE. O dominio, o payload da action e o `minBid` do item sao
-// sempre em CENTAVOS; so o campo visivel do form de lance e em REAIS. Este
-// divisor e a unica ponte entre as duas — o `reaisToCents` vai p/ cima dele e o
-// `bidFormSchema` divide por ele, em vez de reescrever o piso como literal.
-const CENTAVOS_POR_REAL = 100;
+// ponytail: FONTE ÚNICA DE VERDADE. Domínio, payload da action e o `minBid` do
+// item são SEMPRE em CENTAVOS; só o campo visível do formulário de lance é em
+// REAIS. Este divisor é a única ponte entre os dois — `reaisToCents` sobe até ele
+// e `bidFormSchema` divide por ele, em vez de reescrever o piso como literal.
+const CENTS_PER_REAL = 100;
 
-const reaisToCents = (v: number) => Math.round(v * CENTAVOS_POR_REAL);
+const reaisToCents = (v: number) => Math.round(v * CENTS_PER_REAL);
 
-// ponytail: TETO do dinheiro, em CENTAVOS. Toda coluna de dinheiro e `integer`
-// (int4) no Postgres, e o int4 para em 2_147_483_647. Sem este teto, um
-// `amount: 5000000000` passa pelo `placeBidSchema` (que so tem piso), passa
-// pela revalidacao dentro da transacao, e morre no `INSERT` com `22003 integer
-// out of range` — que a action devolvia ao usuario como `err.message`, ou seja,
-// o SQL do insert e os parametros na tela. O teto fecha a porta na fronteira,
-// que e onde ela deve estar. 2.000.000.000 de centavos = R$ 20.000.000,00: muito
-// acima de qualquer Leilao, e com folga para o teto do int4.
-const MAX_CENTAVOS = 2_000_000_000;
-const DINHEIRO_LIMITE = "Valor acima do máximo permitido";
+// ponytail: TETO DE DINHEIRO, em CENTAVOS. Toda coluna de dinheiro é `integer`
+// (int4) no Postgres, e int4 estoura em 2_147_483_647. Sem este teto,
+// `amount: 5000000000` passa no `placeBidSchema` (que só tem piso), passa na
+// revalidação dentro da transação e morre no `INSERT` com
+// `22003 integer out of range` — que a action devolvia ao usuário como
+// `err.message`, isto é, o SQL do insert e os parâmetros na tela. O teto fecha a
+// porta na fronteira, que é onde ela deve ficar.
+// 2_000_000_000 centavos = R$ 20.000.000,00: muito acima de qualquer leilão, com
+// folga para o teto do int4.
+export const MAX_CENTS = 2_000_000_000;
+const MONEY_LIMIT_MSG = "Valor acima do máximo permitido";
+// Teto do `integer` do Postgres. O `MAX_CENTS` acima e o teto de NEGOCIO (e fica
+// abaixo deste de proposito, para o int4 ser o limite final); a soma dos dois campos
+// de dinheiro e medida contra este, porque e a soma que o `placeBid` faz.
+const INT4_MAX = 2_147_483_647;
 
 export const signUpSchema = z.object({
   name: z.string().min(2, "Nome muito curto"),
@@ -37,7 +42,7 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("E-mail inválido"),
 });
 
-/** Converte FormData num objeto plano para validação Zod em server actions. */
+/** Converte `FormData` em um objeto plano para a validação do Zod nas server actions. */
 export function formToObject(formData: FormData): Record<string, string> {
   return Object.fromEntries(formData.entries()) as Record<string, string>;
 }
@@ -46,17 +51,17 @@ export const itemSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres").max(150, "Título muito longo"),
   description: z.string().min(10, "Descrição deve ter no mínimo 10 caracteres").max(5000, "Descrição muito longa"),
   type: z.enum(["product", "service", "piece"], { message: "Tipo inválido" }),
-  minInitialBid: z.coerce.number().positive("Lance mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Lance mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
-  minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE).refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
-  // ponytail: o preprocess NAO substitui o `z.coerce.date()`, ele so devolve a
-  // string para `deInputDeData` antes dele. Um `Date` pronto continua passando
-  // direto (por isso o `typeof === "string"`), e um ISO com `Z`/`+hh:mm` tambem:
-  // sao inequivocos, e `deInputDeData` os repassa. So a string crua do
-  // `datetime-local` — a unica que nao carrega fuso — passa a ser lida no fuso do
-  // produto. Sem isso, salvar qualquer campo do item num servidor em UTC arrastava
-  // o prazo 3 h para tras. Ver `deInputDeData` em `@/lib/fuso`.
+  minInitialBid: z.coerce.number().positive("Lance mínimo inválido").max(MAX_CENTS / CENTS_PER_REAL, MONEY_LIMIT_MSG).refine((v) => v >= 1, "Lance mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
+  minBidIncrement: z.coerce.number().positive("Incremento mínimo inválido").max(MAX_CENTS / CENTS_PER_REAL, MONEY_LIMIT_MSG).refine((v) => v >= 1, "Incremento mínimo deve ser de pelo menos R$ 1,00").transform(reaisToCents),
+  // ponytail: o preprocess NÃO substitui o `z.coerce.date()`, ele apenas
+  // repassa a string para `fromInputDateString` antes disso. Um `Date` pronto
+  // continua passando direto (é a checagem `typeof === "string"`), e uma ISO com
+  // `Z`/`+hh:mm` também passa: são inequívocas, e o `fromInputDateString` as
+  // repassa. SÓ a string crua de `datetime-local` — a única sem zona — é lida no
+  // fuso do produto. Sem isso, salvar QUALQUER campo do item em um servidor UTC
+  // arrastava o prazo 3 h para trás. Veja `fromInputDateString` em `@/lib/timezone`.
   bidDeadline: z.preprocess(
-    (v) => (typeof v === "string" ? deInputDeData(v) : v),
+    (v) => (typeof v === "string" ? fromInputDateString(v) : v),
     z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),
   ),
   paymentDeadlineDays: z.coerce.number().int("Dias de pagamento inválido").min(1, "Mínimo 1 dia para pagamento").max(30, "Máximo 30 dias para pagamento").default(3),
@@ -76,8 +81,21 @@ export const itemSchema = z.object({
         return undefined;
       }
     })
-    .pipe(z.array(z.string().url()).max(10).optional()),
-});
+    .pipe(z.array(z.url({ protocol: /^https?$/ })).max(10).optional()),
+})
+  // ponytail: o teto acima fecha cada campo, mas o `placeBid` soma
+  // `highestBid.amount + minBidIncrement` para chegar no piso do proximo lance.
+  // Dois campos cada um no teto dao uma soma de 4_000_000_000, que passa em cada
+  // `.max`, passa no `invalidMoney` do piso e NAO tem nenhum valor valido de
+  // lance: o item aceitava o primeiro lance e ficava para sempre sem segundo,
+  // sem erro visivel. O limite da SOMA e o do `int4` (2_147_483_647) e nao o
+  // `MAX_CENTS` de negocio (2_000_000_000) — `MAX_CENTS` como teto da soma
+  // rejeitaria `minInitialBid` exatamente no teto, que `validators.test.ts`
+  // fixa como valor VALIDO, e o incremento tem `.min(1)`: nunca da para zero.
+  .refine((v) => v.minInitialBid + v.minBidIncrement <= INT4_MAX, {
+    message: "Lance mínimo + incremento não pode passar do máximo permitido",
+    path: ["minBidIncrement"],
+  });
 
 export const imageUploadSchema = z.object({
   images: z
@@ -91,38 +109,38 @@ export const imageUploadSchema = z.object({
     .refine((f) => Array.from(f).every((file) => file.type.startsWith("image/")), "Apenas imagens"),
 });
 
-// ponytail: o piso canonico do lance, em CENTAVOS, mora aqui e e lido pelo
-// `placeBidSchema` e pelo `bidFormSchema` (que so divide por CENTAVOS_POR_REAL).
-// Nenhum dos dois pode reescrever o numero; a tabela de paridade em
-// validators.test.ts e o que quebra se os dois divergirem.
-export const MIN_BID_CENTAVOS = 100;
+// ponytail: o piso canônico de lance, em CENTAVOS, mora aqui e é lido tanto por
+// `placeBidSchema` quanto por `bidFormSchema` (que só divide por `CENTS_PER_REAL`).
+// Nenhum dos dois pode reescrever o número; a tabela de paridade em
+// validators.test.ts é o que quebra se os dois divergirem.
+export const MIN_BID_CENTS = 100;
 
-const LANCE_INVALIDO = "Lance inválido";
+const INVALID_BID = "Lance inválido";
 
 export const placeBidSchema = z.object({
   itemId: z.string().uuid(),
-  amount: z.coerce.number().positive(LANCE_INVALIDO).int(LANCE_INVALIDO).max(MAX_CENTAVOS, DINHEIRO_LIMITE).refine((v) => v >= MIN_BID_CENTAVOS, `Lance mínimo R$ ${formatReais(MIN_BID_CENTAVOS)}`),
+  amount: z.coerce.number().positive(INVALID_BID).int(INVALID_BID).max(MAX_CENTS, MONEY_LIMIT_MSG).refine((v) => v >= MIN_BID_CENTS, `Lance mínimo R$ ${formatBRL(MIN_BID_CENTS)}`),
 });
 
 /**
- * Schema do campo visivel do form de lance: `itemId` vem do servidor (pick) e
- * `amountReais` e o que o usuario digita, em REAIS. O piso e o `minBid` do item
- * (em centavos) convertido pelo mesmo divisor do servidor, e nunca abaixo do
- * `MIN_BID_CENTAVOS` — assim um item com `minInitialBid` de R$ 1,00 nao pode
- * deixar passar um lance que a action vai rejeitar.
+ * Schema do campo visível do formulário de lance: `itemId` vem do servidor (via
+ * `pick`) e `amountReais` é o que o usuário digita, em REAIS. O piso é o `minBid`
+ * do item (em centavos) convertido pelo mesmo divisor do servidor, e nunca abaixo
+ * de `MIN_BID_CENTS` — assim um item com `minInitialBid` de R$ 1,00 não deixa
+ * passar um lance que a action vai rejeitar.
  */
 export function bidFormSchema(minBid: number) {
-  const pisoCentavos = Math.max(minBid, MIN_BID_CENTAVOS);
+  const floorCents = Math.max(minBid, MIN_BID_CENTS);
   return placeBidSchema.pick({ itemId: true }).extend({
     amountReais: z
-      .number({ message: LANCE_INVALIDO })
-      .positive(LANCE_INVALIDO)
-      // o `amount` do payload e em centavos: o lance em reais precisa sobreviver
-      // a ida e volta (reais -> centavos -> reais). E o mesmo "centavos
-      // inteiros" que o `placeBidSchema` exige, sem depender do `step` do input.
-      .refine((v) => reaisToCents(v) / CENTAVOS_POR_REAL === v, LANCE_INVALIDO)
-      .max(MAX_CENTAVOS / CENTAVOS_POR_REAL, DINHEIRO_LIMITE)
-      .min(pisoCentavos / CENTAVOS_POR_REAL, `Lance mínimo R$ ${formatReais(pisoCentavos)}`),
+      .number({ message: INVALID_BID })
+      .positive(INVALID_BID)
+      // o `amount` do payload é em centavos: o lance em reais precisa sobreviver
+      // ao ida-e-volta (reais -> centavos -> reais). Mesmos "centavos inteiros" que
+      // o `placeBidSchema` exige, sem depender do `step` do input.
+      .refine((v) => reaisToCents(v) / CENTS_PER_REAL === v, INVALID_BID)
+      .max(MAX_CENTS / CENTS_PER_REAL, MONEY_LIMIT_MSG)
+      .min(floorCents / CENTS_PER_REAL, `Lance mínimo R$ ${formatBRL(floorCents)}`),
   });
 }
 

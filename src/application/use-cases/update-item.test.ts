@@ -24,7 +24,10 @@ class FakeItemRepository implements ItemRepository {
   async create() {
     return baseItem;
   }
-  async update(_: string, input: Partial<Item>) {
+  /** simula o item sendo publicado entre a leitura e o UPDATE */
+  raceWithPublish = false;
+  async updateDraft(_: string, input: Partial<Item>) {
+    if (this.raceWithPublish) return null;
     if (!this.item) return null;
     this.item = { ...this.item, ...input };
     return this.item;
@@ -36,6 +39,10 @@ class FakeItemRepository implements ItemRepository {
     return [];
   }
   async delete() {}
+  async closeExpired() {
+    return [];
+  }
+
   async setStatus() {
     return this.item;
   }
@@ -64,6 +71,16 @@ describe("updateItem", () => {
 
   it("bloqueia edição de item publicado", async () => {
     const repo = new FakeItemRepository({ ...baseItem, status: "active" });
+    await expect(updateItem(repo, "u1", "i1", { title: "X" })).rejects.toThrow("Item publicado não pode ser editado");
+  });
+
+  it("bloqueia edição quando o item é publicado entre a leitura e a escrita", async () => {
+    // ponytail: e a corrida que o `updateDraft` fecha. O `if` de status acima
+    // viu `draft`; entre ele e o UPDATE outra aba publicou o item. O `WHERE` do
+    // repositorio devolve `null` em vez de sobrescrever `minInitialBid` de um
+    // item `active`, e o usuario recebe a mesma mensagem do caso bloqueado.
+    const repo = new FakeItemRepository(baseItem);
+    repo.raceWithPublish = true;
     await expect(updateItem(repo, "u1", "i1", { title: "X" })).rejects.toThrow("Item publicado não pode ser editado");
   });
 

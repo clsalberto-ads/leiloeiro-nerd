@@ -1,5 +1,6 @@
 import type { Item, ItemRepository, UpdateItemInput } from "@/domain/repositories/item-repository";
 import { createItemImages } from "./create-item-images";
+import { invalidMoney, invalidPaymentDays } from "./money-guards";
 
 export async function updateItem(
   itemRepo: ItemRepository,
@@ -26,13 +27,22 @@ export async function updateItem(
     throw new Error("Prazo de lances deve ser no futuro");
   }
   if (
-    (input.minInitialBid !== undefined && input.minInitialBid < 100) ||
-    (input.minBidIncrement !== undefined && input.minBidIncrement < 100)
+    (input.minInitialBid !== undefined && invalidMoney(input.minInitialBid)) ||
+    (input.minBidIncrement !== undefined && invalidMoney(input.minBidIncrement))
   ) {
     throw new Error("Lance mínimo deve ser de pelo menos R$ 1,00");
   }
-  const result = await itemRepo.update(itemId, input);
-  if (!result) throw new Error("Item não encontrado");
+  if (invalidPaymentDays(input.paymentDeadlineDays)) {
+    throw new Error("Prazo de pagamento deve ser entre 1 e 30 dias");
+  }
+  const result = await itemRepo.updateDraft(itemId, input);
+  // ponytail: `updateDraft` devolve `null` quando o item sumiu OU quando ele nao
+  // e mais rascunho — e a segunda e o caminho normal depois do `if` acima, que
+  // so protege o caso em que o status ja tinha mudado ANTES desta leitura. A
+  // corrida que sobrou (publicado entre o `if` e o UPDATE) chega aqui, e a
+  // mensagem e a mesma de propósito: para o usuario o resultado e o mesmo
+  // item, nao editavel.
+  if (!result) throw new Error("Item publicado não pode ser editado");
   if (input.imageUrls?.length) {
     await createItemImages(itemRepo, itemId, input.imageUrls);
   }

@@ -94,7 +94,7 @@ describe("BidForm — erro de campo no DOM real", () => {
 
   // ponytail: `minBid` de 100 e o piso que o `itemSchema` ainda permite a um
   // item novo. Este e o teste que fecha a mutacao do piso do servidor: se o
-  // `MIN_BID_CENTAVOS` subir, o cliente passa a exigir o novo piso AQUI (R$ 2,00
+  // `MIN_BID` subir, o cliente passa a exigir o novo piso AQUI (R$ 2,00
   // vira erro) em vez de aceitar um lance que a action vai rejeitar.
   it("aceita lance acima do piso do item com o item no minimo legal", async () => {
     render(<BidForm itemId={ITEM_ID} minBid={100} />);

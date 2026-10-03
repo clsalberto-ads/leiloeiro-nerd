@@ -10,8 +10,8 @@ import type { ItemListFilter, ItemLister, ItemListResult } from "@/domain/reposi
 function normalizar(filter?: ItemListFilter): ItemListFilter | undefined {
   if (!filter) return undefined;
   const q = filter.q?.trim();
-  const limite = normalizarLimite(filter.limit);
-  const deslocamento = normalizarOffset(filter.offset);
+  const limite = normalizeLimit(filter.limit);
+  const deslocamento = normalizeOffset(filter.offset);
   if (q === filter.q && limite === filter.limit && deslocamento === filter.offset) return filter;
   const limpo: ItemListFilter = { ...filter };
   if (q) limpo.q = q;
@@ -29,15 +29,15 @@ function normalizar(filter?: ItemListFilter): ItemListFilter | undefined {
 // "todos" — some; `offset 0` e "a partir do primeiro", que e a pagina 1 e a forma
 // canonica de ela ser pedida, entao fica. Um `offset` negativo tambem nao e pagina -1:
 // e erro de SQL, entao e apeado para 0.
-function normalizarLimite(valor?: number): number | undefined {
-  if (valor === undefined || !Number.isFinite(valor)) return undefined;
-  const inteiro = Math.trunc(valor);
-  return inteiro > 0 ? inteiro : undefined;
+function normalizeLimit(value?: number): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+  const int = Math.trunc(value);
+  return int > 0 ? int : undefined;
 }
 
-function normalizarOffset(valor?: number): number | undefined {
-  if (valor === undefined || !Number.isFinite(valor)) return undefined;
-  return Math.max(0, Math.trunc(valor));
+function normalizeOffset(value?: number): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.trunc(value));
 }
 
 export async function listSellerItems(

@@ -23,9 +23,6 @@ class FakeItemRepository implements ItemRepository {
   async create() {
     return baseItem;
   }
-  async update() {
-    return this.item;
-  }
   async findById() {
     return this.item;
   }
@@ -35,6 +32,13 @@ class FakeItemRepository implements ItemRepository {
   async delete(id: string) {
     this.deleted.push(id);
   }
+  async closeExpired() {
+    return [];
+  }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
+
   async setStatus() {
     return this.item;
   }

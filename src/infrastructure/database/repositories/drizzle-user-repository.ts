@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import { items } from "@/infrastructure/database/schema";
-import type { UserProfile, UserRepository, VitrineDeVendedorRepository } from "@/domain/repositories/user-repository";
+import type { UserProfile, UserRepository, SellerStorefrontRepository } from "@/domain/repositories/user-repository";
 
 export const drizzleUserRepository: UserRepository = {
   async updateProfile(userId, input) {
@@ -75,7 +75,7 @@ export const drizzleUserRepository: UserRepository = {
 // a diferenca entre um `(select count(*) ...)` e um `join lateral`.
 //
 // O `count(*)::int` e obrigatorio: sem o cast o Postgres devolve `bigint`, o `pg`
-// entrega como TEXTO, e `totalDeItensAtivos` viraria a string "3" — que no
+// entrega como TEXTO, e `activeItemCount` viraria a string "3" — que no
 // `pluralize` do hero comparada com 1 seria sempre falsa.
 // ponytail: a consulta mora numa funcao EXPORTADA e nao inline no metodo, e o
 // motivo e o teste. Um teste que montasse a propria query para conferir o SQL
@@ -83,15 +83,15 @@ export const drizzleUserRepository: UserRepository = {
 // a segunda fonte de verdade que este projeto vem desarmando. Com a consulta
 // exportada, `drizzle-user-repository.test.ts` afirma o SQL que o codigo de
 // producao executa.
-export function consultaDeVitrine(slug: string) {
+export function storefrontQuery(slug: string) {
   return db
     .select({
       id: userTable.id,
       name: userTable.name,
       slug: userTable.slug,
       image: userTable.image,
-      criadoEm: userTable.createdAt,
-      totalDeItensAtivos: sql<number>`count(${items.id})::int`,
+      createdAt: userTable.createdAt,
+      activeItemCount: sql<number>`count(${items.id})::int`,
     })
     .from(userTable)
     .leftJoin(items, and(eq(items.sellerId, userTable.id), eq(items.status, "active")))
@@ -100,7 +100,7 @@ export function consultaDeVitrine(slug: string) {
     .limit(1);
 }
 
-export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
+export const drizzleSellerStorefrontRepository: SellerStorefrontRepository = {
   async findVitrineBySlug(slug) {
     // ponytail: o `LEFT JOIN` no lugar da subquery correlacionada por um BUG que a
     // suite nao pegou e so a rota real pegou (HTTP 500, `42883 No operator matches`).
@@ -123,7 +123,7 @@ export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
     // `innerJoin` a linha sumiria e a vitrine distinguiria "vendedor sem itens" de
     // "vendedor inexistente" — o `notFound()` do shell passaria a responder 404
     // para um vendedor que existe e nao tem nada leiloado.
-    const [row] = await consultaDeVitrine(slug);
+    const [row] = await storefrontQuery(slug);
     if (!row || !row.slug) return null;
     // o objeto e montado campo a campo (como o `findBySlug` acima) porque o
     // `{ ...row }` do plano nao carrega o estreitamento do `!row.slug` para o
@@ -133,8 +133,8 @@ export const drizzleVitrineDeVendedorRepository: VitrineDeVendedorRepository = {
       name: row.name,
       slug: row.slug,
       image: row.image,
-      criadoEm: row.criadoEm,
-      totalDeItensAtivos: Number(row.totalDeItensAtivos),
+      createdAt: row.createdAt,
+      activeItemCount: Number(row.activeItemCount),
     };
   },
 };

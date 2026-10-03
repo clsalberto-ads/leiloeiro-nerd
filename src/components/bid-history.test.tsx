@@ -7,7 +7,7 @@ import { BidHistory } from "./bid-history";
 // horario de verao desde 2019). E o instante que separa os dois fusos: em UTC e
 // "01/10/2026", no fuso do produto e "30/09/2026". Um lance caido nesse intervalo
 // de uma hora mostra o dia errado no servidor de producao.
-const LANCE_NA_BORDA: Bid = {
+const BOUNDARY_BID: Bid = {
   id: "b1",
   itemId: "i1",
   bidderId: "u1",
@@ -18,7 +18,7 @@ const LANCE_NA_BORDA: Bid = {
 };
 
 function html(): string {
-  return renderToString(<BidHistory bids={[LANCE_NA_BORDA]} />);
+  return renderToString(<BidHistory bids={[BOUNDARY_BID]} />);
 }
 
 describe("BidHistory", () => {
@@ -39,15 +39,15 @@ describe("BidHistory", () => {
   // O `delete` no caso `undefined` cobre a maquina que nao tem `TZ` setado: sem
   // ele o restauro gravaria a string `"undefined"` como fuso.
   it("renderiza a data do lance no fuso do produto, e nao no fuso do processo", () => {
-    const fusoOriginal = process.env.TZ;
+    const originalTimezone = process.env.TZ;
     try {
       process.env.TZ = "UTC";
-      const saida = html();
-      expect(saida).toContain("30/09/2026");
-      expect(saida).not.toContain("01/10/2026");
+      const output = html();
+      expect(output).toContain("30/09/2026");
+      expect(output).not.toContain("01/10/2026");
     } finally {
-      if (fusoOriginal === undefined) delete process.env.TZ;
-      else process.env.TZ = fusoOriginal;
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
     }
   });
 });

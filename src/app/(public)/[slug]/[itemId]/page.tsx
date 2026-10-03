@@ -3,12 +3,17 @@ import { getItemDetailAction } from "@/presentation/actions/public-actions";
 import { ItemGallery } from "@/components/item-gallery";
 import { BidCountdown } from "@/components/bid-countdown";
 import { BidSection } from "@/components/bid-section";
-import { formatReais } from "@/lib/format-reais";
+import { formatBRL } from "@/lib/format-brl";
+import { isUuid } from "@/lib/uuid";
 
 export const dynamic = "force-dynamic";
 
 export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[itemId]">) {
   const { slug, itemId } = await params;
+  // ponytail: o mesmo `isUuid` de `get-item-by-slug-and-id.ts`, e aqui sem nenhuma
+  // consulta ainda: para `fetch`, a vitrine e publica, entao qualquer visitante
+  // pode digitar `/ana/xyz` e ver um 500 em vez de um 404.
+  if (!isUuid(itemId)) notFound();
   const { item, images, bids } = await getItemDetailAction(slug, itemId);
   if (!item) notFound();
   const imageUrls = images.map((i) => i.url);
@@ -20,7 +25,7 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
         <h1 className="text-2xl font-bold">{item.title}</h1>
         <p className="text-muted-foreground">{item.description}</p>
         <div className="flex gap-4 text-sm text-muted-foreground">
-          <span>Lance mínimo: R$ {formatReais(item.minInitialBid)}</span>
+          <span>Lance mínimo: R$ {formatBRL(item.minInitialBid)}</span>
           <BidCountdown deadline={item.bidDeadline} />
         </div>
       </div>

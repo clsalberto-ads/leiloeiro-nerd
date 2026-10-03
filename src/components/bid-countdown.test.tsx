@@ -2,12 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { BidCountdown } from "./bid-countdown";
 
-// Mock Date.now() to control time in tests
-const realDateNow = Date.now;
+// Congela o relogio para os casos de contagem regressiva.
 vi.spyOn(global.Date, "now").mockReturnValue(new Date("2026-09-20T10:00:00Z").getTime());
 
 describe("BidCountdown", () => {
-  // ponytail: o teste anterior exigia `aria-live="polite"` e therefore fixava o
+  // ponytail: o teste anterior exigia `aria-live="polite"` e portanto fixava o
   // defeito. `role="timer"` implica `aria-live="off"`; o `polite` sobrescrevia
   // e o leitor de tela anunciava o relogio 1x/segundo pelo leilao inteiro. Este
   // e o teste que trava o NAO-anuncio: o `role="timer"` sozinho ja e o
@@ -35,7 +34,7 @@ describe("BidCountdown", () => {
     expect(html).toContain('<span class="sr-only">Prazo: 20/09/2026, 08:00</span>');
   });
 
-  // O prazo que o LEITOR DE TELA ouve, em FUSO do produto. Antes desta correção
+  // O prazo que o LEITOR DE TELA ouve, em `APP_TIMEZONE` do produto. Antes desta correção
   // o `sr-only` formatava com `getUTCDate()`, e um deadline de 30/09 23:59 (fuso
   // de Sao Paulo) aparecia como "1/10 2:59" — um dia e tres horas errado. O
   // countdown numerico contava certo, entao o bug era invisivel olhando o numero.
@@ -49,9 +48,9 @@ describe("BidCountdown", () => {
   });
 
   it("desabilita animacao com prefers-reduced-motion", () => {
-    // This test would typically require a way to mock CSS media queries,
-    // which is not directly possible with renderToString.
-    // We'll rely on the class being present, assuming the CSS handles it.
+    // Este teste exigiria uma forma de mockar media queries de CSS, o que nao e
+    // possivel com `renderToString`. Confia-se na classe estar presente e deixar o
+    // CSS resolver o resto.
     const deadline = new Date(Date.now() + 3600_000);
     const html = renderToString(<BidCountdown deadline={deadline} />);
     expect(html).toContain('motion-reduce:animate-none');

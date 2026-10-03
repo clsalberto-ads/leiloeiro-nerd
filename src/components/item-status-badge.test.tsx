@@ -17,7 +17,7 @@ const ESPERADO: Record<ItemStatus, { label: string; classes: string }> = {
 // Tokens de cor do variant "default" do Badge do shadcn. Eles nao aparecem no
 // badge renderizado porque o `cn` (tailwind-merge) descarta o `bg-primary` e o
 // `text-primary-foreground` em favor das classes de cor do status.
-const DO_VARIANT_DEFAULT = ["bg-primary", "text-primary-foreground"];
+const DEFAULT_VARIANT_CLASSES = ["bg-primary", "text-primary-foreground"];
 
 // ponytail: tokenizar e obrigatorio, e nao cosmico. Um
 // `not.toContain("bg-primary")` no HTML cru acusaria falso positivo: o
@@ -26,7 +26,7 @@ const DO_VARIANT_DEFAULT = ["bg-primary", "text-primary-foreground"];
 // Sobre o HTML inteiro, `toContain(classe)` tambem aceitaria a substring de um
 // token vizinho. Comparando tokens exatos, presenca e ausencia ficam corretas
 // e a mensagem de falha mostra o class inteiro.
-function classesDo(html: string): string[] {
+function classesOf(html: string): string[] {
   const atributo = /class="([^"]*)"/.exec(html);
   expect(atributo, "badge renderizado sem atributo class").not.toBeNull();
   return atributo![1].split(" ");
@@ -36,7 +36,7 @@ describe("ItemStatusBadge", () => {
   it.each(STATUS)("mantem o rotulo pt-BR e as classes de cor do status %s", (status) => {
     const { label, classes } = ESPERADO[status];
     const html = renderToString(<ItemStatusBadge status={status} />);
-    const tokens = classesDo(html);
+    const tokens = classesOf(html);
     expect(html).toContain(`>${label}</span>`);
     for (const classe of classes.split(" ")) {
       expect(tokens, `classe ${classe} ausente no badge de ${status}`).toContain(classe);
@@ -44,8 +44,8 @@ describe("ItemStatusBadge", () => {
   });
 
   it.each(STATUS)("descarta os tokens de cor do variant default no status %s", (status) => {
-    const tokens = classesDo(renderToString(<ItemStatusBadge status={status} />));
-    for (const classe of DO_VARIANT_DEFAULT) {
+    const tokens = classesOf(renderToString(<ItemStatusBadge status={status} />));
+    for (const classe of DEFAULT_VARIANT_CLASSES) {
       expect(
         tokens,
         `token ${classe} do variant default sobreviveu ao merge no badge de ${status}`,

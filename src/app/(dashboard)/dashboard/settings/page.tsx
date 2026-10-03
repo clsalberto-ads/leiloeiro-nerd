@@ -11,7 +11,16 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Configurações" />
-      <SettingsForm />
+      {session ? (
+        <SettingsForm
+          profile={{
+            name: session.user.name,
+            slug: session.user.slug ?? null,
+            phone: session.user.phone ?? null,
+            address: session.user.address ?? null,
+          }}
+        />
+      ) : null}
       {!isSeller ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Conta de leiloeiro</h2>

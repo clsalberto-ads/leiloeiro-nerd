@@ -32,7 +32,7 @@ describe("BidForm", () => {
   });
 
   // ponytail: o campo em reais e o campo do RHF se chamam `amountReais` porque
-  // o `onChange` do RHF le o `name` do input no DOM: um `name="amount"` aqui
+  // o `register` do RHF le o `name` do input no DOM: um `amount` aqui
   // brigaria com o `amount` em centavos do payload no FormData.
   it("da name proprio ao input visivel em reais, sem colidir com o amount em centavos", () => {
     const tag = tagOf(renderToString(<BidForm itemId={ITEM_ID} minBid={5000} />), "amount");

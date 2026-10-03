@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { ItemDaVitrine } from "@/domain/repositories/item-repository";
-import { ROTULO_TIPO } from "@/domain/repositories/item-repository";
-import { formatReais } from "@/lib/format-reais";
+import type { StorefrontItem } from "@/domain/repositories/item-repository";
+import { TYPE_LABELS } from "@/domain/repositories/item-repository";
+import { formatBRL } from "@/lib/format-brl";
 import { BidCountdown } from "@/components/bid-countdown";
 
 export function PublicItemCard({
@@ -9,22 +9,22 @@ export function PublicItemCard({
   slug,
   imageUrl,
 }: {
-  item: ItemDaVitrine;
+  item: StorefrontItem;
   slug: string;
   imageUrl?: string | null;
 }) {
-  const urlDaImagem = imageUrl !== undefined ? imageUrl : item.imageUrl;
-  const temLance = item.maiorLance !== null;
+  const resolvedImageUrl = imageUrl !== undefined ? imageUrl : item.imageUrl;
+  const hasBid = item.highestBid !== null;
 
   return (
     <Link
       href={`/${slug}/${item.id}`}
       className="group flex flex-col overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary"
     >
-      {urlDaImagem ? (
+      {resolvedImageUrl ? (
         <div className="aspect-square w-full overflow-hidden bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={urlDaImagem} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+          <img src={resolvedImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
         </div>
       ) : (
         <div className="flex aspect-square w-full items-center justify-center bg-muted text-2xl font-semibold text-muted-foreground">
@@ -38,22 +38,22 @@ export function PublicItemCard({
         {/* Região 2: Lance Atual (Destaque) */}
         <div className="mt-3">
           <span className="text-xs text-muted-foreground block">
-            {temLance ? "Lance atual" : "Nenhum lance ainda"}
+            {hasBid ? "Lance atual" : "Nenhum lance ainda"}
           </span>
           <p className="text-lg font-bold text-foreground">
-            R$ {formatReais(temLance ? item.maiorLance! : item.minInitialBid)}
+            R$ {formatBRL(hasBid ? item.highestBid! : item.minInitialBid)}
           </p>
         </div>
 
         {/* Região 3: Lance Inicial */}
         <p className="mt-1 text-xs text-muted-foreground">
-          Inicial: R$ {formatReais(item.minInitialBid)}
+          Inicial: R$ {formatBRL(item.minInitialBid)}
         </p>
 
         {/* Região 4: Tipo + Contagem de Lances */}
         <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted-foreground border-t">
-          <span>{ROTULO_TIPO[item.type]}</span>
-          <span>{item.totalDeLances} {item.totalDeLances === 1 ? "lance" : "lances"}</span>
+          <span>{TYPE_LABELS[item.type]}</span>
+          <span>{item.totalBids} {item.totalBids === 1 ? "lance" : "lances"}</span>
         </div>
 
         {/* Região 5: Urgência / Prazo */}

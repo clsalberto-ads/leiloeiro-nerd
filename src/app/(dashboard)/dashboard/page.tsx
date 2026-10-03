@@ -1,11 +1,11 @@
 import { getSession } from "@/presentation/actions/auth-actions";
-import { resumoDoDashboard } from "@/application/use-cases/resumo-do-dashboard";
-import { drizzleAnaliseRepository } from "@/infrastructure/database/repositories/drizzle-analise-repository";
-import { VisaoDoVendedorPainel } from "./graficos/visao-vendedor";
-import { VisaoDoCompradorPainel } from "./graficos/visao-comprador";
-import { PeriodoSelect } from "./periodo/periodo-select";
-import { interpretarPeriodo } from "./periodo/periodo";
-import { primeiroValor } from "@/lib/primeiro-valor";
+import { getDashboardSummary } from "@/application/use-cases/dashboard-summary";
+import { drizzleAnalyticsRepository } from "@/infrastructure/database/repositories/drizzle-analytics-repository";
+import { SellerPanel } from "./charts/seller-view";
+import { BuyerPanel } from "./charts/buyer-view";
+import { PeriodSelect } from "./period/period-select";
+import { parsePeriod } from "./period/period";
+import { firstValue } from "@/lib/first-value";
 import { PageHeader } from "@/components/layout/page-header";
 
 // ponytail: `force-dynamic` e obrigatorio aqui, e nao porFORMANCE. A pagina le a
@@ -24,38 +24,38 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // "se nao ha sessao, nao ha consulta". Ler o `searchParams` antes gastaria um
   // `await` que so interessa a quem esta logado.
   const params = await searchParams;
-  const { chave: periodo, dias } = interpretarPeriodo(primeiroValor(params.periodo));
+  const { key: period, days } = parsePeriod(firstValue(params.periodo));
 
   // ponytail: o `role` do better-auth e `string` no tipo, e nao a union do
   // dominio. A estreitura e feita AQUI, e para o ramo MENOS privilegiado: um
   // papel desconhecido (ou um `undefined` de sessao malformada) cai na visao de
   // comprador, que mostra "voce ainda nao deu nenhum lance". O contrario — dar
   // a visao de vendedor a um papel nao reconhecido — mostraria o catalogo de
-  // outra pessoa ou um painel vazio com cara de bug. `resumoDoDashboard` ainda
+  // outra pessoa ou um painel vazio com cara de bug. `getDashboardSummary` ainda
   // checa "seller"/"both" do seu lado; esta e a mesma regra vista da pagina.
-  const papel = session.user.role === "seller" || session.user.role === "both" ? "seller" : "bidder";
+  const role = session.user.role === "seller" || session.user.role === "both" ? "seller" : "bidder";
 
-  const visao = await resumoDoDashboard(drizzleAnaliseRepository, session.user.id, papel, dias);
+  const view = await getDashboardSummary(drizzleAnalyticsRepository, session.user.id, role, days);
 
-  const ehVendedor = visao.papel === "vendedor";
+  const isSeller = view.role === "seller";
 
   // ponytail: o "Ola, {nome}" NAO se repete aqui — quem manda no nome e no
   // "Sair" e o `DashboardHeader`, que o `(dashboard)/layout.tsx` ja renderiza
   // acima desta pagina. A `description` carrega so o e-mail, que o header nao
   // mostra: e o dado que confirma de qual conta o painel esta aberto. O titulo
-  // ("Seu painel"/"Meus lances") e o `PeriodoSelect` sao os unicos acoes do
+  // ("Seu painel"/"Meus lances") e o `PeriodSelect` sao os unicos acoes do
   // cabecalho da pagina; os links para itens e perfil sao do `DashboardSidebar`.
   return (
     <div className="space-y-6">
       <PageHeader
-        title={ehVendedor ? "Seu painel" : "Meus lances"}
+        title={isSeller ? "Seu painel" : "Meus lances"}
         description={session.user.email}
-        actions={<PeriodoSelect atual={periodo} />}
+        actions={<PeriodSelect current={period} />}
       />
-      {ehVendedor ? (
-        <VisaoDoVendedorPainel visao={visao} periodo={periodo} />
+      {isSeller ? (
+        <SellerPanel view={view} period={period} />
       ) : (
-        <VisaoDoCompradorPainel visao={visao} periodo={periodo} />
+        <BuyerPanel view={view} period={period} />
       )}
     </div>
   );

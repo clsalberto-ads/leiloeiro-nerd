@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createItemImages } from "./create-item-images";
-import type { ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
+import type { Item, ItemImage, ItemRepository } from "@/domain/repositories/item-repository";
 
 class CumulativeFakeItemRepository implements ItemRepository {
+  async closeExpired() {
+    return [];
+  }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
   positions: number[] = [];
   async createImages(itemId: string, urls: string[]) {
     const start = this.positions[this.positions.length - 1] ?? -1;
@@ -52,7 +58,14 @@ class CumulativeFakeItemRepository implements ItemRepository {
 }
 
 class FakeItemRepository implements ItemRepository {
+  async closeExpired() {
+    return [];
+  }
   calls: { itemId: string; urls: string[] }[] = [];
+
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
   async createImages(itemId: string, urls: string[]) {
     this.calls.push({ itemId, urls });
     return urls.map((url, position) => ({

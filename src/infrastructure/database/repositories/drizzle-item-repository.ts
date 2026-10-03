@@ -1,12 +1,12 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, asc, count, desc, eq, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, lte, max, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, itemImages, items } from "@/infrastructure/database/schema";
 import {
-  ROTULO_STATUS,
-  ROTULO_TIPO,
+  STATUS_LABELS,
+  TYPE_LABELS,
   type CreateItemInput,
   type Item,
   type ItemListFilter,
@@ -47,7 +47,7 @@ function toItem(row: ItemRow): Item {
 //
 // Coluna E termo dobram com a MESMA tabela, e isso e load-bearing: dobrar so a coluna
 // troca o defeito de lugar — "acao" passaria a casar e "Acao" (com acento) a sumir,
-// que e exatamente o que o `contemSemAcento` do `DataTable` foi feito para nao
+// que e exatamente o que o `containsIgnoringAccents` do `DataTable` foi feito para nao
 // acontecer. As DUAS tabelas so tem minuscula, e por isso a ordem de `lower` e
 // `translate` esta invertida em relacao ao que parece natural: e `translate(lower(x))`,
 // e nao `lower(translate(x))`. Com o `lower` depois, "AÇÃO" e "Óculos" nao casariam
@@ -68,7 +68,7 @@ const SIMPLES = "aaaaaeeeeiiiiooooouuuucny";
 // precisa dela tanto quanto o titulo — sem dobrar os dois lados, "leilao" nao
 // acharia "Em leilao" e "acao" nao acharia "Ação". Por isso o SQL carrega SEIS
 // tabelas de dobra e nao duas: tres colunas, dois lados cada.
-function dobrar(expressao: SQL): SQL {
+function fold(expressao: SQL): SQL {
   return sql`translate(lower(${expressao}), ${COMPOSTOS}, ${SIMPLES})`;
 }
 
@@ -77,7 +77,7 @@ function dobrar(expressao: SQL): SQL {
 // que foi exatamente o que a busca no cliente acertava (o `accessorFn` da coluna
 // entregava o rotulo) e o que o modo servidor tinha desfeito.
 //
-// Os rotulos entram como PARAMETRO e sao lidos de `ROTULO_STATUS`/`ROTULO_TIPO`,
+// Os rotulos entram como PARAMETRO e sao lidos de `STATUS_LABELS`/`TYPE_LABELS`,
 // do dominio: e o que mantem o vocabulario em um lugar so. A alternativa — escrever
 // os rotulos no proprio SQL, ou em um segundo mapa aqui dentro — seria uma segunda
 // fonte, e o defeito dela e silencioso nos dois sentidos: um rotulo trocado no mapa
@@ -88,28 +88,28 @@ function dobrar(expressao: SQL): SQL {
 // vendedor leria a triagem, e nao a alfabetica do enum: no `CASE` a ordem nao muda
 // o resultado (as chaves sao exaustivas e distintas), e escolher uma delas e uma
 // leitura e nao um contrato — o que e contrato e a chave estar colada no rotulo
-// certo, e o `when <chave> then <rotulo>` gera os dois como parametros vizinhos
+// certo, e o `when <periodKey> then <rotulo>` gera os dois como parametros vizinhos
 // justamente para isso poder ser conferido.
-function rotuloDoEnum<T extends string>(coluna: AnyPgColumn, rotulos: Record<T, string>): SQL {
-  const pares = Object.entries(rotulos) as [T, string][];
-  const bracos = pares.map(([chave, rotulo]) => sql`when ${chave} then ${rotulo}`);
-  return sql`case ${coluna} ${sql.join(bracos, sql` `)} end`;
+function enumLabel<T extends string>(column: AnyPgColumn, labels: Record<T, string>): SQL {
+  const pairs = Object.entries(labels) as [T, string][];
+  const branches = pairs.map(([key, label]) => sql`when ${key} then ${label}`);
+  return sql`case ${column} ${sql.join(branches, sql` `)} end`;
 }
 
-function contem(texto: SQL, agulha: SQL): SQL {
-  return sql`strpos(${texto}, ${agulha}) > 0`;
+function contains(text: SQL, needle: SQL): SQL {
+  return sql`strpos(${text}, ${needle}) > 0`;
 }
 
 // ponytail: `q` le tres colunas, nao uma. A ordem (titulo, status, tipo) nao muda
 // o conjunto devolvido — e um `OR` — mas muda a ordem em que as condicoes sao
 // avaliadas, e por isso a lista comeca pelo texto que o usuario digitou: e a coluna
 // onde a busca tem mais chance de casar.
-function buscaPorRotuloOuTitulo(termo: string): SQL | undefined {
-  const agulha = dobrar(sql`${termo}`);
+function searchByLabelOrTitle(termo: string): SQL | undefined {
+  const needle = fold(sql`${termo}`);
   return or(
-    contem(dobrar(sql`${items.title}`), agulha),
-    contem(dobrar(rotuloDoEnum(items.status, ROTULO_STATUS)), agulha),
-    contem(dobrar(rotuloDoEnum(items.type, ROTULO_TIPO)), agulha),
+    contains(fold(sql`${items.title}`), needle),
+    contains(fold(enumLabel(items.status, STATUS_LABELS)), needle),
+    contains(fold(enumLabel(items.type, TYPE_LABELS)), needle),
   );
 }
 
@@ -117,7 +117,7 @@ function buscaPorRotuloOuTitulo(termo: string): SQL | undefined {
 // dominio, e e exaustivo de proposito: um `ItemOrderBy` novo entra no compilador
 // quebrando aqui, em vez de virar um `ORDER BY` ausente que so apareceria como "a
 // tabela nao ordena quando clico nessa coluna".
-const COLUNA_DE: Record<ItemOrderBy, AnyPgColumn> = {
+const COLUMN_OF: Record<ItemOrderBy, AnyPgColumn> = {
   createdAt: items.createdAt,
   title: items.title,
   minInitialBid: items.minInitialBid,
@@ -131,10 +131,10 @@ const COLUNA_DE: Record<ItemOrderBy, AnyPgColumn> = {
 // planejador, que pode mudar entre requisicoes — a pagina 1 e a pagina 2 viriam com o
 // mesmo item, ou pular um, e o rodape "11-20 de 47" deixaria de bater. Custa uma
 // coluna no `ORDER BY` e fecha a chave de ordenacao: com ela a ordem e total.
-function ordenarItens(filter?: ItemListFilter): SQL[] {
-  const coluna = COLUNA_DE[filter?.orderBy ?? "createdAt"];
+function sortItems(filter?: ItemListFilter): SQL[] {
+  const column = COLUMN_OF[filter?.orderBy ?? "createdAt"];
   const direcao = filter?.orderBy === undefined || filter.direction === "desc" ? desc : asc;
-  return [direcao(coluna), asc(items.id)];
+  return [direcao(column), asc(items.id)];
 }
 
 // ponytail: `if (filter?.q)` e o que faz "q ausente" e "q em branco" serem a mesma
@@ -145,11 +145,11 @@ function ordenarItens(filter?: ItemListFilter): SQL[] {
 // da tela sem erro visivel. Aqui o vazio e ausencia de filtro, e o `q` nao entra no
 // `where`. E os tres filtros andam juntos, sempre nesta ordem, porque e a mesma
 // lista que vai para as DUAS consultas.
-function predicados(sellerId: string, filter?: ItemListFilter): SQL[] {
+function predicates(sellerId: string, filter?: ItemListFilter): SQL[] {
   const condicoes: SQL[] = [eq(items.sellerId, sellerId)];
   if (filter?.status) condicoes.push(eq(items.status, filter.status));
-  const busca = filter?.q ? buscaPorRotuloOuTitulo(filter.q) : undefined;
-  if (busca) condicoes.push(busca);
+  const search = filter?.q ? searchByLabelOrTitle(filter.q) : undefined;
+  if (search) condicoes.push(search);
   return condicoes;
 }
 
@@ -158,11 +158,11 @@ function predicados(sellerId: string, filter?: ItemListFilter): SQL[] {
 // tem a normalizacao. Um `LIMIT -1` aqui e erro do Postgres ("LIMIT must not be
 // negative"), nao um resultado vazio — e o `offset` negativo tambem. Custa tres
 // caracteres e fecha a porta de uma URL digitada a mao.
-function fatiaParaSQL(valor?: number): number | undefined {
-  return valor !== undefined && valor > 0 ? valor : undefined;
+function sliceForSql(value?: number): number | undefined {
+  return value !== undefined && value > 0 ? value : undefined;
 }
 
-async function listarPorVendedor(
+async function listBySeller(
   sellerId: string,
   filter?: ItemListFilter,
 ): Promise<ItemListResult> {
@@ -173,8 +173,8 @@ async function listarPorVendedor(
   // `eq(items.sellerId)` sozinho, e o rodape passa a contar a tabela inteira sem
   // nenhum erro visivel. Com o objeto compartilhado, esse desvio aparece no codigo, e
   // o teste de unidade segura o outro lado dele.
-  const where = and(...predicados(sellerId, filter));
-  const consulta = db.select().from(items).where(where).orderBy(...ordenarItens(filter));
+  const where = and(...predicates(sellerId, filter));
+  const query = db.select().from(items).where(where).orderBy(...sortItems(filter));
   // ponytail: o `limit`/`offset` sao aplicados no proprio builder e o retorno
   // descartado, e a Forma CORRETA de usar — o comentario anterior aqui
   // afirmava o contrario ("o drizzle devolve um builder NOVO") e foi verificado
@@ -186,12 +186,12 @@ async function listarPorVendedor(
   // `limit` tornaria o nome `consulta` um objeto diferente do que o `count`
   // vizinho espera. O teste desta pagina mocka o builder com um chain que
   // devolve `a si mesmo`, entao ele trava o COMPORTAMENTO, nao a frase.
-  const limite = fatiaParaSQL(filter?.limit);
-  const deslocamento = fatiaParaSQL(filter?.offset);
-  if (limite !== undefined) consulta.limit(limite);
-  if (deslocamento !== undefined) consulta.offset(deslocamento);
+  const limite = sliceForSql(filter?.limit);
+  const deslocamento = sliceForSql(filter?.offset);
+  if (limite !== undefined) query.limit(limite);
+  if (deslocamento !== undefined) query.offset(deslocamento);
   const [linhas, contagem] = await Promise.all([
-    consulta,
+    query,
     db.select({ n: count() }).from(items).where(where),
   ]);
   return { items: linhas.map(toItem), total: contagem[0]?.n ?? 0 };
@@ -215,7 +215,10 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
     return toItem(row!);
   },
 
-  async update(id, input) {
+  // O `eq(items.status, "draft")` NAO e repeticao do `if` do `updateItem`: e a
+  // unica forma de o banco recusar a escrita quando o status mudou entre a
+  // leitura do use case e este UPDATE. Ver `updateDraft` no contrato.
+  async updateDraft(id, input) {
     const [row] = await db
       .update(items)
       .set({
@@ -228,7 +231,7 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
         ...(input.paymentDeadlineDays !== undefined ? { paymentDeadlineDays: input.paymentDeadlineDays } : {}),
         updatedAt: new Date(),
       })
-      .where(eq(items.id, id))
+      .where(and(eq(items.id, id), eq(items.status, "draft")))
       .returning();
     return row ? toItem(row) : null;
   },
@@ -238,7 +241,7 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
     return row ? toItem(row) : null;
   },
 
-  // ponytail: `findBySellerId` virou uma linha sobre `listarPorVendedor`, e nao o
+  // ponytail: `findBySellerId` virou uma linha sobre `listBySeller`, e nao o
   // contrario. Quem chama este metodo (a vitrine publica, via
   // `listActiveItemsBySellerId`) quer o conjunto INTEIRO, sem pagina e sem total — e
   // essa e a unica forma de ele continuar sendo "tudo o que casar com o filtro". A
@@ -246,10 +249,10 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
   // em ordenacao: o `id` no desempate e a unica diferenca de ordem, e ela e o
   // conserto, nao a regressao.
   findBySellerId: async (sellerId, filter) => {
-    const { items: lista } = await listarPorVendedor(sellerId, filter);
-    return lista;
+    const { items: list } = await listBySeller(sellerId, filter);
+    return list;
   },
-  listBySellerId: listarPorVendedor,
+  listBySellerId: listBySeller,
 
   async delete(id) {
     await db.delete(items).where(eq(items.id, id));
@@ -262,6 +265,20 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
       .where(eq(items.id, id))
       .returning();
     return row ? toItem(row) : null;
+  },
+
+  // ponytail: o `status = 'active'` no WHERE e o que impede o worker de
+  // REENCERRAR um item que o `placeBid` terminou entre a leitura e a escrita —
+  // um `awaiting_payment` nao volta para `closed`. Sem o predicado de status o
+  // job seria idempotente por acidente e perderia essa corrida uma vez por
+  // auction, exatamente no instante do pagamento.
+  async closeExpired(now) {
+    const rows = await db
+      .update(items)
+      .set({ status: "closed", updatedAt: now })
+      .where(and(eq(items.status, "active"), lte(items.bidDeadline, now)))
+      .returning({ id: items.id });
+    return rows.map((row) => row.id);
   },
 
   async countBids(itemId) {

@@ -4,25 +4,36 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   placeBid: vi.fn(),
   getItemBids: vi.fn(),
+  resolveBidderNames: vi.fn(async (bids: unknown) => bids),
   findItemById: vi.fn(),
   createResendClient: vi.fn(() => ({})),
+  findUserIds: vi.fn(async () => []),
 }));
 
 vi.mock("./auth-actions", () => ({ getSession: mocks.getSession }));
 vi.mock("@/application/use-cases/place-bid", () => ({ placeBid: mocks.placeBid }));
-vi.mock("@/application/use-cases/get-item-bids", () => ({ getItemBids: mocks.getItemBids }));
+// `toBidView` fica REAL aqui de proposito: ele e a fronteira que tira o
+// `bidderId` do payload, e um mock stubs-function devolveria `undefined` e
+// esconderia justamente o comportamento que estes testes precisam travar.
+vi.mock("@/application/use-cases/get-item-bids", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/application/use-cases/get-item-bids")>()),
+  getItemBids: mocks.getItemBids,
+  resolveBidderNames: mocks.resolveBidderNames,
+}));
 vi.mock("@/infrastructure/email/resend", () => ({ createResendClient: mocks.createResendClient }));
 vi.mock("@/infrastructure/database/repositories/drizzle-item-repository", () => ({
   drizzleItemRepository: { findById: mocks.findItemById },
 }));
 vi.mock("@/infrastructure/database/repositories/drizzle-bid-repository", () => ({ drizzleBidRepository: {} }));
-vi.mock("@/infrastructure/database/repositories/drizzle-user-repository", () => ({ drizzleUserRepository: {} }));
+vi.mock("@/infrastructure/database/repositories/drizzle-user-repository", () => ({
+  drizzleUserRepository: { findByIds: mocks.findUserIds },
+}));
 vi.mock("@/infrastructure/database/repositories/drizzle-notification-repository", () => ({
   drizzleNotificationRepository: {},
 }));
 
 import { getItemBidsAction, placeBidAction } from "./bid-actions";
-import type { Bid } from "@/domain/repositories/bid-repository";
+import type { Bid, BidView } from "@/domain/repositories/bid-repository";
 
 const ITEM_ID = "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a";
 
@@ -44,6 +55,12 @@ function makeBid(overrides: Partial<Bid> = {}): Bid {
     createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
+}
+
+/** O que a action promete devolver: o `Bid` do servidor sem o `bidderId`. */
+function asView(bid: Bid): BidView {
+  const { bidderId: _bidderId, ...view } = bid;
+  return view;
 }
 
 describe("placeBidAction", () => {
@@ -74,8 +91,58 @@ describe("placeBidAction", () => {
   it("registra lance válido e retorna { ok, bid }", async () => {
     const bid = makeBid();
     mocks.placeBid.mockResolvedValue({ bid });
-    await expect(placeBidAction(null, bidForm(ITEM_ID, "15000"))).resolves.toEqual({ ok: true, bid });
+    await expect(placeBidAction(null, bidForm(ITEM_ID, "15000"))).resolves.toEqual({ ok: true, bid: asView(bid) });
     expect(mocks.placeBid).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), "u1", ITEM_ID, 15000);
+  });
+
+  // ponytail: o `bidderId` nao pode atravessar a fronteira. O `BidSection` e
+  // `"use client"`, entao o objeto inteiro vai serializado no payload do RSC e
+  // fica no navegador de qualquer visitante da vitrine — e nenhum componente do
+  // cliente usa o campo. O teste usa `Object.keys` de proposito: `not.toHaveProperty`
+  // passa em `undefined` e nao provaria nada; aqui o lance TEM `bidderId` no
+  // servidor e a action precisa terRemoved.
+  it("nao devolve o bidderId do arrematante para o cliente", async () => {
+    const bid = makeBid({ bidderId: "u2", bidderName: "Ana" });
+    mocks.placeBid.mockResolvedValue({ bid });
+
+    const res = await placeBidAction(null, bidForm(ITEM_ID, "15000"));
+
+    expect(res.bid).toBeDefined();
+    expect(Object.keys(res.bid!)).not.toContain("bidderId");
+    expect(res.bid).toEqual(asView(bid));
+  });
+
+  // ponytail: `placeBid` devolve o lance como o repositorio gravou, e o
+  // repositorio de lances NAO sabe o nome — poe o `bidderId` no lugar do
+  // `bidderName` (`bid-repository.ts`). Quem resolve o nome e o
+  // `resolveBidderNames`, que a vitrine chama pelo `bidderName`. Sem repetir a
+  // resolucao aqui, o lance que o USUARIO ACABOU de dar voltava pro `bid`
+  // com `bidderName` = UUID e aparecia no historico publico como
+  // "0b61e95c-2be1-4d38-8f74-3c5a3a1c8f3a" — ao lado dos lances antigos, que
+  // mostravam o nome. O proprio Lanceador vazava o UUID de quem acabou de
+  // licitar, num item publico, para qualquer visitante.
+  it("resolve o nome do arrematante antes de devolver o lance ao historico", async () => {
+    const cru = makeBid({ bidderId: "u2", bidderName: "u2" });
+    const resolvido = makeBid({ bidderId: "u2", bidderName: "Ana" });
+    mocks.placeBid.mockResolvedValue({ bid: cru });
+    mocks.resolveBidderNames.mockResolvedValue([resolvido]);
+
+    const res = await placeBidAction(null, bidForm(ITEM_ID, "15000"));
+
+    expect(mocks.resolveBidderNames).toHaveBeenCalledWith([cru], expect.anything());
+    expect(res.bid?.bidderName).toBe("Ana");
+  });
+
+  it("nao devolve o lance com bidderName igual ao bidderId quando o usuario sumiu", async () => {
+    // lance cujo `bidderName` nao volta na consulta: `resolveBidderNames` mantem o
+    // `bidderName` que veio. O guard e sobre o UUID NAO aparecer, e o preco e uma
+    // segunda consulta por lance so no caso de 404 de usuario — evento rarissimo.
+    const cru = makeBid({ bidderId: "u9", bidderName: "u9" });
+    mocks.placeBid.mockResolvedValue({ bid: cru });
+    mocks.resolveBidderNames.mockResolvedValue([{ ...cru, bidderName: "Usuario removido" }]);
+
+    const res = await placeBidAction(null, bidForm(ITEM_ID, "15000"));
+    expect(res.bid?.bidderName).not.toBe("u9");
   });
 
   it("retorna erro do use case quando lane é inválido", async () => {
@@ -151,7 +218,7 @@ describe("getItemBidsAction", () => {
 
   // ponytail: o `err.message` de um driver NAO volta para o cliente (o
   // `Failed query: ... params: ...` do pg e o `ECONNREFUSED host:port` sao
-  // respectively inuteis e uma dica de topologia). O `getItemBids` do use case
+  // respectivamente inuteis e uma dica de topologia). O `getItemBids` do use case
   // continua devolvendo a sua propria mensagem, que e a que o teste acima fixa.
   it("nao devolve a mensagem do driver quando a consulta falha", async () => {
     mocks.findItemById.mockRejectedValue(

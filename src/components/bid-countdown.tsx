@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FUSO } from "@/lib/fuso";
+import { APP_TIMEZONE } from "@/lib/timezone";
 
 function format(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -12,17 +12,17 @@ function format(ms: number): string {
   return `${d} d ${h} h ${m} min ${s} s`;
 }
 
-// ponytail: o prazo que o leitor de tela ouve e formatado com `FUSO`, e nao com
+// ponytail: o prazo que o leitor de tela ouve e formatado com `APP_TIMEZONE`, e nao com
 // `getUTC*`. As duas formas mostram o mesmo instante com textos diferentes, e o
-// produto tem fuso fixo (ver `@/lib/fuso`) — o vendedor digita "30/09 23:59" no
+// produto tem fuso fixo (ver `@/lib/timezone`) — o vendedor digita "30/09 23:59" no
 // formulario e a tela precisa devolver "30/09 23:59". A versao com `getUTC*`
 // devolvia "1/10 2:59": um dia e tres horas de erro, invisivel porque o
 // countdown numerico (aritmetica de `Date`) contava certo. O upgrade path, se o
 // produto atender gente fora do Brasil, e um `APP_TIMEZONE` no `.env` lido em
-// `@/lib/fuso` — este arquivo continua lendo a constante e nao muda.
+// `@/lib/timezone` — este arquivo continua lendo a constante e nao muda.
 function formatAbsolute(d: Date): string {
   return d.toLocaleString("pt-BR", {
-    timeZone: FUSO,
+    timeZone: APP_TIMEZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

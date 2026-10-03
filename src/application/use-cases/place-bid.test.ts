@@ -3,7 +3,7 @@ import { placeBid } from "./place-bid";
 import type { Bid, BidRepository, CreateBidInput, LockedBidItem, BidPlacement } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository, ItemStatus, CreateItemInput, UpdateItemInput, ItemImage, ItemListFilter } from "@/domain/repositories/item-repository";
 import type { UserProfile, UserRepository, UserRole, UpdateProfileInput } from "@/domain/repositories/user-repository";
-import type { NotificationRepository, CreateNotificationInput, Notification, NotificationType } from "@/domain/repositories/notification-repository";
+import type { NotificationRepository, CreateNotificationInput, Notification } from "@/domain/repositories/notification-repository";
 
 interface ResendClient {
   emails: {
@@ -97,6 +97,13 @@ class FakeItemRepository implements ItemRepository {
   async delete(_id: string): Promise<void> {
     throw new Error("não usado");
   }
+  async closeExpired() {
+    return [];
+  }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
+
   async setStatus(_id: string, _status: ItemStatus): Promise<Item | null> {
     throw new Error("não usado");
   }
@@ -207,7 +214,7 @@ describe("placeBid", () => {
     ).rejects.toThrow("Lance deve ser ≥ R$ 50,00");
   });
 
-  it("cria lance subsequente ≥ maiorLance + minBidIncrement", async () => {
+  it("cria lance subsequente ≥ highestBid + minBidIncrement", async () => {
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
     const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller, bidder2: outbidUser });
@@ -228,7 +235,7 @@ describe("placeBid", () => {
     });
   });
 
-  it("rejeita lance < maiorLance + minBidIncrement", async () => {
+  it("rejeita lance < highestBid + minBidIncrement", async () => {
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
     const userRepo = new FakeUserRepository({ bidder1: baseBidder, seller1: baseSeller });

@@ -34,6 +34,12 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 class FakeItemRepository implements ItemRepository {
+  async closeExpired() {
+    return [];
+  }
+  async updateDraft(): Promise<Item | null> {
+    throw new Error("não usado");
+  }
   constructor(
     private item: Item | null,
     private images: ItemImage[] = [],

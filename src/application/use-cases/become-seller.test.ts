@@ -52,4 +52,27 @@ describe("becomeSeller", () => {
     await expect(becomeSeller(repo, "u1", { slug: "!!", role: "seller" })).rejects.toThrow();
     expect(repo.current.slug).toBeNull();
   });
+
+    // ponytail: `becomeSeller` e a porta que ATIVA a vitrine, nao a porta que
+    // RENOMEIA ela. A `dashboard/settings` esconde o form para quem ja e
+    // vendedor, mas a action e um endpoint POST — um vendedor que chamasse
+    // `becomeSellerAction` direto trocava o proprio slug publico e quebrava
+    // todo link ja divulgado da vitrine (`loja-do-nerd/item1`), sem aviso e sem
+    // volta: o slug antigo nao volta em lugar nenhum.
+    //
+    // Quem ja tem slug mantem o slug e so muda o papel. O `createSlug` do input
+    // continua rodando (um payload invalido ainda e recusado) mas o resultado
+    // nao e gravado.
+    it("nao renomeia a vitrine de quem ja tem slug", async () => {
+      const repo = new FakeUserRepository({ ...baseUser, role: "seller", slug: "loja-do-nerd" });
+      const user = await becomeSeller(repo, "u1", { slug: "outro-nome", role: "both" });
+      expect(user.slug).toBe("loja-do-nerd");
+      expect(user.role).toBe("both");
+    });
+
+    it("ainda recusa payload invalido mesmo quando o slug sera preservado", async () => {
+      const repo = new FakeUserRepository({ ...baseUser, role: "seller", slug: "loja-do-nerd" });
+      await expect(becomeSeller(repo, "u1", { slug: "!!", role: "seller" })).rejects.toThrow();
+      expect(repo.current.slug).toBe("loja-do-nerd");
+    });
 });

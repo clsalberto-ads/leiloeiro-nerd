@@ -1,5 +1,19 @@
-import type { Bid, BidRepository } from "@/domain/repositories/bid-repository";
+import type { Bid, BidRepository, BidView } from "@/domain/repositories/bid-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
+
+/**
+ * Projeta o `Bid` do servidor no `BidView` que pode ir para o cliente.
+ *
+ * ponytail: a tela nao usa `bidderId` (o `bidderName` basta), mas o objeto
+ * inteiro era serializado no payload do RSC porque `bid-section.tsx` e
+ * `"use client"`. Remover o campo no boundary — e nao no repositorio — mantem o
+ * `Bid` completo disponivel para o servidor, que precisa do `bidderId` para
+ * notificar quem foi superado.
+ */
+export function toBidView(bid: Bid): BidView {
+  const { bidderId: _bidderId, ...view } = bid;
+  return view;
+}
 
 // ponytail: UMA consulta para todos os arrematantes, e nao uma por lance. O
 // `findById` em `Promise.all` parecia concorrente, mas continua sendo N idas ao
@@ -14,10 +28,10 @@ export async function resolveBidderNames(bids: Bid[], userRepo: UserRepository):
   if (bids.length === 0) return bids;
   const ids = [...new Set(bids.map((b) => b.bidderId))];
   const users = await userRepo.findByIds(ids);
-  const nomePorId = new Map(users.map((u) => [u.id, u.name]));
+  const nameById = new Map(users.map((u) => [u.id, u.name]));
   return bids.map((bid) => {
-    const nome = nomePorId.get(bid.bidderId);
-    return nome ? { ...bid, bidderName: nome } : bid;
+    const name = nameById.get(bid.bidderId);
+    return name ? { ...bid, bidderName: name } : bid;
   });
 }
 
@@ -25,7 +39,7 @@ export async function getItemBids(
   bidRepo: BidRepository,
   userRepo: UserRepository,
   itemId: string,
-): Promise<Bid[]> {
+): Promise<BidView[]> {
   const bids = await bidRepo.findByItemId(itemId);
-  return resolveBidderNames(bids, userRepo);
+  return (await resolveBidderNames(bids, userRepo)).map(toBidView);
 }

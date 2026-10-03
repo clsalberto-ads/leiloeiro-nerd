@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // forma de torna-la real — descer a consulta para um filho async — quebra o
 // `items/page.test.tsx`, que esta entre os testes protegidos: o
 // `renderToStaticMarkup` dele (linha 206) tem de conter "Console retrô" e um filho
-// async sempre entrega o fallback, e o `achar(elemento, ItensDaUrl)` (linha 104)
+// async sempre entrega o fallback, e o `achar(elemento, ItemsUrl)` (linha 104)
 // acha o componente por tipo so andando por `props.children`.
 //
 // O `loading.tsx` do segmento tambem nao serve, e por um motivo diferente: no modo
@@ -34,7 +34,7 @@ const CARDS = 6;
 // pelos seis blocos vazios procurando informacao que nao existe ali. O anuncio de
 // "carregando" e do CONTAINER (o unico `role="status"`), e nao de cada card:
 // seis regioes vivas repetiriam a mesma frase seis vezes.
-function CartaoEsqueleto() {
+function SkeletonCard() {
   return (
     <div data-slot="item-card-skeleton" aria-hidden="true" className="overflow-hidden rounded-lg border">
       <Skeleton className="aspect-square w-full rounded-none" />
@@ -64,7 +64,7 @@ export function ItemCardSkeleton() {
       className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
     >
       {Array.from({ length: CARDS }, (_, indice) => (
-        <CartaoEsqueleto key={indice} />
+        <SkeletonCard key={indice} />
       ))}
     </div>
   );

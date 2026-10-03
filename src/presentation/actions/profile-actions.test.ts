@@ -17,19 +17,19 @@ vi.mock("@/infrastructure/database/repositories/drizzle-user-repository", () => 
 
 import { becomeSellerAction, updateProfileAction } from "./profile-actions";
 
-const SESSAO = { user: { id: "u1", name: "Ana", email: "ana@ex.com", role: "bidder" } };
+const SESSION = { user: { id: "u1", name: "Ana", email: "ana@ex.com", role: "bidder" } };
 
 /** Reproduz o que o browser manda: todo input do form entra, vazio ou nao. */
-function formDe(campos: Record<string, string>): FormData {
+function formOf(fields: Record<string, string>): FormData {
   const fd = new FormData();
-  for (const [k, v] of Object.entries(campos)) fd.set(k, v);
+  for (const [k, v] of Object.entries(fields)) fd.set(k, v);
   return fd;
 }
 
 describe("updateProfileAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSession.mockResolvedValue(SESSAO);
+    mocks.getSession.mockResolvedValue(SESSION);
     mocks.updateProfile.mockResolvedValue(undefined);
   });
 
@@ -42,7 +42,7 @@ describe("updateProfileAction", () => {
   // recebia "Nome muito curto" e nada era salvo, a menos que reescrevesse o
   // nome inteiro. A traducao `v || undefined` e a mesma dos outros tres campos.
   it("salva quando o usuario so mexe no telefone e o nome fica vazio", async () => {
-    const r = await updateProfileAction(null, formDe({ name: "", phone: "+55 11 99999-0000" }));
+    const r = await updateProfileAction(null, formOf({ name: "", phone: "+55 11 99999-0000" }));
     expect(r).toEqual({ ok: true });
     expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), "u1", {
       name: undefined,
@@ -53,7 +53,7 @@ describe("updateProfileAction", () => {
   });
 
   it("nao envia NENHUM campo quando o form volta inteiro vazio", async () => {
-    await updateProfileAction(null, formDe({ name: "", phone: "", slug: "", address: "" }));
+    await updateProfileAction(null, formOf({ name: "", phone: "", slug: "", address: "" }));
     expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), "u1", {
       name: undefined,
       phone: undefined,
@@ -63,16 +63,29 @@ describe("updateProfileAction", () => {
   });
 
   it("ainda rejeita um nome com 1 caractere", async () => {
-    const r = await updateProfileAction(null, formDe({ name: "A" }));
+    const r = await updateProfileAction(null, formOf({ name: "A" }));
     expect(r.error).toBe("Nome muito curto");
     expect(mocks.updateProfile).not.toHaveBeenCalled();
+  });
+
+  // ponytail: o catch desta action era proprio e tratava SO o `pg`; todo
+  // resto virava "Nao foi possivel salvar o perfil" — inclusive os erros de
+  // dominio que o usuario pode corrigir digitando outra coisa. "Slug excede 60
+  // caracteres" e "Slug contains caracteres invalidos" sao exatamente o que o
+  // `zod` existe para deixar passar: `err.code` sem `pg` so pode ter
+  // vindo do nosso codigo.
+  it("deixa o erro de dominio do slug chegar ao usuario", async () => {
+    mocks.updateProfile.mockRejectedValue(new Error("Slug excede 60 caracteres"));
+    await expect(updateProfileAction(null, formOf({ name: "Ana", slug: "x".repeat(70) }))).resolves.toEqual({
+      error: "Slug excede 60 caracteres",
+    });
   });
 
   it("nao devolve a mensagem do driver ao usuario", async () => {
     mocks.updateProfile.mockRejectedValue(
       Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
     );
-    const r = await updateProfileAction(null, formDe({ name: "Ana" }));
+    const r = await updateProfileAction(null, formOf({ name: "Ana" }));
     expect(r.error).not.toContain("ECONNREFUSED");
     expect(r.error).toBe("Não foi possível salvar o perfil. Tente novamente.");
   });
@@ -84,7 +97,7 @@ describe("updateProfileAction", () => {
   // reescrevendo o slug publico em silencio. Nao havia um unico
   // `revalidatePath` no projeto inteiro.
   it("revalida a pagina de configuracoes depois de salvar", async () => {
-    await updateProfileAction(null, formDe({ name: "Ana" }));
+    await updateProfileAction(null, formOf({ name: "Ana" }));
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard/settings");
   });
 });
@@ -92,12 +105,12 @@ describe("updateProfileAction", () => {
 describe("becomeSellerAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSession.mockResolvedValue(SESSAO);
+    mocks.getSession.mockResolvedValue(SESSION);
     mocks.becomeSeller.mockResolvedValue(undefined);
   });
 
   it("revalida a pagina de configuracoes depois de ativar", async () => {
-    await becomeSellerAction(null, formDe({ slug: "nerd-colecionaveis", role: "seller" }));
+    await becomeSellerAction(null, formOf({ slug: "nerd-colecionaveis", role: "seller" }));
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard/settings");
   });
 
@@ -105,7 +118,7 @@ describe("becomeSellerAction", () => {
     mocks.becomeSeller.mockRejectedValue(
       Object.assign(new Error('duplicate key value violates unique constraint "user_slug_key"'), { code: "23505" }),
     );
-    const r = await becomeSellerAction(null, formDe({ slug: "nerd", role: "seller" }));
+    const r = await becomeSellerAction(null, formOf({ slug: "nerd", role: "seller" }));
     expect(r.error).toBe("Este slug já está em uso");
   });
 
@@ -113,11 +126,24 @@ describe("becomeSellerAction", () => {
   // desde sempre; aqui o `raw` ia direto para o browser. `permission denied for
   // schema user` e `ECONNREFUSED host:port` nao sao corrigiveis pelo usuario e o
   // segundo entrega a topologia do banco.
+  // ponytail: o catch desta action era proprio e tratava SO o `pg`; todo
+  // resto virava "Nao foi possivel salvar o perfil" — inclusive os erros de
+  // dominio que o usuario pode corrigir digitando outra coisa. "Slug excede 60
+  // caracteres" e "Slug contains caracteres invalidos" sao exatamente o que o
+  // `zod` existe para deixar passar: `err.code` sem `pg` so pode ter
+  // vindo do nosso codigo.
+  it("deixa o erro de dominio do slug chegar ao usuario", async () => {
+    mocks.updateProfile.mockRejectedValue(new Error("Slug excede 60 caracteres"));
+    await expect(updateProfileAction(null, formOf({ name: "Ana", slug: "x".repeat(70) }))).resolves.toEqual({
+      error: "Slug excede 60 caracteres",
+    });
+  });
+
   it("nao devolve a mensagem do driver ao usuario", async () => {
     mocks.becomeSeller.mockRejectedValue(
       Object.assign(new Error("permission denied for schema user"), { code: "42501" }),
     );
-    const r = await becomeSellerAction(null, formDe({ slug: "nerd", role: "seller" }));
+    const r = await becomeSellerAction(null, formOf({ slug: "nerd", role: "seller" }));
     expect(r.error).not.toContain("permission denied");
     expect(r.error).not.toContain("schema user");
   });

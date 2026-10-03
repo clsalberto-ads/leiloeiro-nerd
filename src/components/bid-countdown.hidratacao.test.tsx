@@ -26,31 +26,31 @@ import { BidCountdown } from "./bid-countdown";
 // latencia de rede. Com `Date.now()` congelado (fake timer sem avancar) os dois
 // lados concordariam e o teste passaria sem provar nada.
 describe("BidCountdown — a hidratacao de verdade", () => {
-  async function hidrarComAtraso(deadline: Date) {
-    const erros: string[] = [];
+  async function hydrateDelayed(deadline: Date) {
+    const errors: string[] = [];
     const original = console.error;
     console.error = (...args: unknown[]) => {
-      erros.push(args.map(String).join(" "));
+      errors.push(args.map(String).join(" "));
     };
     try {
       const html = renderToString(<BidCountdown deadline={deadline} />);
-      const doServidor = html.replace(/<[^>]+>/g, "").trim();
+      const serverText = html.replace(/<[^>]+>/g, "").trim();
 
-      const alvo = document.createElement("div");
-      alvo.innerHTML = html;
-      document.body.appendChild(alvo);
+      const target = document.createElement("div");
+      target.innerHTML = html;
+      document.body.appendChild(target);
 
       await act(async () => {
         await new Promise((r) => setTimeout(r, 1200));
       });
       await act(async () => {
-        hydrateRoot(alvo, <BidCountdown deadline={deadline} />);
+        hydrateRoot(target, <BidCountdown deadline={deadline} />);
       });
       return {
-        doServidor,
-        doCliente: alvo.textContent?.trim() ?? "",
-        htmlCliente: alvo.innerHTML,
-        erros,
+        serverText,
+        clientText: target.textContent?.trim() ?? "",
+        htmlCliente: target.innerHTML,
+        errors,
       };
     } finally {
       console.error = original;
@@ -58,8 +58,8 @@ describe("BidCountdown — a hidratacao de verdade", () => {
   }
 
   it("nao acusa falha de hidratacao mesmo com o relogio avancado", async () => {
-    const { erros } = await hidrarComAtraso(new Date("2026-12-25T12:00:00Z"));
-    const avisos = erros.filter((e) => /hydrat|did not match|Text content/i.test(e));
+    const { errors } = await hydrateDelayed(new Date("2026-12-25T12:00:00Z"));
+    const avisos = errors.filter((e) => /hydrat|did not match|Text content/i.test(e));
     expect(avisos, `avisos de hidratacao: ${avisos.join(" | ")}`).toEqual([]);
   });
 
@@ -70,9 +70,9 @@ describe("BidCountdown — a hidratacao de verdade", () => {
     // leitor de tela usa) sobrevive intacto depois de hidratar; se a arvore fosse
     // regenerada, ele ainda estaria la, entao este `it` trava o `role="timer"` e o
     // prazo absoluto, que sao as duas coisas que o usuario perde.
-    const { htmlCliente, doCliente } = await hidrarComAtraso(new Date("2026-12-25T12:00:00Z"));
+    const { htmlCliente, clientText } = await hydrateDelayed(new Date("2026-12-25T12:00:00Z"));
     expect(htmlCliente).toContain('role="timer"');
-    expect(doCliente).toContain("Prazo: 25/12/2026, 09:00");
+    expect(clientText).toContain("Prazo: 25/12/2026, 09:00");
   });
 
   it("o prazo absoluto do sr-only e' identico no servidor e no cliente", async () => {
@@ -80,8 +80,8 @@ describe("BidCountdown — a hidratacao de verdade", () => {
     // nao precisa de `suppressHydrationWarning`. Este `it` trava essa separacao: se
     // alguem passar a computar a contagem dentro do `sr-only` tambem, os dois lados
     // passam a divergir e o leitor de tela ouve o prazo errado.
-    const { doServidor, doCliente } = await hidrarComAtraso(new Date("2026-12-25T12:00:00Z"));
+    const { serverText, clientText } = await hydrateDelayed(new Date("2026-12-25T12:00:00Z"));
     const prazo = (t: string) => t.match(/Prazo: [^P]+/)?.[0];
-    expect(prazo(doServidor)).toBe(prazo(doCliente));
+    expect(prazo(serverText)).toBe(prazo(clientText));
   });
 });
