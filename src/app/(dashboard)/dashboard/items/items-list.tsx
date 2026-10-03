@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { DataTable, type DataTableSort } from "@/components/data-table";
 import type { EmptyStateAction } from "@/components/empty-state";
 import { StatusTabs } from "./status-tabs";
-import { COLUNAS } from "./columns";
+import { ITEM_COLUMNS } from "./columns";
 import {
   sortColumnByOrder,
   DEFAULT_SORT_DIRECTION,
@@ -23,7 +23,7 @@ import type { DashboardItemRow } from "./dashboard-item-row";
 // da URL, e a ligacao com o `useRouter`.
 //
 // As tres coisas que ele carregava e nao belonged to here foram para o lugar que
-// o guia de data-table do shadcn indica: as COLUNAS (com as row actions dentro)
+// o guia de data-table do shadcn indica: as colunas (com as row actions dentro)
 // para `columns.tsx`, e as ABAS para `status-tabs.tsx`. O vocabulario das abas
 // e as colunas sao as duas metades de "o que a tela mostra"; este arquivo e a
 // metade de "o que a tela faz quando o usuario mexe".
@@ -212,8 +212,9 @@ export function ItemsList({ items, view, totalCount, navigate }: ItemsListProps)
       <StatusTabs view={view} />
 
       <DataTable
-        columns={COLUNAS}
+        columns={ITEM_COLUMNS}
         data={items}
+        getRowId={(item) => item.id}
         pageIndex={view.page - 1}
         pageSize={view.pageSize}
         sort={ordenacao}

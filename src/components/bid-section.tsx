@@ -1,13 +1,13 @@
 "use client";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { getItemBidsAction } from "@/presentation/actions/bid-actions";
 import { BidForm } from "@/components/bid-form";
 import { BidHistory } from "@/components/bid-history";
-import type { Bid } from "@/domain/repositories/bid-repository";
+import type { BidView } from "@/domain/repositories/bid-repository";
 
 interface BidSectionProps {
   itemId: string;
-  initialBids: Bid[];
+  initialBids: BidView[];
   minInitialBid: number;
   minBidIncrement: number;
   /** Prazo de lances do item. Ausente = item sem prazo (nao desliga o form). */
@@ -15,7 +15,7 @@ interface BidSectionProps {
 }
 
 export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement, deadline }: BidSectionProps) {
-  const [bids, setBids] = useState<Bid[]>(initialBids);
+  const [bids, setBids] = useState<BidView[]>(initialBids);
   // ponytail: o `deadline` desce do servidor porque o `status` sozinho nao diz
   // que o leilao esta aberto — nada transiciona `active -> closed`, entao um item
   // com prazo vencido continua `active` para sempre. Sem isto o `BidCountdown`
@@ -66,20 +66,27 @@ export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement
   const minBid = bids.length > 0 ? bids[0].amount + minBidIncrement : minInitialBid;
 
   // ponytail: o lance que acabou de sair entra na lista na hora, sem esperar o
-  // poll. O `form.reset` do `BidForm` tambem dispara a remontagem por causa do
-  // `key={minBid}`, entao o `min` do input ja sobe para o novo piso no mesmo
-  // render — o que mantem o lance seguinte valido, em vez de o cliente recusar
-  // por ate 10s com o piso velho.
-  const placeBid = (bid: Bid) => {
+  // poll.
+  //
+  // O `key={minBid}` que existia aqui nao era necessario e custava o campo de
+  // digitado: o `minBid` sobe toda vez que CHEGAM lances de outra pessoa — o poll
+  // de 10s traz `setBids` com array novo, o piso sobe, a `key` muda e o React
+  // DESPARTA o `BidForm` inteiro. Quem estava digitando o valor perdia o que tinha
+  // digitado, sem aviso, no instante em que alguem mais deu lance. Piso e schema
+  // nao precisam de remontagem para acompanhar o prop: o `min` do input, o
+  // `zodResolver(bidFormSchema(minBid))` e o `amountReais` do reset ja leem
+  // `minBid` a cada render. E o `placeBid` e memoizado porque o `onBid` esta no
+  // array de deps do efeito do `BidForm`.
+  const placeBid = useCallback((bid: BidView) => {
     setBids((atuais) => [bid, ...atuais.filter((b) => b.id !== bid.id)]);
-  };
+  }, []);
 
   return (
     <div className="space-y-4">
       {encerrado ? (
         <p className="text-sm text-muted-foreground">Leilão encerrado — não aceita mais lances.</p>
       ) : (
-        <BidForm key={minBid} itemId={itemId} minBid={minBid} onBid={placeBid} />
+        <BidForm itemId={itemId} minBid={minBid} onBid={placeBid} />
       )}
       <BidHistory bids={bids} />
     </div>

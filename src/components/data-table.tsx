@@ -55,6 +55,16 @@ export interface DataTableSort {
 interface CommonDataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
+  /**
+   * Identidade estavel da linha. Sem isto o TanStack usa o INDICE da pagina, e
+   * com `manualPagination` o indice nao identifica nada: a linha 0 da pagina 2 e
+   * a linha 0 da pagina 1, entao dois itens diferentes compartilham a mesma
+   * `key` do React e o DOM/estado traveling de um para o outro quando o
+   * servidor responde. Nao implementei `T extends { id: string }` porque este
+   * componente e generico e nem toda lista tem `id` — quem sabe passar o
+   * proprio desempate (aqui, `item.id`) passa.
+   */
+  getRowId?: (row: T, index: number) => string;
   pageSize?: number;
   pageIndex?: number;
   onPageChange?: (page: number) => void;
@@ -199,6 +209,7 @@ export function DataTable<T>({
   emptyAction,
   manualPagination = false,
   totalCount,
+  getRowId,
 }: DataTableProps<T>): React.JSX.Element {
   // ponytail: `query` e o que esta no input (muda a cada tecla); `filtro` e o que
   // foi efetivamente aplicado a tabela (so depois do debounce).
@@ -376,6 +387,7 @@ export function DataTable<T>({
     manualFiltering: manualPagination,
     manualSorting: manualPagination,
     rowCount: manualPagination ? totalCount : undefined,
+    getRowId,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

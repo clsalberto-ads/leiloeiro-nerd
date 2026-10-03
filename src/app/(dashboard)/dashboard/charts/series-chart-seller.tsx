@@ -66,7 +66,7 @@ export function SellerSeriesChart({
             <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} />
             <ChartTooltip content={<ChartTooltipContent labelKey="day" />} />
             <Area dataKey="bids" type="monotone" stroke="var(--color-bids)" fill="var(--color-bids)" fillOpacity={0.18} isAnimationActive={false} />
-            <Area dataKey="itens" type="monotone" stroke="var(--color-itens)" fill="var(--color-itens)" fillOpacity={0.18} isAnimationActive={false} />
+            <Area dataKey="items" type="monotone" stroke="var(--color-items)" fill="var(--color-items)" fillOpacity={0.18} isAnimationActive={false} />
           </AreaChart>
         </ChartContainer>
       </CardContent>

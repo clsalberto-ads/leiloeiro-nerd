@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import type { Bid } from "@/domain/repositories/bid-repository";
+import type { BidView } from "@/domain/repositories/bid-repository";
 
 interface BidFormProps {
   itemId: string;
@@ -24,7 +24,7 @@ interface BidFormProps {
    * cliente. `revalidatePath` na action nao resolve: a page ja esta montada e o
    * `useState` do cliente nao se ressincroniza de props novas.
    */
-  onBid?: (bid: Bid) => void;
+  onBid?: (bid: BidView) => void;
 }
 
 // Sem coerce/transform/default no schema do form: o input usa `valueAsNumber`,
@@ -56,12 +56,25 @@ export function BidForm({ itemId, minBid, onBid }: BidFormProps) {
   const amountReais = Number(amountReaisStr);
   const centavos = Number.isFinite(amountReais) ? Math.round(amountReais * 100) : minBid;
 
+  // ponytail: o toast e o `onBid` sao disparados UMA VEZ por resultado de action,
+  // e nao uma vez por execucao do efeito. `onBid` entra no array de deps e o pai
+  // NAO memoiza essa funcao: cada poll de 10s que traz lances novos re-renderiza o
+  // `BidSection`, o `placeBid` ganha uma identidade nova, o efeito roda de novo
+  // com o `state` do lance que JA TINHA SIDO TRATADO, e o usuario via
+  // "Lance registrado!" de novo — quantas vezes o polling rodasse antes de ele
+  // mudar de aba. O `ref` amarra o efeito a IDENTIDADE do `state`, que e o que
+  // representa um resultado novo da action; os outros deps viram so gatilho de
+  // re-execucao, e o `ref` e quem impede o disparo repetido.
+  const stateTratado = useRef<typeof state>(null);
   useEffect(() => {
-    if (state && state.ok) {
+    if (!state) return;
+    if (stateTratado.current === state) return;
+    stateTratado.current = state;
+    if (state.ok) {
       toast.success("Lance registrado!");
       if (state.bid) onBid?.(state.bid);
       form.reset({ itemId, amountReais: minBid / 100 });
-    } else if (state && state.error) {
+    } else if (state.error) {
       toast.error(state.error);
     }
     // ponytail: accessibility constraint (DOM alert must stay) - the toast is visual-only, in-DOM alert for screen readers
