@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Settings } from "lucide-react";
+import { LayoutDashboard, Package, Settings, Star, Gavel } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export function DashboardSidebar() {
@@ -12,6 +12,12 @@ export function DashboardSidebar() {
         </Button>
         <Button nativeButton={false} render={<Link href="/dashboard/items" />} variant="ghost" className="justify-start gap-2">
           <Package className="h-4 w-4" /> Meus items
+        </Button>
+        <Button nativeButton={false} render={<Link href="/dashboard/favorites" />} variant="ghost" className="justify-start gap-2">
+          <Star className="h-4 w-4" /> Favoritos
+        </Button>
+        <Button nativeButton={false} render={<Link href="/dashboard/my-bids" />} variant="ghost" className="justify-start gap-2">
+          <Gavel className="h-4 w-4" /> Meus lances
         </Button>
         <Button nativeButton={false} render={<Link href="/dashboard/settings" />} variant="ghost" className="justify-start gap-2">
           <Settings className="h-4 w-4" /> Configurações

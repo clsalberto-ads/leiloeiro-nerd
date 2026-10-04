@@ -6,7 +6,8 @@ import type { Item, ItemRepository } from "@/domain/repositories/item-repository
 class FakeBidRepo implements BidRepository {
   constructor(private bids: Bid[] = []) {}
   async findByItemId() { return []; }
-  async placeBid(_input: unknown, _validate: (ctx: unknown) => void): Promise<never> { throw new Error("no"); }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async placeBid(_input: any, _validate: (ctx: { item: any; highestBid: any }) => void): Promise<any> { throw new Error("no"); }
   async listByBidder(_bidderId: string) { return this.bids; }
 }
 
