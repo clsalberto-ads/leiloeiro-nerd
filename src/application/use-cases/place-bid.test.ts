@@ -183,6 +183,13 @@ class FakeNotificationRepository implements NotificationRepository {
     this.created = input;
     return { id: "notif1", ...input, read: false, createdAt: new Date() };
   }
+  async getUnreadCount() { return 0; }
+  async listRecent() { return []; }
+  async listByUser() { return { items: [], total: 0 }; }
+  async countByUser() { return 0; }
+  async markAsRead() {}
+  async markAllAsRead() {}
+  async markManyAsRead() {}
 }
 
 describe("placeBid", () => {
@@ -407,9 +414,14 @@ describe("placeBid", () => {
   it("não falha o lance se notifRepo.create der erro (best effort)", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const throwingNotifRepo: NotificationRepository = {
-      async create() {
-        throw new Error("notificação falhou");
-      },
+      async create() { throw new Error("notificação falhou"); },
+      async getUnreadCount() { return 0; },
+      async listRecent() { return []; },
+      async listByUser() { return { items: [], total: 0 }; },
+      async countByUser() { return 0; },
+      async markAsRead() {},
+      async markAllAsRead() {},
+      async markManyAsRead() {},
     };
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
