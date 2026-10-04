@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Gavel } from "lucide-react";
 import { signOutAction } from "@/presentation/actions/auth-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function DashboardHeader({ userName }: { userName?: string | null }) {
   return (
@@ -14,7 +15,8 @@ export function DashboardHeader({ userName }: { userName?: string | null }) {
         <span className="hidden sm:inline-block bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Leiloeiro Nerd</span>
       </Link>
       <div className="flex items-center gap-2 sm:gap-3">
-        <ThemeToggle />
+        <NotificationBell />
+            <ThemeToggle />
         {userName ? <span className="hidden text-sm text-muted-foreground sm:inline-block">Olá, {userName}</span> : null}
         <form action={signOutAction}>
           <Button type="submit" variant="outline" size="sm">Sair</Button>

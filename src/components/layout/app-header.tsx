@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Gavel } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function AppHeader() {
   return (
@@ -18,7 +19,8 @@ export function AppHeader() {
         <Link href="/#stats" className="transition-colors hover:text-foreground">Plataforma</Link>
       </nav>
       <div className="flex items-center gap-3">
-        <ThemeToggle />
+        <NotificationBell />
+            <ThemeToggle />
         <Button nativeButton={false} render={<Link href="/login">Entrar</Link>} variant="ghost" size="sm" />
         <Button nativeButton={false} render={<Link href="/register">Criar conta</Link>} size="sm" className="gap-1.5 shadow-sm" />
       </div>
