@@ -49,7 +49,7 @@ export async function getDashboardSummary(
 ): Promise<DashboardView> {
   if (role === "seller" || role === "both") {
     const [summary, series] = await Promise.all([
-      analytics.sellerSummary(userId),
+      analytics.sellerSummary(userId, clampWindowDays(days)),
       analytics.sellerSeries(userId, clampWindowDays(days)),
     ]);
     return { role: "seller", summary, series };

@@ -79,7 +79,7 @@ export function SellerPanel({ view, period }: { view: SellerView; period: Period
                       <Badge variant="secondary">
                         {item.bids} {item.bids === 1 ? "lance" : "lances"}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">R$ {formatBRL(item.highestBid)}</span>
+                      <span className="text-sm text-muted-foreground">R$ {formatBRL(item.highestBid ?? 0)}</span>
                     </div>
                   </li>
                 ))}

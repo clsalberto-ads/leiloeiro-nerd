@@ -50,7 +50,10 @@ function fake(): AnalyticsRepository & { calls: string[] } {
     async buyerSummary(id, days) {
       calls.push(`buyerSummary:${id}:${days}`);
       return BUYER_SUMMARY;
-    },
+    },    async getRevenueApproved() { return { amountCents: 0 }; },
+    async getPendingPaymentsAmount() { return { amountCents: 0 }; },
+    async getApprovedCount() { return { count: 0 }; },
+    async getAverageTicketApproved() { return { amountCents: 0 }; },
   };
 }
 

@@ -1,7 +1,8 @@
-import { and, count, desc, eq, max, sql, sum } from "drizzle-orm";
+import type { Period } from "@/app/(dashboard)/dashboard/period/period";
+import { and, count, countDistinct, avg, desc, eq, gte, lte, max, sql, sum } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { APP_TIMEZONE, localDateOf, startOfLocalDay } from "@/lib/timezone";
-import { bids, items } from "@/infrastructure/database/schema";
+import { bids, items, payments } from "@/infrastructure/database/schema";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import type { ItemStatus, ItemType } from "@/domain/repositories/item-repository";
 import type {
@@ -148,7 +149,7 @@ export const drizzleAnalyticsRepository: AnalyticsRepository = {
     } satisfies SellerSummary;
   },
 
-  async sellerSeries(sellerId, days) {
+  async sellerSeries(sellerId: string, days: number) {
     const since = windowStart(days);
     const until = new Date();
 
@@ -176,7 +177,7 @@ export const drizzleAnalyticsRepository: AnalyticsRepository = {
     } satisfies SellerSeries;
   },
 
-  async buyerSummary(bidderId, days) {
+  async buyerSummary(bidderId: string, days: number) {
     const since = windowStart(days);
     const until = new Date();
     const mine = eq(bids.bidderId, bidderId);
@@ -243,4 +244,49 @@ export const drizzleAnalyticsRepository: AnalyticsRepository = {
       })) satisfies RecentBid[],
     } satisfies BuyerSummary;
   },
+  async getRevenueApproved(sellerId: string, period: Period): Promise<{ amountCents: number }> {
+    const { start, end } = getPeriodRange(period);
+    const [r] = await db
+      .select({ amountCents: sum(payments.amount) })
+      .from(payments)
+      .innerJoin(items, eq(payments.itemId, items.id))
+      .where(and(eq(items.sellerId, sellerId), eq(payments.status, "approved"), gte(payments.createdAt, start), lte(payments.createdAt, end)));
+    return { amountCents: Number(r?.amountCents ?? 0) };
+  },
+  async getPendingPaymentsAmount(sellerId: string, period?: Period): Promise<{ amountCents: number }> {
+    const where = [eq(items.sellerId, sellerId), eq(payments.status, "pending")];
+    if (period) {
+      const { start, end } = getPeriodRange(period);
+      where.push(gte(payments.createdAt, start), lte(payments.createdAt, end));
+    }
+    const [r] = await db
+      .select({ amountCents: sum(payments.amount) })
+      .from(payments)
+      .innerJoin(items, eq(payments.itemId, items.id))
+      .where(and(...where));
+    return { amountCents: Number(r?.amountCents ?? 0) };
+  },
+  async getApprovedCount(sellerId: string, period: Period): Promise<{ count: number }> {
+    const { start, end } = getPeriodRange(period);
+    const [r] = await db
+      .select({ count: countDistinct(payments.id) })
+      .from(payments)
+      .innerJoin(items, eq(payments.itemId, items.id))
+      .where(and(eq(items.sellerId, sellerId), eq(payments.status, "approved"), gte(payments.createdAt, start), lte(payments.createdAt, end)));
+    return { count: Number(r?.count ?? 0) };
+  },
+  async getAverageTicketApproved(sellerId: string, period: Period): Promise<{ amountCents: number }> {
+    const { start, end } = getPeriodRange(period);
+    const [r] = await db
+      .select({ avg: avg(payments.amount) })
+      .from(payments)
+      .innerJoin(items, eq(payments.itemId, items.id))
+      .where(and(eq(items.sellerId, sellerId), eq(payments.status, "approved"), gte(payments.createdAt, start), lte(payments.createdAt, end)));
+    return { amountCents: Math.round(Number(r?.avg ?? 0)) };
+  }
 };
+function getPeriodRange(period: Period) {
+  const end = new Date();
+  const start = new Date(end.getTime() - period.days * 24 * 60 * 60 * 1000);
+  return { start, end };
+}

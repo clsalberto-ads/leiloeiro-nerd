@@ -90,7 +90,7 @@ describe("dashboard/page — a visao segue o papel", () => {
     mocks.session.mockResolvedValue({ user: { id: "u1", name: "Ana", email: "ana@ex.com", role: "both" } });
     const html = renderToStaticMarkup(await DashboardPage(props()));
     expect(html).toContain("Seu painel");
-    expect(mocks.analise.sellerSummary).toHaveBeenCalledWith("u1");
+    expect(mocks.analise.sellerSummary).toHaveBeenCalledWith("u1", 30);
     expect(mocks.analise.buyerSummary).not.toHaveBeenCalled();
   });
 
