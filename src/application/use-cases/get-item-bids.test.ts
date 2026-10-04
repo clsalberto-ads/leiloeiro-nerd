@@ -35,6 +35,9 @@ class FakeBidRepository implements BidRepository {
   async placeBid(_input: CreateBidInput, _validate: (ctx: { item: LockedBidItem | null; highestBid: Bid | undefined }) => void): Promise<never> {
     throw new Error("não usado");
   }
+  async listByBidder(_bidderId: string): Promise<Bid[]> {
+    return [];
+  }
 }
 
 class FakeUserRepository implements UserRepository {

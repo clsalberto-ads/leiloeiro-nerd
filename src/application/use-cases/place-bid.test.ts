@@ -149,6 +149,9 @@ class FakeBidRepository implements BidRepository {
     this.bids = [bid, ...this.bids].sort((a, b) => b.amount - a.amount);
     return { bid, previousHighestBid: highestBid ?? null };
   }
+  async listByBidder(_bidderId: string): Promise<Bid[]> {
+    return [];
+  }
 }
 
 class FakeUserRepository implements UserRepository {

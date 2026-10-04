@@ -100,6 +100,31 @@ export const drizzleBidRepository: BidRepository = {
       };
     });
   },
+
+  async listByBidder(bidderId: string, limit?: number, offset?: number) {
+    const base = db
+      .select({
+        id: bids.id,
+        itemId: bids.itemId,
+        bidderId: bids.bidderId,
+        amount: bids.amount,
+        rank: bids.rank,
+        createdAt: bids.createdAt,
+      })
+      .from(bids)
+      .where(eq(bids.bidderId, bidderId))
+      .orderBy(desc(bids.createdAt), desc(bids.id));
+    const rows = await (typeof limit === "number" ? (typeof offset === "number" ? base.limit(limit).offset(offset) : base.limit(limit)) : base);
+    return rows.map((row) => ({
+      id: row.id,
+      itemId: row.itemId,
+      bidderId: row.bidderId,
+      bidderName: row.bidderId,
+      amount: row.amount,
+      rank: row.rank,
+      createdAt: row.createdAt,
+    } satisfies Bid));
+  },
 };
 
 // ponytail: `total: number | string` e o que torna o `Number()` LOAD-BEARING.

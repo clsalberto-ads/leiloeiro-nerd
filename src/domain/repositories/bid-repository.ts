@@ -51,6 +51,7 @@ export interface BidRepository {
     input: CreateBidInput,
     validate: (ctx: { item: LockedBidItem | null; highestBid: Bid | undefined }) => void,
   ): Promise<BidPlacement>;
+  listByBidder(bidderId: string, limit?: number, offset?: number): Promise<Bid[]>;
 }
 
 // ponytail: o agregado que a vitrine precisa, e NAO mais um metodo em
