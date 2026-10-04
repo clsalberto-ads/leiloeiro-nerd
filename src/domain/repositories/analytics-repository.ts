@@ -37,6 +37,7 @@ export interface SellerSummary {
   totalItems: number;
   activeItems: number;
   listedValue: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   itemsByStatus: Array<{ status: any; total: number }>;
   itemsByType: { type: string; total: number }[];
   mostContested: { id: string; title: string; bids: number; highestBid: number | null }[];

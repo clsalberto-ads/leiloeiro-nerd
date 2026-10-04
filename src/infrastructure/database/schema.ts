@@ -1,4 +1,5 @@
 import { integer, index, uniqueIndex, pgEnum, pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { user as userTable } from "./auth-schema";
 
 export const itemTypeEnum = pgEnum("item_type", ["product", "service", "piece"]);
@@ -20,6 +21,7 @@ export const items = pgTable("items", {
   status: itemStatusEnum("status").notNull().default("draft"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  searchTsv: text("search_tsv").generatedAlwaysAs(sql`to_tsvector('portuguese', coalesce(title, '') || ' ' || coalesce(description, ''))`).notNull(),
 // ponytail: `items_seller_id_idx` e o indice da tela principal do app.
 // `listBySeller` filtra por `seller_id` e o unico indice que havia
 // (`bid_deadline, status`) comeca por outra coluna, entao o Postgres nao o
@@ -30,6 +32,7 @@ export const items = pgTable("items", {
 }, (t) => [
   index("items_bid_deadline_status_idx").on(t.bidDeadline, t.status),
   index("items_seller_id_idx").on(t.sellerId),
+  index("items_search_tsv_idx").using("gin", sql`to_tsvector('portuguese', coalesce(title, '') || ' ' || coalesce(description, ''))`),
 ]);
 
 export const itemImages = pgTable("item_images", {

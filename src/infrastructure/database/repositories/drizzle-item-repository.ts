@@ -148,8 +148,15 @@ function sortItems(filter?: ItemListFilter): SQL[] {
 function predicates(sellerId: string, filter?: ItemListFilter): SQL[] {
   const condicoes: SQL[] = [eq(items.sellerId, sellerId)];
   if (filter?.status) condicoes.push(eq(items.status, filter.status));
-  const search = filter?.q ? searchByLabelOrTitle(filter.q) : undefined;
-  if (search) condicoes.push(search);
+  if (filter?.q) {
+    const search = searchByLabelOrTitle(filter.q);
+    if (search) condicoes.push(search);
+    // Also use FTS on the generated searchTsv column for better relevance
+    const needle = filter.q.trim();
+    if (needle) {
+      condicoes.push(sql`${items.searchTsv} @@ plainto_tsquery('portuguese', ${needle})`);
+    }
+  }
   return condicoes;
 }
 
