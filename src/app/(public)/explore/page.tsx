@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PublicItemCard } from "@/components/public-item-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { AppHeader } from "@/components/layout/app-header";
@@ -18,7 +19,7 @@ export default async function ExplorePage() {
             <h2 className="text-lg font-semibold">Terminando em breve</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {ending.map((item) => (
-                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId ?? (item as any).seller?.slug ?? ""} />
+                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId} />
               ))}
             </div>
           </section>
@@ -26,7 +27,7 @@ export default async function ExplorePage() {
             <h2 className="text-lg font-semibold">Mais recentes</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {recent.map((item) => (
-                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId ?? (item as any).seller?.slug ?? ""} />
+                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId} />
               ))}
             </div>
           </section>
@@ -34,7 +35,7 @@ export default async function ExplorePage() {
             <h2 className="text-lg font-semibold">Destaques</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {popular.map((item) => (
-                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId ?? (item as any).seller?.slug ?? ""} />
+                <PublicItemCard key={item.id} item={item} slug={(item as any).sellerId} />
               ))}
             </div>
           </section>

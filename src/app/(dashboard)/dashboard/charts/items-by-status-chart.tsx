@@ -32,7 +32,7 @@ const TONES: Record<ItemStatus, string> = {
 const config = {
   items: { label: "Itens" },
   ...Object.fromEntries(
-    (Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => [status, { label: STATUS_LABELS[status] }]),
+    ((STATUS_LABELS && Object.keys(STATUS_LABELS)) as ItemStatus[]).map((status) => [status, { label: STATUS_LABELS?.[status] ?? status }]),
   ),
 } satisfies ChartConfig;
 

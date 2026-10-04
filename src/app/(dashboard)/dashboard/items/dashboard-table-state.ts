@@ -128,7 +128,8 @@ export type SearchParamGetter = (name: string) => string | null;
 // escrita a mao divergiria do nada e viraria um status que a tela nao consegue
 // filtrar, que e o mesmo defeito das abas (e e por isso que as abas usam
 // `satisfies` + `ponytail:`).
-function keysOf<T extends string>(labels: Record<T, string>): T[] {
+function keysOf<T extends string>(labels: Record<T, string> | undefined | null): T[] {
+  if (!labels || typeof labels !== "object") return [] as T[];
   return Object.keys(labels) as T[];
 }
 
