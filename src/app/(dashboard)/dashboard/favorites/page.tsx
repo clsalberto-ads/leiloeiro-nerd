@@ -33,7 +33,7 @@ export default async function FavoritesPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <p className="text-muted-foreground">Nenhum favorito ainda</p>
-                <Button className="mt-4" render={<Link href="/dashboard">Voltar ao dashboard</Link>} />
+                <Button className="mt-4" nativeButton={false} render={<Link href="/dashboard">Voltar ao dashboard</Link>} />
               </CardContent>
             </Card>
           ) : (
@@ -44,7 +44,7 @@ export default async function FavoritesPage() {
                     <CardTitle className="text-base">{item.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Button size="sm" variant="outline" render={<Link href={`/${session.user.slug || session.user.id}/${item.id}`}>Ver item</Link>} />
+                    <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/${session.user.slug || session.user.id}/${item.id}`}>Ver item</Link>} />
                   </CardContent>
                 </Card>
               ))}
