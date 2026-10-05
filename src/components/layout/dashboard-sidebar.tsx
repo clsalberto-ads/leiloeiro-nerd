@@ -44,7 +44,7 @@ export function DashboardSidebar() {
       <Separator />
       <div className="p-3">
         <form action={signOutAction}>
-          <Button nativeButton={false} variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground">
+          <Button type="submit" variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground">
             <LogOut className="h-5 w-5" />
             Sair
           </Button>
@@ -73,12 +73,7 @@ export function DashboardSidebarMobile({ onClose }: DashboardSidebarMobileProps)
       <NavItem href="/dashboard/settings" icon={Settings} label="Configurações" onClose={onClose} />
       <Separator className="my-4" />
       <form action={signOutAction}>
-        <Button
-          nativeButton={false}
-          type="submit"
-          variant="ghost"
-          className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground"
-        >
+        <Button type="submit" variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground">
           <LogOut className="h-5 w-5" />
           Sair
         </Button>
