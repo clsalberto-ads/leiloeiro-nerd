@@ -4,7 +4,6 @@ import { drizzleFavoriteRepository } from "@/infrastructure/database/repositorie
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { listFavoritesByUser } from "@/application/use-cases/list-favorites-by-user";
 import Link from "next/link";
-import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ export default async function FavoritesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <DashboardHeader userName={session.user.name} />
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
           <PageHeader title="Favoritos" description="Itens que você marcou como favoritos" />

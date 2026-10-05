@@ -4,7 +4,6 @@ import { drizzleBidRepository } from "@/infrastructure/database/repositories/dri
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { listMyBids } from "@/application/use-cases/list-my-bids";
 import Link from "next/link";
-import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format-brl";
@@ -17,7 +16,6 @@ export default async function MyBidsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <DashboardHeader userName={session.user.name} />
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
           <PageHeader title="Meus lances" description="Histórico dos seus lances" />

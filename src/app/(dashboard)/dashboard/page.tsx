@@ -46,7 +46,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // ("Seu painel"/"Meus lances") e o `PeriodSelect` sao os unicos acoes do
   // cabecalho da pagina; os links para itens e perfil sao do `DashboardSidebar`.
   return (
-    <div className="space-y-6">
+  <div className="min-h-screen flex flex-col bg-background">
+    <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader
         title={isSeller ? "Seu painel" : "Meus lances"}
         description={session.user.email}
@@ -57,6 +58,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       ) : (
         <BuyerPanel view={view} period={period} />
       )}
-    </div>
+    </main>
+  </div>
   );
 }

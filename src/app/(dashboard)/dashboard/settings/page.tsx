@@ -9,7 +9,8 @@ export default async function SettingsPage() {
   const session = await getSession();
   const isSeller = session?.user.role === "seller" || session?.user.role === "both";
   return (
-    <div className="space-y-6">
+  <div className="min-h-screen flex flex-col bg-background">
+    <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader title="Configurações" />
       {session ? (
         <SettingsForm
@@ -26,7 +27,8 @@ export default async function SettingsPage() {
           <h2 className="text-lg font-semibold">Conta de leiloeiro</h2>
           <BecomeSellerForm />
         </section>
-      ) : null}
+        ) : null}
+    </main>
     </div>
   );
 }

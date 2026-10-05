@@ -82,16 +82,18 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Meus itens"
-        actions={
-          <Button nativeButton={false} render={<Link href="/dashboard/items/new" />} size="sm">
-            + Novo item
-          </Button>
-        }
-      />
-      <ItemsUrl items={items.map(toDashboardItemRow)} view={view} totalCount={total} />
+    <div className="min-h-screen flex flex-col bg-background">
+      <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <PageHeader
+          title="Meus itens"
+          actions={
+            <Button nativeButton={false} render={<Link href="/dashboard/items/new" />} size="sm">
+              + Novo item
+            </Button>
+          }
+        />
+        <ItemsUrl items={items.map(toDashboardItemRow)} view={view} totalCount={total} />
+      </main>
     </div>
   );
 }
