@@ -1,30 +1,70 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Settings, Star, Gavel } from "lucide-react";
+import { LayoutDashboard, Package, Settings, Star, Gavel, LogOut } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { signOutAction } from "@/presentation/actions/auth-actions";
+
+interface DashboardSidebarMobileProps {
+  onClose: () => void;
+}
+
+function NavItem({ href, icon: Icon, label, onClose }: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; onClose?: () => void }) {
+  return (
+    <Button
+      nativeButton={false}
+      render={<Link href={href} onClick={onClose} />}
+      variant="ghost"
+      className="w-full justify-start gap-3 px-3 py-2.5 text-base"
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </Button>
+  );
+}
 
 export function DashboardSidebar() {
   return (
-    <aside className="flex shrink-0 flex-row overflow-x-auto border-b bg-card md:h-full md:w-64 md:flex-col md:border-r md:border-b-0">
-      <nav className="flex flex-1 flex-row gap-1 p-2 md:flex-col md:p-3">
-        <Button nativeButton={false} render={<Link href="/dashboard" />} variant="ghost" className="justify-start gap-2">
-          <LayoutDashboard className="h-4 w-4" /> Painel
-        </Button>
-        <Button nativeButton={false} render={<Link href="/dashboard/items" />} variant="ghost" className="justify-start gap-2">
-          <Package className="h-4 w-4" /> Meus items
-        </Button>
-        <Button nativeButton={false} render={<Link href="/dashboard/favorites" />} variant="ghost" className="justify-start gap-2">
-          <Star className="h-4 w-4" /> Favoritos
-        </Button>
-        <Button nativeButton={false} render={<Link href="/dashboard/my-bids" />} variant="ghost" className="justify-start gap-2">
-          <Gavel className="h-4 w-4" /> Meus lances
-        </Button>
-        <Button nativeButton={false} render={<Link href="/dashboard/settings" />} variant="ghost" className="justify-start gap-2">
-          <Settings className="h-4 w-4" /> Configurações
-        </Button>
+    <aside className="hidden md:flex md:h-[calc(100vh-4rem)] md:w-64 md:flex-col md:border-r md:bg-card sticky top-16">
+      <nav className="flex flex-1 flex-col gap-1 p-3">
+        <NavItem href="/dashboard" icon={LayoutDashboard} label="Painel" />
+        <NavItem href="/dashboard/items" icon={Package} label="Meus itens" />
+        <NavItem href="/dashboard/favorites" icon={Star} label="Favoritos" />
+        <NavItem href="/dashboard/my-bids" icon={Gavel} label="Meus lances" />
+        <NavItem href="/dashboard/settings" icon={Settings} label="Configurações" />
       </nav>
-      <Separator className="hidden md:block" />
-      <div className="hidden p-3 text-xs text-muted-foreground md:block">Leiloeiro Nerd</div>
+      <Separator />
+      <div className="p-3">
+        <form action={signOutAction}>
+          <Button nativeButton={false} variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground">
+            <LogOut className="h-5 w-5" />
+            Sair
+          </Button>
+        </form>
+      </div>
     </aside>
+  );
+}
+
+export function DashboardSidebarMobile({ onClose }: DashboardSidebarMobileProps) {
+  return (
+    <nav className="flex flex-col gap-2">
+      <NavItem href="/dashboard" icon={LayoutDashboard} label="Painel" onClose={onClose} />
+      <NavItem href="/dashboard/items" icon={Package} label="Meus itens" onClose={onClose} />
+      <NavItem href="/dashboard/favorites" icon={Star} label="Favoritos" onClose={onClose} />
+      <NavItem href="/dashboard/my-bids" icon={Gavel} label="Meus lances" onClose={onClose} />
+      <NavItem href="/dashboard/settings" icon={Settings} label="Configurações" onClose={onClose} />
+      <Separator className="my-4" />
+      <form action={signOutAction}>
+        <Button
+          nativeButton={false}
+          type="submit"
+          variant="ghost"
+          className="w-full justify-start gap-3 px-3 py-2.5 text-base text-muted-foreground hover:text-foreground"
+        >
+          <LogOut className="h-5 w-5" />
+          Sair
+        </Button>
+      </form>
+    </nav>
   );
 }
