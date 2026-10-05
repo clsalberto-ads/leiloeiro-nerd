@@ -25,7 +25,7 @@ function NavItem({ href, icon: Icon, label, onClose }: { href: string; icon: Rea
 
 export function DashboardSidebar() {
   return (
-    <aside className="hidden md:fixed md:left-0 md:top-0 md:z-40 md:h-screen md:w-64 md:flex-col md:border-r md:bg-card">
+    <aside className="hidden md:flex md:fixed md:left-0 md:top-0 md:z-40 md:h-screen md:w-64 md:flex-col md:border-r md:bg-card">
       <div className="flex h-16 items-center justify-start border-b px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
