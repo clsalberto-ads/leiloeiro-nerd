@@ -12,7 +12,7 @@ function SheetContent({
   className,
   side = "left",
   children,
-  ...props
+  ..._props
 }: React.ComponentProps<typeof Dialog.Popup> & { side?: "left" | "right" | "top" | "bottom" }) {
   return (
     <Dialog.Portal>

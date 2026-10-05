@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LinkButton } from "@/components/ui/link-button";
 import { LayoutDashboard, Package, Settings, Star, Gavel, LogOut } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { signOutAction } from "@/presentation/actions/auth-actions";
@@ -10,15 +10,15 @@ interface DashboardSidebarMobileProps {
 
 function NavItem({ href, icon: Icon, label, onClose }: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; onClose?: () => void }) {
   return (
-    <Button
-      nativeButton={false}
-      render={<Link href={href} onClick={onClose} />}
+    <LinkButton
+      href={href}
       variant="ghost"
       className="w-full justify-start gap-3 px-3 py-2.5 text-base"
+      onClick={onClose}
     >
       <Icon className="h-5 w-5" />
       {label}
-    </Button>
+    </LinkButton>
   );
 }
 
