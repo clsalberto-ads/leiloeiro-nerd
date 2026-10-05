@@ -16,7 +16,7 @@ export function DashboardHeader({ userName }: { userName?: string | null }) {
     <>
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger>
-          <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Abrir menu">
+          <Button variant="ghost" size="icon" className="sm:hidden" nativeButton={false} aria-label="Abrir menu">
             <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
