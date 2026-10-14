@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getOpenRouterClient, MODEL } from "@/lib/ai/client";
-import { SYSTEM_PROMPT } from "@/lib/ai/prompt";
+import { buildSystemPrompt } from "@/lib/ai/prompt";
+import {
+  KnowledgeIndexNotFoundError,
+  buildContextBlock,
+  searchKnowledge,
+} from "@/lib/rag";
 import type {
   ApiMessage,
   ChatErrorBody,
@@ -51,12 +56,36 @@ export async function POST(request: Request) {
     return errorResponse("Envie uma lista válida de mensagens.", 400);
   }
 
+  // A última mensagem é garantidamente do usuário (ver sanitizeMessages acima).
+  const question = messages[messages.length - 1].content;
+
+  let context: string | null = null;
+  try {
+    const results = await searchKnowledge(question);
+    context = buildContextBlock(results);
+  } catch (err) {
+    if (err instanceof KnowledgeIndexNotFoundError) {
+      console.error("[api/chat]", err.message);
+      return errorResponse(
+        'Base de conhecimento ainda não indexada. Execute "pnpm knowledge:index" e tente novamente.',
+        500,
+      );
+    }
+    // Uma falha pontual na busca (ex.: API de embeddings fora do ar) não deve
+    // derrubar o chat: seguimos sem contexto, e o prompt instrui a IA a dizer
+    // que não encontrou a informação em vez de inventar uma resposta.
+    console.error("[api/chat] Falha ao buscar na base de conhecimento:", err);
+  }
+
   try {
     const completion = await getOpenRouterClient().chat.completions.create({
       model: MODEL,
       temperature: 0.4,
       max_tokens: 500,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [
+        { role: "system", content: buildSystemPrompt(context) },
+        ...messages,
+      ],
     });
 
     const reply = completion.choices[0]?.message?.content?.trim();
@@ -67,8 +96,12 @@ export async function POST(request: Request) {
     return NextResponse.json<ChatResponseBody>({ message: reply });
   } catch (err) {
     console.error("[api/chat]", err);
+    // ponytail: a checagem original comparava contra "OPENAI_API_KEY", mas o
+    // cliente de chat (getOpenRouterClient) lança "OPENROUTER_API_KEY não
+    // configurada." — substring diferente, então essa branch nunca disparava
+    // e uma chave ausente sempre voltava 502 em vez de 500. Corrigido aqui.
     const isConfig =
-      err instanceof Error && err.message.includes("OPENAI_API_KEY");
+      err instanceof Error && err.message.includes("OPENROUTER_API_KEY");
     return errorResponse(
       "Não foi possível processar sua mensagem.",
       isConfig ? 500 : 502,
