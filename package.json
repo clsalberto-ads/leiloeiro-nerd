@@ -13,7 +13,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
-    "worker": "tsx src/infrastructure/cron/worker.ts"
+    "worker": "tsx src/infrastructure/cron/worker.ts",
+    "knowledge:index": "tsx --env-file=.env scripts/index-knowledge.ts",
+    "knowledge:search": "tsx scripts/search-knowledge.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -49,6 +51,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "auth": "1.7.4",
+    "dotenv": "^18.0.7",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
