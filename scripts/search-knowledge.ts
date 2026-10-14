@@ -1,8 +1,3 @@
-import { loadEnv } from "./load-env";
-
-// Precisa rodar antes de qualquer import que leia a chave de embeddings.
-loadEnv();
-
 import { RAG_CONFIG } from "../src/lib/rag/config";
 import { LocalKnowledgeRetriever } from "../src/lib/rag/retriever";
 
