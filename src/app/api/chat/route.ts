@@ -6,6 +6,7 @@ import {
   buildContextBlock,
   searchKnowledge,
 } from "@/lib/rag";
+import { isRateLimited } from "@/lib/rate-limit";
 import type {
   ApiMessage,
   ChatErrorBody,
@@ -16,6 +17,27 @@ export const runtime = "nodejs";
 
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 2000;
+
+// ponytail: cada POST aqui dispara UMA chamada de embeddings + UMA de LLM —
+// ambos pagos. Sem este teto, um `while true; curl` queima a cota do projeto
+// em minutos. 30/min/IP é muito acima do ritmo de uma conversa humana (uma
+// pergunta a cada 2s, sem parar, por um minuto inteiro) e muito abaixo do que
+// um script consegue produzir. O limitador em si é o `rate-limit.ts` (memória
+// local, por processo — a nota lá explica o trade-off).
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 60_000;
+
+/**
+ * IP do cliente atrás de proxies. Em produção (Vercel/NGINX) o IP real chega
+ * no `x-forwarded-for` (primeiro hop da lista); `request.headers.get` nunca
+ * lança, e o fallback "unknown" agrupa quem chega sem os headers — para esses
+ * o limite vale coletivamente, o que é o lado seguro do erro.
+ */
+function clientKeyOf(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]!.trim();
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
 
 function sanitizeMessages(input: unknown): ApiMessage[] | null {
   if (!Array.isArray(input)) return null;
@@ -42,6 +64,15 @@ function errorResponse(error: string, status: number) {
 }
 
 export async function POST(request: Request) {
+  // O rate limit vem ANTES de qualquer parse: recusar um golpe não pode
+  // gastar nem o custo de ler o corpo — e muito menos uma chamada de API.
+  if (isRateLimited(clientKeyOf(request), RATE_LIMIT, RATE_WINDOW_MS)) {
+    return errorResponse(
+      "Muitas mensagens seguidas. Aguarde um instante e tente novamente.",
+      429,
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();

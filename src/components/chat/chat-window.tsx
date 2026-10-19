@@ -95,12 +95,14 @@ export default function Chat({ isOpen, onClose }: ChatProps) {
       role="dialog"
       aria-label="Assistente virtual"
       hidden={!isOpen}
-      className="fixed inset-0 z-9999 flex flex-col overflow-hidden bg-slate-50 shadow-2xl sm:inset-auto sm:bottom-24 sm:left-5 sm:h-[min(500px,calc(100dvh-7rem))] sm:w-90 sm:rounded-2xl sm:border sm:border-slate-200 [[hidden]]:hidden"
+      // ponytail: `bg-background`/`border-border` em vez de `slate-*` fixos —
+      // tokens seguem o tema (inclusive o dark) como o resto do app.
+      className="fixed inset-0 z-9999 flex flex-col overflow-hidden bg-background shadow-2xl sm:inset-auto sm:bottom-24 sm:left-5 sm:h-[min(500px,calc(100dvh-7rem))] sm:w-90 sm:rounded-2xl sm:border sm:border-border [[hidden]]:hidden"
     >
-      <header className="flex items-center justify-between bg-[#1c2b3a] px-4 py-3 text-white">
+      <header className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
         <div className="flex items-center gap-2">
           <span
-            className="h-2 w-2 rounded-full bg-[#b8892b]"
+            className="h-2 w-2 rounded-full bg-primary-foreground/70"
             aria-hidden="true"
           />
           <h2 className="text-sm font-semibold">Assistente Virtual</h2>
@@ -109,7 +111,7 @@ export default function Chat({ isOpen, onClose }: ChatProps) {
           type="button"
           onClick={onClose}
           aria-label="Fechar chat"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-xl leading-none hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#b8892b]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-xl leading-none hover:bg-primary-foreground/10 focus-visible:outline-2 focus-visible:outline-ring"
         >
           ×
         </button>
@@ -126,7 +128,7 @@ export default function Chat({ isOpen, onClose }: ChatProps) {
         {error && (
           <p
             role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
             {error}
           </p>

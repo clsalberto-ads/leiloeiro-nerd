@@ -20,7 +20,11 @@ export default function ChatWidget() {
         onClick={() => setIsOpen((v) => !v)}
         aria-label={isOpen ? "Fechar assistente" : "Abrir assistente"}
         aria-expanded={isOpen}
-        className={`fixed bottom-5 left-5 z-9998 h-14 w-14 items-center justify-center rounded-full bg-[#1c2b3a] text-[#e3b95a] shadow-lg transition hover:scale-105 hover:bg-[#2a3f55] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b8892b] motion-reduce:transition-none ${
+        // ponytail: tokens do tema (o mesmo `primary` dos botões do app), e não
+        // cores fixas — as hex hardcoded quebravam o dark mode: o botão mantinha
+        // a mesma cara em qualquer tema e a janela virava um retângulo branco
+        // num fundo escuro. `ring` substitui o dourado fixo no foco.
+        className={`fixed bottom-5 left-5 z-9998 h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ${
           isOpen ? "hidden sm:flex" : "flex"
         }`}
       >

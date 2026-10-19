@@ -50,7 +50,7 @@ Variáveis no `.env` (modelo em `.env.example`):
 | Variável                 | Obrigatória | Padrão                               | Para que serve                                   |
 | ------------------------ | ----------- | ------------------------------------ | ------------------------------------------------ |
 | `OPENROUTER_API_KEY`     | sim         | n/d                                  | Resposta final do chat                           |
-| `OPENROUTER_MODEL`       | não         | `openrouter/free`                    | Modelo usado na resposta                         |
+| `OPENROUTER_MODEL`       | não         | `openrouter/auto`                    | Modelo usado na resposta                         |
 | `OPENAI_GEMINI_API_KEY`  | sim         | n/d                                  | Embeddings (chave do Google AI Studio)           |
 | `OPENAI_EMBEDDING_MODEL` | não         | `gemini-embedding-001`               | Modelo de embeddings                             |
 | `OPENAI_BASE_URL`        | não         | endpoint OpenAI-compatível do Gemini | Troca de provedor de embeddings                  |

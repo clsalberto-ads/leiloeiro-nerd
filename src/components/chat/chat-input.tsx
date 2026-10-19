@@ -44,7 +44,7 @@ export default function ChatInput({
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border-slate-200 bg-white p-3">
+    <div className="flex items-end gap-2 border-t border-border bg-card p-3">
       <textarea
         ref={textareaRef}
         value={value}
@@ -54,14 +54,16 @@ export default function ChatInput({
         maxLength={2000}
         placeholder="Digite sua pergunta..."
         aria-label="Mensagem"
-        className="max-h-30 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#b8892b] focus:ring-2 focus:ring-[#b8892b]/30"
+        // O padrão de foco é o mesmo do `ui/input.tsx` (border-ring + ring
+        // translúcido), para o chat não inventar um foco visual próprio.
+        className="max-h-30 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
       />
       <button
         type="button"
         onClick={submit}
         disabled={disabled || !value.trim()}
         aria-label="Enviar mensagem"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1c2b3a] text-white transition hover:bg-[#2a3f55] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b8892b] disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         <svg
           viewBox="0 0 24 24"

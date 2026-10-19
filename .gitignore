@@ -49,3 +49,6 @@ next-env.d.ts
 
 # índice do RAG (gerado por "pnpm knowledge:index"; regenerável, não precisa de versionamento)
 /data/knowledge-index.json
+
+# store local do pnpm (usado só quando o global não é gravável)
+/.pnpm-store

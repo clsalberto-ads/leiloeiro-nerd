@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 
-export const MODEL = process.env.OPENROUTER_MODEL ?? "openrouter/free";
+// "openrouter/auto" é o slug válido do roteador da OpenRouter: escolhe o modelo
+// disponível conforme a chave. O "openrouter/free" que estava aqui não existe
+// como modelo — qualquer chamada sem OPENROUTER_MODEL explícito falhava com 400.
+export const MODEL = process.env.OPENROUTER_MODEL ?? "openrouter/auto";
 
 let client: OpenAI | null = null;
 

@@ -8,8 +8,8 @@ export default function ChatMessage({ message }: { message: Message }) {
       <div
         className={`max-w-[85%] whitespace-pre-wrap wrap-break-words rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
           isUser
-            ? "rounded-br-sm bg-[#1c2b3a] text-white"
-            : "rounded-bl-sm border border-slate-200 bg-white text-slate-800"
+            ? "rounded-br-sm bg-primary text-primary-foreground"
+            : "rounded-bl-sm border border-border bg-card text-card-foreground"
         }`}
       >
         {message.content}
@@ -21,11 +21,11 @@ export default function ChatMessage({ message }: { message: Message }) {
 export function TypingIndicator() {
   return (
     <div className="flex justify-start" role="status" aria-label="Digitando">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3">
         {[0, 150, 300].map((delay) => (
           <span
             key={delay}
-            className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 motion-reduce:animate-none"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground motion-reduce:animate-none"
             style={{ animationDelay: `${delay}ms` }}
           />
         ))}

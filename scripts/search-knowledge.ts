@@ -1,5 +1,12 @@
 import { RAG_CONFIG } from "../src/lib/rag/config";
+import { loadEnv } from "../src/lib/rag/load-env";
 import { LocalKnowledgeRetriever } from "../src/lib/rag/retriever";
+
+// Sem isto, "pnpm knowledge:search" só via as variáveis exportadas no shell:
+// o tsx não carrega .env sozinho (o script de INDEXAÇÃO ganha o --env-file do
+// package.json; este aqui não tinha) e a busca falhava com
+// "OPENAI_GEMINI_API_KEY não configurada." num ambiente com .env válido.
+loadEnv();
 
 /**
  * Mostra o ranking completo de similaridade para uma pergunta, SEM aplicar o
