@@ -1,14 +1,18 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { and, asc, count, desc, eq, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lte, max, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/infrastructure/database/drizzle";
 import { bids, itemImages, items } from "@/infrastructure/database/schema";
+import { user as userTable } from "@/infrastructure/database/auth-schema";
 import {
   STATUS_LABELS,
   TYPE_LABELS,
   type CreateItemInput,
+  type ExploreItemRow,
+  type ExploreLister,
   type Item,
+  type ItemBatchFinder,
   type ItemListFilter,
   type ItemListResult,
   type ItemLister,
@@ -150,12 +154,18 @@ function predicates(sellerId: string, filter?: ItemListFilter): SQL[] {
   if (filter?.status) condicoes.push(eq(items.status, filter.status));
   if (filter?.q) {
     const search = searchByLabelOrTitle(filter.q);
-    if (search) condicoes.push(search);
-    // Also use FTS on the generated searchTsv column for better relevance
     const needle = filter.q.trim();
-    if (needle) {
-      condicoes.push(sql`${items.searchTsv} @@ plainto_tsquery('portuguese', ${needle})`);
-    }
+    // ponytail: a busca é "título/status/tipo via strpos OU título+descrição via
+    // FTS", e NÃO um AND. Antes o FTS entrava como uma condição separada do AND,
+    // e a busca por RÓTULO quebrava: o `searchTsv` só contém title+description,
+    // então o termo que casava com o rótulo ("Em leilão", "Serviço") falhava no
+    // FTS e o item sumia da lista — exatamente o contrário do que os testes
+    // deste arquivo documentam. O OR restaura "casa com o rótulo OU com o texto".
+    const buscas: SQL[] = [];
+    if (search) buscas.push(search);
+    if (needle) buscas.push(sql`${items.searchTsv} @@ plainto_tsquery('portuguese', ${needle})`);
+    if (buscas.length === 1) condicoes.push(buscas[0]!);
+    else if (buscas.length > 1) condicoes.push(or(...buscas)!);
   }
   return condicoes;
 }
@@ -204,7 +214,7 @@ async function listBySeller(
   return { items: linhas.map(toItem), total: contagem[0]?.n ?? 0 };
 }
 
-export const drizzleItemRepository: ItemRepository & ItemLister = {
+export const drizzleItemRepository: ItemRepository & ItemLister & ItemBatchFinder = {
   async create(input: CreateItemInput) {
     const [row] = await db
       .insert(items)
@@ -246,6 +256,12 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
   async findById(id) {
     const [row] = await db.select().from(items).where(eq(items.id, id)).limit(1);
     return row ? toItem(row) : null;
+  },
+
+  async findByIds(ids) {
+    if (ids.length === 0) return [];
+    const rows = await db.select().from(items).where(inArray(items.id, ids));
+    return rows.map(toItem);
   },
 
   // ponytail: `findBySellerId` virou uma linha sobre `listBySeller`, e nao o
@@ -364,5 +380,31 @@ export const drizzleItemRepository: ItemRepository & ItemLister = {
           .where(eq(items.id, row.itemId));
       }
     });
+  },
+};
+
+// ponytail: a leitura da página "Descobrir" (`/explore`). Um `INNER JOIN` no
+// `user` (não LEFT) porque um item ativo SEM vendedor com slug é um dado
+// inconsistente — e devolvê-lo com `sellerSlug: null` geraria um link
+// `/{null}/{id}`. Ordena por prazo crescente porque é a ordem padrão da página
+// ("terminando em breve"); a recência e a "disputa" são reordenadas no use case.
+export const drizzleExploreLister: ExploreLister = {
+  async listActiveWithSeller(): Promise<ExploreItemRow[]> {
+    const rows = await db
+      .select({
+        id: items.id,
+        title: items.title,
+        type: items.type,
+        minInitialBid: items.minInitialBid,
+        bidDeadline: items.bidDeadline,
+        imageUrl: items.imageUrl,
+        createdAt: items.createdAt,
+        sellerSlug: userTable.slug,
+      })
+      .from(items)
+      .innerJoin(userTable, eq(userTable.id, items.sellerId))
+      .where(eq(items.status, "active"))
+      .orderBy(asc(items.bidDeadline));
+    return rows;
   },
 };

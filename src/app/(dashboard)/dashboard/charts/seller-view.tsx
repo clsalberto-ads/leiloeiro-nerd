@@ -60,7 +60,7 @@ export function SellerPanel({ view, period }: { view: SellerView; period: Period
         <Card>
           <CardHeader>
             <CardTitle>Mais disputados</CardTitle>
-            <CardDescription>Os items que mais atraíram lances, em qualquer situação</CardDescription>
+            <CardDescription>Os itens que mais atraíram lances, em qualquer situação</CardDescription>
           </CardHeader>
           <CardContent>
             {summary.mostContested.length === 0 ? (

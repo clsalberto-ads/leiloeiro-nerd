@@ -267,3 +267,32 @@ export interface ItemRepository {
   createImages(itemId: string, urls: string[]): Promise<ItemImage[]>;
   deleteImage(imageId: string): Promise<void>;
 }
+
+// ponytail: porta separada, como o `ItemLister`, para NAO acrescentar um método
+// aos 11 fakes de `ItemRepository` dos testes. `findByIds` em UMA consulta
+// substitui o `findById` em loop dos use cases `listMyBids`, da página de
+// favoritos e do export CSV — o mesmo padrão do `findByIds` de `UserRepository`.
+// `ids` vazio devolve `[]` sem tocar no banco.
+export interface ItemBatchFinder {
+  findByIds(ids: string[]): Promise<Item[]>;
+}
+
+// ponytail: a linha que a página "Descobrir" (`/explore`) precisa, e que não
+// existe em nenhuma das outras portas: um item ativo com o slug do vendedor, para
+// montar o link `/{slug}/{id}`. `StorefrontItem` não carrega slug (é por
+// vendedor), e `Item` não carrega slug nem agregados de lance — então este é o
+// menor contrato que junta as duas coisas sem vazar `description`/`sellerId`.
+export interface ExploreItemRow {
+  id: string;
+  title: string;
+  type: ItemType;
+  minInitialBid: number;
+  bidDeadline: Date;
+  imageUrl: string | null;
+  createdAt: Date;
+  sellerSlug: string | null;
+}
+
+export interface ExploreLister {
+  listActiveWithSeller(): Promise<ExploreItemRow[]>;
+}

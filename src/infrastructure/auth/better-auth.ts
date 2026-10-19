@@ -7,8 +7,16 @@ import { nextCookies } from "better-auth/next-js";
 import { db } from "@/infrastructure/database/drizzle";
 import { user, session, account, verification } from "@/infrastructure/database/auth-schema";
 
+// ponytail: falhar alto e cedo, como o `worker.ts` faz com `REDIS_URL`/
+// `DATABASE_URL`. Um `secret` ausente transformaria a autenticação num token
+// derivado de `undefined` (ou numa exceção obscura do better-auth em runtime) —
+// melhor apontar o problema na inicialização, com a variável nomeada.
+if (!process.env.BETTER_AUTH_SECRET) {
+  throw new Error("BETTER_AUTH_SECRET ausente: defina a variável antes de iniciar o app");
+}
+
 export const auth = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET!,
+  secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,

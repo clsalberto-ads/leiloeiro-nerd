@@ -14,7 +14,7 @@ import { createItemAction, updateItemAction } from "@/presentation/actions/item-
 import { uploadItemImagesAction } from "@/presentation/actions/upload-actions";
 import { itemSchema } from "@/lib/validators";
 import { toInputDateString } from "@/lib/timezone";
-import type { Item } from "@/domain/repositories/item-repository";
+import { TYPE_LABELS, type Item } from "@/domain/repositories/item-repository";
 
 type ItemInput = z.input<typeof itemSchema>;
 type ItemOutput = z.output<typeof itemSchema>;
@@ -162,22 +162,11 @@ export function ItemForm({ item, mode }: { item?: Item | null; mode: "create" | 
               disabled={locked}
               className="rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 aria-invalid:border-destructive"
             >
-              <option value="product">Produto</option>
-              <option value="service">Serviço</option>
-              <option value="piece">Peça colecionável</option>
-              {/* ponytail: as tres `<option>` sao o ultimo lugar onde o rotulo de
-               tipo aparece depois que `TYPE_LABELS` virou o vocabulario canonico
-               (o badge, a coluna da tabela, a aba e a busca server-side leem o
-               mapa; aqui o texto ainda esta escrito a mao). A divergencia e o mesmo
-               defeito silencioso dos outros: o `<option>` diz "Serviço" e a tabela
-               diz outra coisa.
-               A correcao e
-               `Object.entries(TYPE_LABELS).map(([value, rotulo]) => <option …>)`, e
-               ela nao tem NENHUMA decisao de produto pendente: a ordem do mapa
-               (`product`, `service`, `piece`) ja e a ordem das opcoes, e a chave do
-               mapa ja e o `value` gravado. O que falta e escopo, nao decisao — este
-               formulario nao entrou na tarefa da tabela, e mexer no preenchimento dele
-               e um diff proprio. */}
+              {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           )}
         </Field>

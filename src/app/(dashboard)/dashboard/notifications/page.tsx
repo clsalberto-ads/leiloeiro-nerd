@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { listNotificationsAction, markAllAsReadAction, markAsReadAction } from "@/presentation/actions/notification-actions";
-import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+
+// ponytail: como as demais páginas do dashboard, esta página NÃO renderiza o
+// `DashboardHeader` — o `(dashboard)/layout.tsx` já o fornece (junto do
+// `DashboardSidebar`). Renderizar de novo aqui duplicava o cabeçalho.
+export const dynamic = "force-dynamic";
 
 function timeAgo(d: Date) {
   try {
@@ -39,7 +43,6 @@ export default async function NotificationsPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <DashboardHeader userName={session.user.name} />
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
           <PageHeader title="Notificações" description="Suas notificações recentes" />

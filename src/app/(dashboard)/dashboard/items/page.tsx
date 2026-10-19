@@ -48,10 +48,12 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   // leiloeiro nao ganha `actions`: nao ha item novo para criar sem esse papel.
   if (session.user.role !== "seller" && session.user.role !== "both") {
     return (
-      <div className="space-y-4">
-        <PageHeader title="Meus itens" />
-        <p className="text-muted-foreground">Você ainda não é leiloeiro.</p>
-        <BecomeSellerForm />
+      <div className="min-h-screen flex flex-col bg-background">
+        <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+          <PageHeader title="Meus itens" />
+          <p className="text-muted-foreground">Você ainda não é leiloeiro.</p>
+            <BecomeSellerForm />
+        </main>
       </div>
     );
   }

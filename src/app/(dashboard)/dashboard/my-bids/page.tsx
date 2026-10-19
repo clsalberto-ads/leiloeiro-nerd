@@ -2,11 +2,14 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
+import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { listMyBids } from "@/application/use-cases/list-my-bids";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format-brl";
+
+export const dynamic = "force-dynamic";
 
 export default async function MyBidsPage() {
   const session = await getSession();
@@ -14,9 +17,16 @@ export default async function MyBidsPage() {
 
   const rows = await listMyBids(drizzleBidRepository, drizzleItemRepository, session.user.id, 100);
 
+  // ponytail: o link "Ver item" precisa do slug do VENDEDOR do item, não do
+  // `sellerId` (UUID) — a rota é `/[slug]/[itemId]`. Os slugs são resolvidos em
+  // uma única consulta em lote.
+  const sellerIds = [...new Set(rows.map((r) => r.item?.sellerId).filter((id): id is string => Boolean(id)))];
+  const sellers = await drizzleUserRepository.findByIds(sellerIds);
+  const slugById = new Map(sellers.map((s) => [s.id, s.slug]));
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
           <PageHeader title="Meus lances" description="Histórico dos seus lances" />
           {rows.length === 0 ? (
@@ -37,7 +47,7 @@ export default async function MyBidsPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span>Valor: {formatBRL(row.bid.amount)}</span>
                       {row.item ? (
-                        <Link href={`/${row.item.sellerId}/${row.item.id}`} className="inline-flex h-7 items-center justify-center rounded-lg border px-2.5 text-sm hover:bg-muted">Ver item</Link>
+                        <Link href={`/${slugById.get(row.item.sellerId) ?? row.item.sellerId}/${row.item.id}`} className="inline-flex h-7 items-center justify-center rounded-lg border px-2.5 text-sm hover:bg-muted">Ver item</Link>
                       ) : (
                         <span className="text-muted-foreground text-sm">Indisponível</span>
                       )}

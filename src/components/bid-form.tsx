@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -84,11 +84,18 @@ export function BidForm({ itemId, minBid, onBid }: BidFormProps) {
     // `form.reset`, e `minBid` pelo `amountReais` do reset.
   }, [state, minBid, onBid, form, itemId]);
 
-  const onSubmit = async (data: BidFormValues) => {
+  // ponytail: o `formAction` do `useActionState` é uma função assíncrona de
+  // transição; chamá-la fora de um `startTransition` (ou fora do `action` de um
+  // `<form>`) faz o React avisar que `isPending` não atualiza corretamente. Como
+  // este formulário passa pelo `handleSubmit` do RHF (validação no cliente antes),
+  // o disparo precisa ser envolvido em `startTransition`.
+  const onSubmit = (data: BidFormValues) => {
     const formData = new FormData();
     formData.set("itemId", data.itemId);
     formData.set("amount", Math.round(Number(data.amountReais) * 100).toString());
-    await formAction(formData);
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   return (

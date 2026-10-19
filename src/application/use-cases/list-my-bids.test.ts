@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listMyBids } from "./list-my-bids";
 import type { Bid, BidRepository } from "@/domain/repositories/bid-repository";
-import type { Item, ItemRepository } from "@/domain/repositories/item-repository";
+import type { Item, ItemBatchFinder } from "@/domain/repositories/item-repository";
 
 class FakeBidRepo implements BidRepository {
   constructor(private bids: Bid[] = []) {}
@@ -11,9 +11,9 @@ class FakeBidRepo implements BidRepository {
   async listByBidder(_bidderId: string) { return this.bids; }
 }
 
-class FakeItemRepo implements Pick<ItemRepository, "findById"> {
+class FakeItemRepo implements ItemBatchFinder {
   map = new Map<string, Item>();
-  async findById(id: string) { return this.map.get(id) ?? null; }
+  async findByIds(ids: string[]) { return ids.map((id) => this.map.get(id)).filter((i): i is Item => Boolean(i)); }
 }
 
 describe("listMyBids", () => {

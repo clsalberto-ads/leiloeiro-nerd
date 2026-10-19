@@ -17,10 +17,12 @@ interface BidSectionProps {
 export function BidSection({ itemId, initialBids, minInitialBid, minBidIncrement, deadline }: BidSectionProps) {
   const [bids, setBids] = useState<BidView[]>(initialBids);
   // ponytail: o `deadline` desce do servidor porque o `status` sozinho nao diz
-  // que o leilao esta aberto — nada transiciona `active -> closed`, entao um item
-  // com prazo vencido continua `active` para sempre. Sem isto o `BidCountdown`
-  // acima dizia "Encerrado" e o formulario logo abaixo aceitava o lance, que o
-  // servidor so recusava DEPOIS de digitado ("Leilao encerrado").
+  // que o leilao esta aberto: a transicao `active -> closed` agora existe (o
+  // worker roda `closeExpiredItems` a cada minuto), mas há a janela entre o prazo
+  // vencer e o proximo tick do worker em que o item continua `active`. Sem o
+  // `deadline` aqui, nessa janela o `BidCountdown` diria "Encerrado" e o
+  // formulario logo abaixo aceitaria o lance, que o servidor so recusava DEPOIS
+  // de digitado ("Leilao encerrado").
   //
   // `Date.now()` fica no INICIALIZADOR do `useState`, e nao no corpo do
   // componente: o lint `react-hooks/purity` do React Compiler marca leitura de

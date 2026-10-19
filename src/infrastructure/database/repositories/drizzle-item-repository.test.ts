@@ -190,6 +190,17 @@ describe("drizzleItemRepository.listBySellerId", () => {
     expect(text.match(/strpos\(/g)).toHaveLength(3);
   });
 
+  it("o FTS e uma ALTERNATIVA (OR) ao rótulo, não uma exigência (AND)", async () => {
+    await drizzleItemRepository.listBySellerId("u1", { q: "leilao" });
+    const text = sqlOf(rowsQuery(), "where");
+    // O `search_tsv` só contém title+description. Se ele entrasse como um `and`
+    // irmão do `strpos` dos rótulos, a busca por "Em leilão"/"Serviço" (que só
+    // casam com o rótulo) pararia de retornar o item. O FTS tem de estar no MESMO
+    // `or` — "casa com o rótulo OU com o texto cheio".
+    expect(text).toMatch(/\)\s*or\s*"items"\."search_tsv" @@ plainto_tsquery/);
+    expect(text).not.toMatch(/\)\s*and\s*"items"\."search_tsv" @@ plainto_tsquery/);
+  });
+
   it("os rotulos que o SQL casa sao os do vocabulario canonico, nao copias", async () => {
     await drizzleItemRepository.listBySellerId("u1", { q: "leilao" });
     const params = paramsOf(rowsQuery(), "where");

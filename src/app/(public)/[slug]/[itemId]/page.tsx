@@ -16,20 +16,35 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
   if (!isUuid(itemId)) notFound();
   const { item, images, bids } = await getItemDetailAction(slug, itemId);
   if (!item) notFound();
+
   const imageUrls = images.map((i) => i.url);
   const galleryUrls = imageUrls.length ? imageUrls : item.imageUrl ? [item.imageUrl] : [];
+
   return (
-    <div className="space-y-6 max-w-3xl">
-      <ItemGallery images={galleryUrls} />
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{item.title}</h1>
-        <p className="text-muted-foreground">{item.description}</p>
-        <div className="flex gap-4 text-sm text-muted-foreground">
-          <span>Lance mínimo: R$ {formatBRL(item.minInitialBid)}</span>
-          <BidCountdown deadline={item.bidDeadline} />
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      {/* Uma coluna no mobile, duas no desktop (md+). A galeria fica à esquerda e
+          os detalhes/lance à direita. */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+        <div className="self-start md:sticky md:top-24">
+          <ItemGallery images={galleryUrls} />
+        </div>
+
+        <div className="space-y-4">
+          <h1 className="text-2xl font-bold md:text-3xl">{item.title}</h1>
+          <p className="text-muted-foreground">{item.description}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <span>Lance mínimo: R$ {formatBRL(item.minInitialBid)}</span>
+            <BidCountdown deadline={item.bidDeadline} />
+          </div>
+          <BidSection
+            itemId={item.id}
+            initialBids={bids}
+            minInitialBid={item.minInitialBid}
+            minBidIncrement={item.minBidIncrement}
+            deadline={item.bidDeadline}
+          />
         </div>
       </div>
-      <BidSection itemId={item.id} initialBids={bids} minInitialBid={item.minInitialBid} minBidIncrement={item.minBidIncrement} deadline={item.bidDeadline} />
     </div>
   );
 }

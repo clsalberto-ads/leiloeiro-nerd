@@ -26,7 +26,7 @@ const TONES: Record<ItemStatus, string> = {
   closed: "var(--color-chart-3)",
   awaiting_payment: "var(--color-chart-4)",
   paid: "var(--color-chart-5)",
-  cancelled: "var(--color-chart-1)",
+  cancelled: "var(--color-chart-6)",
 };
 
 const config = {

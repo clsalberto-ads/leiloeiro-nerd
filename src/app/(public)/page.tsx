@@ -20,7 +20,7 @@ export default function Home() {
             </h1>
             
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground sm:text-xl">
-              A plataforma de leilões moderna com curadoria especializada, máxima segurança e zero taxas. Exponha suas peças ou arremate items exclusivos.
+              A plataforma de leilões moderna com curadoria especializada, máxima segurança e zero taxas. Exponha suas peças ou arremate itens exclusivos.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -93,7 +93,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold mb-2">Taxa Zero</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Diferente de plataformas tradicionais, aqui você não paga comissão sobre seus lances ou items vendidos. O lucro é 100% seu.
+                Diferente de plataformas tradicionais, aqui você não paga comissão sobre seus lances ou itens vendidos. O lucro é 100% seu.
               </p>
             </div>
           </div>
@@ -123,10 +123,6 @@ export default function Home() {
           <span>Leiloeiro Nerd</span>
         </div>
         <p>© {new Date().getFullYear()} Leiloeiro Nerd. Todos os direitos reservados.</p>
-        <div className="flex gap-6">
-          <Link href="/login" className="hover:text-foreground transition-colors">Termos</Link>
-          <Link href="/login" className="hover:text-foreground transition-colors">Privacidade</Link>
-        </div>
       </div>
     </footer>
     </>
