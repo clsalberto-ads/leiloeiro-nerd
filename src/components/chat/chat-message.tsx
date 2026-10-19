@@ -1,35 +1,52 @@
-import type { Message } from "@/domain/chat/types/chat";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { Message, MessageContent } from "@/components/ui/message";
+import type { Message as ChatMessageData } from "@/domain/chat/types/chat";
 
-export default function ChatMessage({ message }: { message: Message }) {
+// ponytail: a bolha é o `Bubble` do design system (variante `default` =
+// bg-primary/text-primary-foreground para o usuário; `outline` para o
+// assistente), dentro do `Message`/`MessageContent` que cuidam do alinhamento.
+// `whitespace-pre-wrap` é acréscimo local: o BubbleContent do DS resolve quebra
+// de palavra, mas o usuário pode digitar quebras de linha — e elas precisam
+// sobreviver até a tela.
+export default function ChatMessage({ message }: { message: ChatMessageData }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[85%] whitespace-pre-wrap wrap-break-words rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-          isUser
-            ? "rounded-br-sm bg-primary text-primary-foreground"
-            : "rounded-bl-sm border border-border bg-card text-card-foreground"
-        }`}
-      >
-        {message.content}
-      </div>
-    </div>
+    <Message align={isUser ? "end" : "start"}>
+      <MessageContent>
+        <Bubble
+          variant={isUser ? "default" : "outline"}
+          align={isUser ? "end" : "start"}
+        >
+          <BubbleContent className="whitespace-pre-wrap">
+            {message.content}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   );
 }
 
 export function TypingIndicator() {
   return (
-    <div className="flex justify-start" role="status" aria-label="Digitando">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3">
-        {[0, 150, 300].map((delay) => (
-          <span
-            key={delay}
-            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground motion-reduce:animate-none"
-            style={{ animationDelay: `${delay}ms` }}
-          />
-        ))}
-      </div>
-    </div>
+    <Message align="start">
+      <MessageContent>
+        <Bubble variant="muted">
+          <BubbleContent
+            role="status"
+            aria-label="Digitando"
+            className="flex items-center gap-1 px-4 py-3"
+          >
+            {[0, 150, 300].map((delay) => (
+              <span
+                key={delay}
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground motion-reduce:animate-none"
+                style={{ animationDelay: `${delay}ms` }}
+              />
+            ))}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   );
 }

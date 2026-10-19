@@ -7,6 +7,8 @@ import type {
   ChatResponseBody,
   Message,
 } from "@/domain/chat/types/chat";
+import { MessageGroup } from "@/components/ui/message";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import ChatInput from "./chat-input";
 import ChatMessage, { TypingIndicator } from "./chat-message";
 
@@ -119,20 +121,23 @@ export default function Chat({ isOpen, onClose }: ChatProps) {
       </header>
 
       <div
-        className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-4"
+        className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-4"
         aria-live="polite"
       >
-        {messages.map((m) => (
-          <ChatMessage key={m.id} message={m} />
-        ))}
-        {isLoading && <TypingIndicator />}
+        {/* ponytail: as mensagens moram num `MessageGroup` do design system (o
+            gap e o alinhamento dos filhos vêm dele), e o erro é um Bubble
+            `destructive` centralizado — a variante do DS já é o par
+            bg-destructive/10 + text-destructive que o alerta pede. */}
+        <MessageGroup>
+          {messages.map((m) => (
+            <ChatMessage key={m.id} message={m} />
+          ))}
+          {isLoading && <TypingIndicator />}
+        </MessageGroup>
         {error && (
-          <p
-            role="alert"
-            className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            {error}
-          </p>
+          <Bubble variant="destructive" className="mx-auto">
+            <BubbleContent role="alert">{error}</BubbleContent>
+          </Bubble>
         )}
         <div ref={bottomRef} />
       </div>

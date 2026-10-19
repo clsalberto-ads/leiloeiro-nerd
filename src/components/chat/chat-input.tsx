@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { SendHorizontalIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -20,7 +23,11 @@ export default function ChatInput({
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);
 
-  // Cresce com o texto, até um limite.
+  // Cresce com o texto, até um limite. `field-sizing-fixed` DESLIGA o
+  // `field-sizing-content` que o Textarea do design system traz (suporte de
+  // navegador ainda parcial) e deixa o crescimento para cá — que funciona
+  // em todos. O `min-h-10` sobrepõe o `min-h-16` base: uma linha de entrada
+  // em janela pequena não pode valer duas.
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -45,7 +52,7 @@ export default function ChatInput({
 
   return (
     <div className="flex items-end gap-2 border-t border-border bg-card p-3">
-      <textarea
+      <Textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -54,31 +61,17 @@ export default function ChatInput({
         maxLength={2000}
         placeholder="Digite sua pergunta..."
         aria-label="Mensagem"
-        // O padrão de foco é o mesmo do `ui/input.tsx` (border-ring + ring
-        // translúcido), para o chat não inventar um foco visual próprio.
-        className="max-h-30 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+        className="max-h-30 min-h-10 field-sizing-fixed resize-none"
       />
-      <button
+      <Button
         type="button"
         onClick={submit}
         disabled={disabled || !value.trim()}
+        size="icon"
         aria-label="Enviar mensagem"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M22 2 11 13" />
-          <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
-        </svg>
-      </button>
+        <SendHorizontalIcon aria-hidden="true" />
+      </Button>
     </div>
   );
 }
