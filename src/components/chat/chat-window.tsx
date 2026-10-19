@@ -97,7 +97,8 @@ export default function Chat({ isOpen, onClose }: ChatProps) {
       hidden={!isOpen}
       // ponytail: `bg-background`/`border-border` em vez de `slate-*` fixos —
       // tokens seguem o tema (inclusive o dark) como o resto do app.
-      className="fixed inset-0 z-9999 flex flex-col overflow-hidden bg-background shadow-2xl sm:inset-auto sm:bottom-24 sm:left-5 sm:h-[min(500px,calc(100dvh-7rem))] sm:w-90 sm:rounded-2xl sm:border sm:border-border [[hidden]]:hidden"
+      // `sm:right-5` acompanha o botão, que fica no canto inferior DIREITO.
+      className="fixed inset-0 z-9999 flex flex-col overflow-hidden bg-background shadow-2xl sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[min(500px,calc(100dvh-7rem))] sm:w-90 sm:rounded-2xl sm:border sm:border-border [[hidden]]:hidden"
     >
       <header className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
         <div className="flex items-center gap-2">

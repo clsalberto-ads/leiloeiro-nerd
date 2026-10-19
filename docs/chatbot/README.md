@@ -1,6 +1,6 @@
 # Chatbot de IA com RAG
 
-Assistente virtual do Leiloeiro Nerd: um widget flutuante, no canto inferior esquerdo de todas as páginas, que responde dúvidas sobre cadastro, lances, pagamento, retirada e regras da plataforma. As respostas são baseadas em arquivos Markdown (`knowledge/`), recuperados por busca semântica (RAG).
+Assistente virtual do Leiloeiro Nerd: um widget flutuante, no canto inferior direito de todas as páginas, que responde dúvidas sobre cadastro, lances, pagamento, retirada e regras da plataforma. As respostas são baseadas em arquivos Markdown (`knowledge/`), recuperados por busca semântica (RAG).
 
 O chatbot **não** consulta dados dinâmicos (lance atual, status ou prazo de um item). Para isso o assistente diz que não tem acesso e orienta a consultar a página do item. Esses dados virão de Tools/API numa etapa futura, não do RAG.
 

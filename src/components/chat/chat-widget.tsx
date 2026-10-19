@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import Chat from "./chat-window";
 
 /**
- * Widget flutuante: botão fixo no canto inferior esquerdo
+ * Widget flutuante: botão fixo no canto inferior direito
  * que abre/fecha a janela de chat sobre a página.
  */
 export default function ChatWidget() {
@@ -24,7 +24,7 @@ export default function ChatWidget() {
         // cores fixas — as hex hardcoded quebravam o dark mode: o botão mantinha
         // a mesma cara em qualquer tema e a janela virava um retângulo branco
         // num fundo escuro. `ring` substitui o dourado fixo no foco.
-        className={`fixed bottom-5 left-5 z-9998 h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ${
+        className={`fixed bottom-5 right-5 z-9998 h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ${
           isOpen ? "hidden sm:flex" : "flex"
         }`}
       >
