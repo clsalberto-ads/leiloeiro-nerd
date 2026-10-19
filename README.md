@@ -6,17 +6,17 @@ arrematantes dão lances. Este repositório contém a base técnica do projeto
 
 ## Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Linguagem | TypeScript (strict) |
-| Estilização | Tailwind CSS v4 + shadcn/ui |
-| Banco | PostgreSQL 17 (Docker) |
-| ORM | Drizzle ORM |
-| Autenticação | Better Auth |
-| Fila / Cron | Redis 7 + BullMQ |
-| Testes | Vitest |
-| Package manager | pnpm |
+| Camada          | Tecnologia                         |
+| --------------- | ---------------------------------- |
+| Framework       | Next.js 16 (App Router, Turbopack) |
+| Linguagem       | TypeScript (strict)                |
+| Estilização     | Tailwind CSS v4 + shadcn/ui        |
+| Banco           | PostgreSQL 17 (Docker)             |
+| ORM             | Drizzle ORM                        |
+| Autenticação    | Better Auth                        |
+| Fila / Cron     | Redis 7 + BullMQ                   |
+| Testes          | Vitest                             |
+| Package manager | pnpm                               |
 
 ## Requisitos
 
@@ -39,23 +39,29 @@ docker compose up -d
 
 # 4. Aplicar migrações do banco
 pnpm db:migrate
+
+# 5. Chatbot (opcional): preencha OPENROUTER_API_KEY e OPENAI_GEMINI_API_KEY no .env
+#    e gere o índice da base de conhecimento
+pnpm knowledge:index
 ```
 
 ## Scripts
 
-| Script | Descrição |
-|---|---|
-| `pnpm dev` | Servidor de desenvolvimento |
-| `pnpm build` | Build de produção |
-| `pnpm start` | Sobe o build de produção |
-| `pnpm lint` | ESLint |
-| `pnpm test` | Executa os testes (Vitest) |
-| `pnpm typecheck` | Checagem de tipos (tsc --noEmit) |
-| `pnpm db:generate` | Gera migrações a partir do schema Drizzle |
-| `pnpm db:migrate` | Aplica migrações no banco |
-| `pnpm db:push` | Push direto do schema (dev) |
-| `pnpm auth:generate` | Regenera o `auth-schema.ts` do Better Auth |
-| `pnpm worker` | Sobe o worker BullMQ (espelha fila `auction-jobs`) |
+| Script                             | Descrição                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                         | Servidor de desenvolvimento                                                              |
+| `pnpm build`                       | Build de produção                                                                        |
+| `pnpm start`                       | Sobe o build de produção                                                                 |
+| `pnpm lint`                        | ESLint                                                                                   |
+| `pnpm test`                        | Executa os testes (Vitest)                                                               |
+| `pnpm typecheck`                   | Checagem de tipos (tsc --noEmit)                                                         |
+| `pnpm db:generate`                 | Gera migrações a partir do schema Drizzle                                                |
+| `pnpm db:migrate`                  | Aplica migrações no banco                                                                |
+| `pnpm db:push`                     | Push direto do schema (dev)                                                              |
+| `pnpm auth:generate`               | Regenera o `auth-schema.ts` do Better Auth                                               |
+| `pnpm worker`                      | Sobe o worker BullMQ (espelha fila `auction-jobs`)                                       |
+| `pnpm knowledge:index`             | Indexa os `.md` de `knowledge/` e gera o índice do chatbot (`data/knowledge-index.json`) |
+| `pnpm knowledge:search "pergunta"` | Mostra o ranking de similaridade de uma pergunta (calibração do RAG)                     |
 
 ## Arquitetura
 
@@ -78,6 +84,7 @@ Clean Architecture pragmática em camadas:
 - Schema Drizzle completo: `user`, `items`, `item_images`, `bids`, `payments`, `notifications`
 - Base de pagamentos: `PaymentRepository` (PIX + Payment Link) e constraint UNIQUE em `mp_payment_id` para idempotência do webhook
 - Worker BullMQ conectado ao Redis (placeholder; jobs da Fase 3 pendentes)
+- Chatbot de IA (widget flutuante em todas as páginas) com RAG sobre arquivos Markdown em `knowledge/` — ver [docs/chatbot.md](docs/chatbot.md)
 
 ## Autenticação
 

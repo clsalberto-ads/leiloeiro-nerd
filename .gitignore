@@ -46,3 +46,6 @@ next-env.d.ts
 
 # superpowers
 /.superpowers
+
+# índice do RAG (gerado por "pnpm knowledge:index"; regenerável, não precisa de versionamento)
+/data/knowledge-index.json
