@@ -6,6 +6,12 @@ export interface Payment {
   bidderId: string;
   bidId: string;
   amount: number;
+  // ponytail: o LEDGER da taxa de marketplace (5%). Vem junto do `amount`
+  // porque os KPIs e a página de pagamento leem os três — e a soma
+  // `sellerNetCents + platformFeeCents === amount` é o invariante que o
+  // `splitPayment` (@/lib/platform-fee) garante na criação.
+  platformFeeCents: number;
+  sellerNetCents: number;
   mpPaymentId: string | null;
   /** Imagem do QR Code PIX (ex.: data URL base64 do MP `qr_code_base64`). */
   pixQrCode: string | null;
@@ -24,6 +30,8 @@ export interface CreatePaymentInput {
   bidderId: string;
   bidId: string;
   amount: number;
+  platformFeeCents: number;
+  sellerNetCents: number;
   mpPaymentId: string | null;
   pixQrCode: string | null;
   pixCopiaECola: string | null;

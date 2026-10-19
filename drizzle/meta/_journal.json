@@ -43,6 +43,13 @@
       "when": 1791157153268,
       "tag": "0005_lazy_marvel_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792439999764,
+      "tag": "0006_panoramic_lake",
+      "breakpoints": true
     }
   ]
 }

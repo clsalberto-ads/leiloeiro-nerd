@@ -5,7 +5,11 @@ import { user as userTable } from "./auth-schema";
 export const itemTypeEnum = pgEnum("item_type", ["product", "service", "piece"]);
 export const itemStatusEnum = pgEnum("item_status", ["draft", "active", "closed", "awaiting_payment", "paid", "cancelled"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "approved", "expired", "cancelled", "refunded"]);
-export const notificationTypeEnum = pgEnum("notification_type", ["outbid", "won", "payment_due", "payment_expired", "payment_confirmed"]);
+// ponytail: `next_bidder_called` entra na Fase 3 — é a notificação da CASCATA
+// (o arrematante anterior não pagou e o próximo da fila foi chamado). A
+// ausência dele no enum forçaria um re-trabalho de migration no meio da fase
+// de pagamentos; entra agora, junto com as outras fundações.
+export const notificationTypeEnum = pgEnum("notification_type", ["outbid", "won", "payment_due", "payment_expired", "payment_confirmed", "next_bidder_called"]);
 
 export const items = pgTable("items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -18,6 +22,11 @@ export const items = pgTable("items", {
   minBidIncrement: integer("min_bid_increment").notNull(),
   bidDeadline: timestamp("bid_deadline", { withTimezone: true }).notNull(),
   paymentDeadlineDays: integer("payment_deadline_days").notNull().default(3),
+  // ponytail: prazo de cada NOVO pagamento da cascata (spec §3.5). Nullable:
+  // ausente = o job usa o default de 1 dia (24h). E o prazo DA CASCATA, nao o
+  // inicial — o inicial continua sendo `paymentDeadlineDays`, que o vendedor
+  // já configura no formulário do item.
+  cascadeDeadlineDays: integer("cascade_deadline_days"),
   status: itemStatusEnum("status").notNull().default("draft"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -67,6 +76,14 @@ export const payments = pgTable("payments", {
   bidderId: text("bidder_id").notNull().references(() => userTable.id),
   bidId: uuid("bid_id").notNull().references(() => bids.id),
   amount: integer("amount").notNull(),
+  // ponytail: o LEDGER da taxa de marketplace. O `application_fee` do
+  // Mercado Pago faz o split no dinheiro (95% vendedor / 5% plataforma), mas o
+  // split da MP não é consultável por item de forma barata — o par gravado AQUI
+  // é o que os KPIs do vendedor e da plataforma leem, e o que a auditoria
+  // confere contra o extrato da MP. `sellerNetCents = amount - platformFeeCents`,
+  // gravado junto para não derivar em leitura.
+  platformFeeCents: integer("platform_fee_cents").notNull().default(0),
+  sellerNetCents: integer("seller_net_cents").notNull().default(0),
   mpPaymentId: text("mp_payment_id").unique(),
   pixQrCode: text("pix_qr_code"),
   pixQrCodeBase64: text("pix_qr_code_base64"),
@@ -77,6 +94,27 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("payments_item_id_idx").on(t.itemId), index("payments_status_deadline_idx").on(t.status, t.deadline)]);
+
+// ponytail: a conta Mercado Pago de cada LEILOEIRO, via OAuth (spec do
+// marketplace MP: o pagamento é criado com o token do vendedor — o dinheiro cai
+// na conta DELE — e o `application_fee` da plataforma retém 5%).
+// `userId` é UNIQUE: uma conta MP por vendedor; reconectar substitui os tokens.
+// `refreshToken`/`tokenExpiresAt` existem porque o access token da MP expira
+// (~180 dias) e a renovação é server-side, sem pedir nova autorização ao
+// vendedor. O token NUNCA vai ao cliente: a UI só sabe `connectedAt`.
+export const mpSellerAccounts = pgTable("mp_seller_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => userTable.id, { onDelete: "cascade" }),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  mpUserId: text("mp_user_id"),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),

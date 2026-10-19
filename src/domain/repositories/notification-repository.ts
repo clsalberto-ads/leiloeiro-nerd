@@ -1,7 +1,15 @@
 export interface Notification {
   id: string;
   userId: string;
-  type: "outbid" | "won" | "payment_due" | "payment_expired" | "payment_confirmed";
+  // ponytail: `next_bidder_called` é a notificação da CASCATA de pagamentos
+  // (Fase 3): o arrematante anterior não pagou e o próximo da fila foi chamado.
+  type:
+    | "outbid"
+    | "won"
+    | "payment_due"
+    | "payment_expired"
+    | "payment_confirmed"
+    | "next_bidder_called";
   title: string;
   content: string;
   read: boolean;
