@@ -89,4 +89,11 @@ export const drizzleNotificationRepository: NotificationRepository = {
       .set({ read: true })
       .where(and(inArray(notifications.id, ids), eq(notifications.userId, userId)));
   },
+  async delete(id: string, userId: string): Promise<void> {
+    // O `userId` no WHERE é a barreira de propriedade — o mesmo predicado do
+    // `markAsRead`, porque apagar a notificação do outro é a mesma violação.
+    await db
+      .delete(notifications)
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  },
 };

@@ -27,4 +27,14 @@ export interface NotificationRepository {
   markAsRead(id: string, userId: string): Promise<void>;
   markAllAsRead(userId: string): Promise<void>;
   markManyAsRead(ids: string[], userId: string): Promise<void>;
+  /**
+   * Apaga UMA notificação, e só do dono.
+   *
+   * ponytail: o `userId` no contrato (e no `WHERE` da implementação) é o que
+   * impede um POST forjado de apagar a notificação de outra pessoa — o mesmo
+   * invariante de `markAsRead`, que também é uma escrita escopada por dono.
+   * Sem efeito se o id não existir OU não pertencer ao usuário: apagar é
+   * idempotente por natureza, não há erro a distinguir.
+   */
+  delete(id: string, userId: string): Promise<void>;
 }

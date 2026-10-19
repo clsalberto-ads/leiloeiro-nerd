@@ -190,6 +190,7 @@ class FakeNotificationRepository implements NotificationRepository {
   async markAsRead() {}
   async markAllAsRead() {}
   async markManyAsRead() {}
+  async delete() {}
 }
 
 describe("placeBid", () => {
@@ -422,6 +423,7 @@ describe("placeBid", () => {
       async markAsRead() {},
       async markAllAsRead() {},
       async markManyAsRead() {},
+      async delete() {},
     };
     const itemRepo = new FakeItemRepository();
     const bidRepo = new FakeBidRepository([existingHighBid]);
