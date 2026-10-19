@@ -112,7 +112,13 @@ export async function POST(request: Request) {
     const completion = await getOpenRouterClient().chat.completions.create({
       model: MODEL,
       temperature: 0.4,
-      max_tokens: 500,
+      // ponytail: 800 (e não 500) porque muitos modelos :free da OpenRouter
+      // emitem um campo `reasoning` que CONTA no orçamento — com 500, um
+      // modelo que "pensa" muito devolvia content:null e o chat respondia
+      // "A IA não retornou uma resposta." Ainda é curto: é uma janela de chat.
+      // Para modelos de raciocínio pesado, prefira subir isto ou trocar por um
+      // modelo sem reasoning (ver OPENROUTER_MODEL no .env.example).
+      max_tokens: 800,
       messages: [
         { role: "system", content: buildSystemPrompt(context) },
         ...messages,
@@ -133,9 +139,39 @@ export async function POST(request: Request) {
     // e uma chave ausente sempre voltava 502 em vez de 500. Corrigido aqui.
     const isConfig =
       err instanceof Error && err.message.includes("OPENROUTER_API_KEY");
-    return errorResponse(
-      "Não foi possível processar sua mensagem.",
-      isConfig ? 500 : 502,
-    );
+    if (isConfig) {
+      return errorResponse(
+        "Assistente não configurado: preencha OPENROUTER_API_KEY no .env.",
+        500,
+      );
+    }
+    // ponytail: sem este mapeamento, TODO erro da OpenRouter virava o genérico
+    // "Não foi possível processar sua mensagem." — e o 402 (conta sem
+    // créditos, o caso mais comum em conta nova) ficava indistinguível de um
+    // 500 qualquer. A mensagem devolvida aqui vai direto para o widget, então
+    // ela precisa dizer O QUE fazer, não só o que falhou.
+    const status =
+      typeof err === "object" && err !== null && "status" in err
+        ? (err as { status?: unknown }).status
+        : undefined;
+    if (status === 402) {
+      return errorResponse(
+        "A conta da OpenRouter está sem créditos. Adicione créditos em openrouter.ai/settings/credits ou configure um modelo gratuito (sufixo \":free\") em OPENROUTER_MODEL, no .env.",
+        502,
+      );
+    }
+    if (status === 401) {
+      return errorResponse(
+        "Chave da OpenRouter inválida. Confira OPENROUTER_API_KEY no .env.",
+        502,
+      );
+    }
+    if (status === 429) {
+      return errorResponse(
+        "Muitas requisições à IA em pouco tempo. Aguarde um instante e tente de novo.",
+        502,
+      );
+    }
+    return errorResponse("Não foi possível processar sua mensagem.", 502);
   }
 }

@@ -243,4 +243,45 @@ describe("POST /api/chat", () => {
       expect(JSON.stringify(await res.json())).not.toContain("segredo");
     });
   });
+
+  // ponytail: sem este mapeamento, TODO erro da OpenRouter virava o genérico
+  // "Não foi possível processar sua mensagem." — e a conta sem créditos (402,
+  // o caso mais comum em conta nova) era indistinguível de qualquer falha.
+  // As mensagens mapeadas vão para o WIDGET, então dizem o que FAZER.
+  describe("mapeamento dos erros da OpenRouter", () => {
+    function apiError(status: number, message: string): Error {
+      return Object.assign(new Error(message), { status });
+    }
+
+    it("402 sem créditos devolve mensagem acionável (créditos ou modelo :free)", async () => {
+      create.mockRejectedValue(apiError(402, "Insufficient credits"));
+
+      const res = await POST(makeRequest(validBody));
+
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain("créditos");
+      expect(body.error).toContain(":free");
+    });
+
+    it("401 chave inválida devolve mensagem que nomeia a variável", async () => {
+      create.mockRejectedValue(apiError(401, "Invalid API key"));
+
+      const res = await POST(makeRequest(validBody));
+
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("429 da OpenRouter (não o rate limit local) devolve mensagem de espera", async () => {
+      create.mockRejectedValue(apiError(429, "rate limited"));
+
+      const res = await POST(makeRequest(validBody));
+
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain("Aguarde");
+    });
+  });
 });

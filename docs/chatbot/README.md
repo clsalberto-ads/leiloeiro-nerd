@@ -15,7 +15,7 @@ POST /api/chat                      src/app/api/chat/route.ts
   ↓
 Valida e limita as mensagens        (últimas 20, até 2000 caracteres cada)
   ↓
-Embedding da pergunta               Gemini  (OPENAI_GEMINI_API_KEY)
+Embedding da pergunta               Gemini  (GEMINI_API_KEY)
   ↓
 Similaridade de cosseno             contra data/knowledge-index.json
   ↓
@@ -32,7 +32,7 @@ São duas chamadas de IA, com provedores e chaves independentes:
 
 | Etapa                          | Provedor                                    | Chave                   |
 | ------------------------------ | ------------------------------------------- | ----------------------- |
-| Embeddings (indexação e busca) | Gemini, pelo endpoint compatível com OpenAI | `OPENAI_GEMINI_API_KEY` |
+| Embeddings (indexação e busca) | Gemini, pelo endpoint compatível com OpenAI | `GEMINI_API_KEY` |
 | Resposta final do chat         | OpenRouter                                  | `OPENROUTER_API_KEY`    |
 
 Pontos importantes do comportamento:
@@ -51,8 +51,8 @@ Variáveis no `.env` (modelo em `.env.example`):
 | ------------------------ | ----------- | ------------------------------------ | ------------------------------------------------ |
 | `OPENROUTER_API_KEY`     | sim         | n/d                                  | Resposta final do chat                           |
 | `OPENROUTER_MODEL`       | não         | `openrouter/auto`                    | Modelo usado na resposta                         |
-| `OPENAI_GEMINI_API_KEY`  | sim         | n/d                                  | Embeddings (chave do Google AI Studio)           |
-| `OPENAI_EMBEDDING_MODEL` | não         | `gemini-embedding-001`               | Modelo de embeddings                             |
+| `GEMINI_API_KEY`  | sim         | n/d                                  | Embeddings (chave do Google AI Studio)           |
+| `EMBEDDING_MODEL` | não         | `gemini-embedding-001`               | Modelo de embeddings                             |
 | `OPENAI_BASE_URL`        | não         | endpoint OpenAI-compatível do Gemini | Troca de provedor de embeddings                  |
 | `RAG_TOP_K`              | não         | `5`                                  | Máximo de trechos enviados à IA                  |
 | `RAG_MIN_SCORE`          | não         | `0.7`                                | Similaridade mínima (0 a 1) para um trecho valer |
@@ -177,8 +177,10 @@ Os testes do chatbot não chamam nenhuma API (tudo é simulado) e rodam sem chav
 | Sintoma                                                     | Causa provável                                                                       | O que fazer                                                         |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | `429 ... credit_balance_exhausted` ao indexar               | Provedor de embeddings sem créditos (ou limite do plano gratuito)                    | Confira a chave e a cota no provedor; espere o limite renovar       |
-| `OPENAI_GEMINI_API_KEY não configurada.`                    | Chave ausente no `.env`                                                              | Preencha e rode o comando de novo                                   |
+| `GEMINI_API_KEY não configurada.`                    | Chave ausente no `.env`                                                              | Preencha e rode o comando de novo                                   |
 | Chat responde 500 "Base de conhecimento ainda não indexada" | `data/knowledge-index.json` não existe                                               | `pnpm knowledge:index`                                              |
+| Erro "conta da OpenRouter está sem créditos" no widget      | `openrouter/auto` precisa de créditos comprados                                      | Compre créditos (openrouter.ai/settings/credits) ou use um modelo `:free` em OPENROUTER_MODEL |
+| Erro "Chave da OpenRouter inválida" no widget             | `OPENROUTER_API_KEY` incorreta                                                       | Confira a chave em openrouter.ai/keys e o `.env`                     |
 | Chat diz "não encontrei" para tudo                          | Busca falhando em silêncio, threshold alto demais, ou índice gerado com outro modelo | Veja o terminal do servidor; rode `pnpm knowledge:search`; reindexe |
 | Mudou um `.md` e a resposta não mudou                       | Índice não regenerado, ou servidor com o índice antigo em memória                    | `pnpm knowledge:index` e reinicie o servidor                        |
 | Trocou o modelo de embeddings e a busca parou               | Vetores de tamanhos diferentes no índice                                             | Reindexe com o modelo novo (o erro aparece só no terminal)          |
