@@ -1,7 +1,7 @@
 "use server";
 
 import { getSession } from "./auth-actions";
-import { formToObject, placeBidSchema } from "@/lib/validators";
+import { placeBidSchema } from "@/domain/validation/validators";
 import { toActionError } from "@/lib/action-error";
 import { isUuid } from "@/lib/uuid";
 import { placeBid } from "@/application/use-cases/place-bid";
@@ -11,6 +11,7 @@ import { drizzleBidRepository } from "@/infrastructure/database/repositories/dri
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
 import { createResendClient } from "@/infrastructure/email/resend";
+import { formToObject } from "@/lib/form-object";
 import type { BidView } from "@/domain/repositories/bid-repository";
 
 export type BidActionResult = { ok?: boolean; error?: string; bid?: BidView; bids?: BidView[] };

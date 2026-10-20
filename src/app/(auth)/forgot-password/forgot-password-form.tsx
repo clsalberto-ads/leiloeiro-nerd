@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { forgotPasswordAction } from "@/presentation/actions/auth-actions";
-import { forgotPasswordSchema } from "@/lib/validators";
+import { forgotPasswordSchema } from "@/domain/validation/validators";
 
 type ForgotPasswordInput = z.input<typeof forgotPasswordSchema>;
 

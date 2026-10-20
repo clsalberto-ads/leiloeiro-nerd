@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 vi.mock("@/presentation/actions/auth-actions", () => ({ signUpAction: vi.fn() }));
 
 import { RegisterForm } from "./register-form";
-import { signUpSchema } from "@/lib/validators";
+import { signUpSchema } from "@/domain/validation/validators";
 
 // ponytail: o resolver e testado direto porque o repo roda em node puro (sem jsdom/RTL) e o useActionState nao injeta state no renderToString; subir para asserção de UI (mensagem no Field) exige ambiente DOM.
 const NO_FIELDS = { fields: {}, shouldUseNativeValidation: false };

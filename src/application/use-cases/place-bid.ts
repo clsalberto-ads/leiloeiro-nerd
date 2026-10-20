@@ -3,23 +3,21 @@ import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
 import { renderOutbidEmail } from "@/lib/email-templates";
-import { INVALID_BID } from "@/lib/validators";
+// ponytail: a porta de e-mail era uma interface LOCAL duplicada — o
+// `TransactionalEmailClient` de email-client.ts é a mesma forma, agora
+// compartilhada pelos três use cases que enviam (lance, webhook, pagamentos).
+import type { TransactionalEmailClient } from "@/lib/email-client";
+import { INVALID_BID } from "@/domain/validation/validators";
 
 import { formatBRL } from "@/lib/format-brl";
 import { invalidMoney } from "./money-guards";
-
-export interface ResendClient {
-  emails: {
-    send: (args: { from: string; to: string; subject: string; html: string }) => Promise<unknown>;
-  };
-}
 
 export async function placeBid(
   itemRepo: ItemRepository,
   bidRepo: BidRepository,
   userRepo: UserRepository,
   notifRepo: NotificationRepository,
-  resend: ResendClient,
+  resend: TransactionalEmailClient,
   bidderId: string,
   itemId: string,
   amount: number,

@@ -9,7 +9,7 @@ import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { createSlug } from "@/domain/value-objects/slug";
 import { becomeSellerAction } from "@/presentation/actions/profile-actions";
-import { becomeSellerSchema } from "@/lib/validators";
+import { becomeSellerSchema } from "@/domain/validation/validators";
 
 // ponytail: o slug tem transform (trim + createSlug) no becomeSellerSchema, o
 // que exige a forma de 3 generics do useForm mesmo sem handleSubmit — o

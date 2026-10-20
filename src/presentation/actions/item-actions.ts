@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getSession } from "./auth-actions";
-import { formToObject, itemSchema } from "@/lib/validators";
+import { itemSchema } from "@/domain/validation/validators";
 import { toActionError } from "@/lib/action-error";
 import { isUuid } from "@/lib/uuid";
 import { createItem } from "@/application/use-cases/create-item";
@@ -12,6 +12,7 @@ import { cancelItem } from "@/application/use-cases/cancel-item";
 import { deleteItem } from "@/application/use-cases/delete-item";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
+import { formToObject } from "@/lib/form-object";
 
 export type ItemActionResult = { ok?: boolean; error?: string };
 

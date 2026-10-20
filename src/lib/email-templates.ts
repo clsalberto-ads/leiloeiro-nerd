@@ -1,5 +1,5 @@
 import { formatBRL } from "./format-brl";
-import { APP_TIMEZONE } from "./timezone";
+import { APP_TIMEZONE } from "@/domain/timezone";
 
 // ponytail: o e-mail é o ÚNICO destino do app que não escapa automaticamente.
 // Todo o resto renderiza `src/app` via JSX, que escapa sozinho;

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fromInputDateString, localDateOf, startOfLocalDay, toInputDateString } from "./timezone";
-import { itemSchema } from "./validators";
+import { itemSchema } from "./validation/validators";
 
 // ponytail: a mutacao de `process.env.TZ` neste arquivo NAO e enfeite — e o que
 // torna o teste barato E verdadeiro ao mesmo tempo. Rodar a suite inteira duas
@@ -211,7 +211,7 @@ describe("APP_TIMEZONE continua sendo a fonte unica de verdade", () => {
         else if (
           /\.tsx?$/.test(path) &&
           !path.includes(".test.") &&
-          path !== join("src", "lib", "timezone.ts")
+          path !== join("src", "domain", "timezone.ts")
         ) {
           readFileSync(path, "utf8")
             .split("\n")

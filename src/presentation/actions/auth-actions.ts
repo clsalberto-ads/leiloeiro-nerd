@@ -3,7 +3,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/infrastructure/auth/better-auth";
-import { forgotPasswordSchema, formToObject, signInSchema, signUpSchema } from "@/lib/validators";
+import { formToObject } from "@/lib/form-object";
+import { forgotPasswordSchema, signInSchema, signUpSchema } from "@/domain/validation/validators";
 
 export type ActionResult = { ok?: boolean; error?: string };
 

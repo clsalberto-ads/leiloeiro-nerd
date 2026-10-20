@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { placeBidAction } from "@/presentation/actions/bid-actions";
 import { formatBRL } from "@/lib/format-brl";
-import { bidFormSchema } from "@/lib/validators";
+import { bidFormSchema } from "@/domain/validation/validators";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";

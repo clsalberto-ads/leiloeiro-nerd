@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSession } from "./auth-actions";
-import { becomeSellerSchema, formToObject } from "@/lib/validators";
+import { becomeSellerSchema } from "@/domain/validation/validators";
 import { toActionError } from "@/lib/action-error";
 import { becomeSeller } from "@/application/use-cases/become-seller";
 import { updateProfile } from "@/application/use-cases/update-profile";
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
+import { formToObject } from "@/lib/form-object";
 
 export type ProfileActionResult = { ok?: boolean; error?: string };
 

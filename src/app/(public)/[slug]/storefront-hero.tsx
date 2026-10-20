@@ -1,5 +1,5 @@
 import type { SellerStorefront } from "@/domain/repositories/user-repository";
-import { APP_TIMEZONE } from "@/lib/timezone";
+import { APP_TIMEZONE } from "@/domain/timezone";
 
 // ponytail: o hero mostra SO FATOS VERIFICAVEIS — quantos itens estao em leilao e
 // desde quando o vendedor existe. Os dois sao checaveis pelo visitante na propria

@@ -4,7 +4,7 @@
 // `minInitialBid` falhava aberto e deixava `NaN` chegar ao INSERT, estourando
 // `22003 numeric_value_out_of_range`. Guard que segura so metade do dominio e pior que
 // nenhum: da sensacao de protecao sem dar.
-import { MAX_CENTS } from "@/lib/validators";
+import { MAX_CENTS } from "@/domain/validation/validators";
 // `Number.isSafeInteger` cobre as DUAS primeiras (nao-e-NaN, nao-e-Infinito) e
 // segura o inteiro, mas o seu teto e 2^53-1 — nao o do `int4`, que estoura em
 // 2_147_483_647. O `isSafeInteger` sozinho deixava passar `amount: 5000000000`,

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { signInAction } from "@/presentation/actions/auth-actions";
-import { signInSchema } from "@/lib/validators";
+import { signInSchema } from "@/domain/validation/validators";
 
 type SignInInput = z.input<typeof signInSchema>;
 

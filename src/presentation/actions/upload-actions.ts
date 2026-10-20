@@ -4,7 +4,7 @@ import { getSession } from "./auth-actions";
 import { deleteItemImage } from "@/application/use-cases/delete-item-image";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { utapi } from "@/infrastructure/upload/uploadthing";
-import { imageUploadSchema } from "@/lib/validators";
+import { imageUploadSchema } from "@/domain/validation/validators";
 import { toActionError } from "@/lib/action-error";
 
 export type UploadActionResult = { urls?: string[]; error?: string; partial?: boolean; falhas?: number };

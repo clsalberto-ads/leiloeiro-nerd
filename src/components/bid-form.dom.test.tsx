@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/presentation/actions/bid-actions", () => ({ placeBidAction: vi.fn() }));
 
 import { fireEvent, render, screen, waitFor } from "@/test/dom-render";
-import { placeBidSchema } from "@/lib/validators";
+import { placeBidSchema } from "@/domain/validation/validators";
 import { BidForm } from "./bid-form";
 
 const ITEM_ID = "3f6c1f6e-1d5a-4f1e-9b6a-2f0b1c3d4e5f";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFeeCents, PLATFORM_FEE_PERCENT, splitPayment } from "./platform-fee";
+import { calculateFeeCents, PLATFORM_FEE_PERCENT, splitPayment } from "./fee";
 
 describe("taxa de marketplace (5%)", () => {
   it("retém exatamente 5% de valores redondos", () => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createSlug } from "@/domain/value-objects/slug";
 import { formatBRL } from "@/lib/format-brl";
-import { fromInputDateString } from "@/lib/timezone";
+import { fromInputDateString } from "@/domain/timezone";
 
 // ponytail: FONTE ÚNICA DE VERDADE. Domínio, payload da action e o `minBid` do
 // item são SEMPRE em CENTAVOS; só o campo visível do formulário de lance é em
@@ -42,11 +42,6 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("E-mail inválido"),
 });
 
-/** Converte `FormData` em um objeto plano para a validação do Zod nas server actions. */
-export function formToObject(formData: FormData): Record<string, string> {
-  return Object.fromEntries(formData.entries()) as Record<string, string>;
-}
-
 export const itemSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres").max(150, "Título muito longo"),
   description: z.string().min(10, "Descrição deve ter no mínimo 10 caracteres").max(5000, "Descrição muito longa"),
@@ -59,7 +54,7 @@ export const itemSchema = z.object({
   // `Z`/`+hh:mm` também passa: são inequívocas, e o `fromInputDateString` as
   // repassa. SÓ a string crua de `datetime-local` — a única sem zona — é lida no
   // fuso do produto. Sem isso, salvar QUALQUER campo do item em um servidor UTC
-  // arrastava o prazo 3 h para trás. Veja `fromInputDateString` em `@/lib/timezone`.
+  // arrastava o prazo 3 h para trás. Veja `fromInputDateString` em `@/domain/timezone`.
   bidDeadline: z.preprocess(
     (v) => (typeof v === "string" ? fromInputDateString(v) : v),
     z.coerce.date({ message: "Prazo de lances inválido" }).refine((d) => d.getTime() > Date.now(), "Prazo de lances deve ser no futuro"),

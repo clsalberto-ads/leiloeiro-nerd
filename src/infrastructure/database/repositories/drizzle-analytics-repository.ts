@@ -1,7 +1,7 @@
 import type { Period } from "@/app/(dashboard)/dashboard/period/period";
 import { and, count, countDistinct, avg, desc, eq, gte, lte, max, sql, sum } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
-import { APP_TIMEZONE, localDateOf, startOfLocalDay } from "@/lib/timezone";
+import { APP_TIMEZONE, localDateOf, startOfLocalDay } from "@/domain/timezone";
 import { bids, items, payments } from "@/infrastructure/database/schema";
 import { user as userTable } from "@/infrastructure/database/auth-schema";
 import type { ItemStatus, ItemType } from "@/domain/repositories/item-repository";
@@ -32,7 +32,7 @@ import type {
 //
 // O ponto de usar a CONSTANTE e nao a string: a mesma `America/Sao_Paulo` ja e
 // lida pela celula de prazo da tabela de itens (`columns.tsx`), via
-// `@/lib/timezone`. Se os dois divergirem, o grafico de "lances por dia" contaria
+// `@/domain/timezone`. Se os dois divergirem, o grafico de "lances por dia" contaria
 // dias diferentes dos que a lista de itens mostra — e nada accuse isso, porque
 // os dois continuam "funcionando".
 const LOCAL_DAY = sql`date_trunc('day', ${bids.createdAt} at time zone ${sql.raw(`'${APP_TIMEZONE}'`)})`;

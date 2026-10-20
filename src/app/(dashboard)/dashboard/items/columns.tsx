@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatBRL } from "@/lib/format-brl";
-import { APP_TIMEZONE } from "@/lib/timezone";
+import { APP_TIMEZONE } from "@/domain/timezone";
 import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
 import { createPaymentFormAction } from "@/presentation/actions/payment-actions";
 import type { DashboardItemRow } from "./dashboard-item-row";

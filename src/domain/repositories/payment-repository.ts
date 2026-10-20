@@ -9,7 +9,7 @@ export interface Payment {
   // ponytail: o LEDGER da taxa de marketplace (5%). Vem junto do `amount`
   // porque os KPIs e a página de pagamento leem os três — e a soma
   // `sellerNetCents + platformFeeCents === amount` é o invariante que o
-  // `splitPayment` (@/lib/platform-fee) garante na criação.
+  // `splitPayment` (@/domain/value-objects/fee) garante na criação.
   platformFeeCents: number;
   sellerNetCents: number;
   mpPaymentId: string | null;

@@ -3,7 +3,7 @@ import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { Payment, PaymentRepository } from "@/domain/repositories/payment-repository";
 import type { UserRepository } from "@/domain/repositories/user-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
-import { splitPayment } from "@/lib/platform-fee";
+import { splitPayment } from "@/domain/value-objects/fee";
 import { formatBRL } from "@/lib/format-brl";
 import { renderNextBidderCalledEmail } from "@/lib/email-templates";
 import { appBaseUrl, sendEmailBestEffort, type TransactionalEmailClient } from "@/lib/email-client";
