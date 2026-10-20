@@ -29,8 +29,19 @@ export interface UpsertMpSellerAccountInput {
 export interface MpSellerAccountRepository {
   /** A conta do vendedor, SEM o token — uso da UI e de checagens de estado. */
   findByUserId(userId: string): Promise<MpSellerAccount | null>;
-  /** O token de acesso, para o fluxo de pagamento. `null` = não conectado. */
-  findAccessToken(userId: string): Promise<string | null>;
+  /**
+   * As credenciais OAuth COMPLETAS, para o fluxo de pagamento (criar PIX,
+   * renovar token). `null` = vendedor sem conta conectada.
+   *
+   * ponytail: o trio vem JUNTO porque a renovação precisa do `refreshToken`
+   * quando o `accessToken` está perto de expirar — duas chamadas separadas
+   * deixariam a janela de corrida "leu token, expirou, leu refresh" entre elas.
+   * Continua SEM ir à UI: a separação `findByUserId` (estado) vs
+   * `findCredentials` (segredo) é a mesma de antes.
+   */
+  findCredentials(
+    userId: string,
+  ): Promise<{ accessToken: string; refreshToken: string | null; tokenExpiresAt: Date | null } | null>;
   /** Conecta (ou reconecta) a conta: substitui os tokens de um `userId`. */
   upsert(input: UpsertMpSellerAccountInput): Promise<MpSellerAccount>;
   /** Desconecta: apaga a conta. Ausência = não conectado. */

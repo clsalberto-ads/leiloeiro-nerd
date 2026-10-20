@@ -1,6 +1,14 @@
 import { Queue, Worker } from "bullmq";
 import { closeExpiredItems } from "@/application/use-cases/close-expired-items";
+import { createPayment } from "@/application/use-cases/create-payment";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
+import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
+import { drizzlePaymentRepository } from "@/infrastructure/database/repositories/drizzle-payment-repository";
+import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
+import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
+import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
+import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
+import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
 import { AUCTION_QUEUE, CLOSE_EXPIRED_EVERY_MS } from "./queue";
 
 const CLOSE_EXPIRED_JOB = "close-expired-items";
@@ -14,11 +22,43 @@ const worker = new Worker(
     }
     // Um unico `Date` para todos os itens desta execucao: dois itens que venceram
     // no mesmo minuto caem no mesmo dia, independente de quanto o UPDATE levou.
-    const encerrados = await closeExpiredItems(drizzleItemRepository, new Date());
+    const now = new Date();
+    const encerrados = await closeExpiredItems(drizzleItemRepository, now);
     if (encerrados.length > 0) {
       console.log(`[worker] ${encerrados.length} item(ns) expirado(s) encerrado(s): ${encerrados.join(", ")}`);
     }
-    return { encerrados: encerrados.length };
+
+    // ponytail: a cobranca do arremate e GERADA aqui, no mesmo job do
+    // encerramento — a spec nao deixa o item encerrado esperar um segundo
+    // gatilho para o vencedor poder pagar. Best-effort POR ITEM: um item cujo
+    // vendedor ainda nao conectou a conta MP (ou cuja chamada falhou) nao pode
+    // impedir os outros de receberem cobranca — o erro e logado e o proximo
+    // ciclo (ou o botao "gerar cobranca" do vendedor) recupera, porque o
+    // `createPayment` e idempotente.
+    let cobrancas = 0;
+    for (const itemId of encerrados) {
+      try {
+        await createPayment(
+          {
+            itemRepo: drizzleItemRepository,
+            bidRepo: drizzleBidRepository,
+            paymentRepo: drizzlePaymentRepository,
+            userRepo: drizzleUserRepository,
+            notifRepo: drizzleNotificationRepository,
+            getAccessToken: (userId) =>
+              getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
+            mpClient: { createPixPayment: createMpPixPayment },
+          },
+          itemId,
+          now,
+        );
+        cobrancas += 1;
+      } catch (err) {
+        console.error(`[worker] falha ao gerar cobranca do item ${itemId}:`, err);
+      }
+    }
+
+    return { encerrados: encerrados.length, cobrancas };
   },
   { connection: { url: process.env.REDIS_URL } },
 );

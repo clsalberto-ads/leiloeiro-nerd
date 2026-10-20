@@ -41,13 +41,17 @@ export const drizzleMpSellerAccountRepository: MpSellerAccountRepository = {
     return row ?? null;
   },
 
-  async findAccessToken(userId) {
+  async findCredentials(userId: string) {
     const [row] = await db
-      .select({ accessToken: mpSellerAccounts.accessToken })
+      .select({
+        accessToken: mpSellerAccounts.accessToken,
+        refreshToken: mpSellerAccounts.refreshToken,
+        tokenExpiresAt: mpSellerAccounts.tokenExpiresAt,
+      })
       .from(mpSellerAccounts)
       .where(eq(mpSellerAccounts.userId, userId))
       .limit(1);
-    return row?.accessToken ?? null;
+    return row ?? null;
   },
 
   async upsert(input: UpsertMpSellerAccountInput) {
