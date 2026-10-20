@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "worker": "tsx src/infrastructure/cron/worker.ts",
     "knowledge:index": "tsx --env-file=.env scripts/index-knowledge.ts",
-    "knowledge:search": "tsx scripts/search-knowledge.ts"
+    "knowledge:search": "tsx scripts/search-knowledge.ts",
+    "smoke:cards": "tsx --env-file=.env scripts/smoke-cards.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
