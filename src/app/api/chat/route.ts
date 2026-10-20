@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenRouterClient, MODEL } from "@/lib/ai/client";
+import { runChatCompletion } from "@/lib/ai/chat-completion";
 import { buildSystemPrompt } from "@/lib/ai/prompt";
 import {
   KnowledgeIndexNotFoundError,
@@ -109,23 +110,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const completion = await getOpenRouterClient().chat.completions.create({
+    // ponytail: a chamada única ao modelo virou `runChatCompletion`, que
+    // também atende pedidos de ferramenta (ex.: search_active_items) com limite
+    // de rodadas. Sem pedido de ferramenta, é exatamente uma chamada, como antes.
+    const reply = await runChatCompletion({
+      client: getOpenRouterClient(),
       model: MODEL,
-      temperature: 0.4,
-      // ponytail: 800 (e não 500) porque muitos modelos :free da OpenRouter
-      // emitem um campo `reasoning` que CONTA no orçamento — com 500, um
-      // modelo que "pensa" muito devolvia content:null e o chat respondia
-      // "A IA não retornou uma resposta." Ainda é curto: é uma janela de chat.
-      // Para modelos de raciocínio pesado, prefira subir isto ou trocar por um
-      // modelo sem reasoning (ver OPENROUTER_MODEL no .env.example).
-      max_tokens: 800,
       messages: [
         { role: "system", content: buildSystemPrompt(context) },
         ...messages,
       ],
     });
-
-    const reply = completion.choices[0]?.message?.content?.trim();
     if (!reply) {
       return errorResponse("A IA não retornou uma resposta.", 502);
     }
@@ -156,7 +151,7 @@ export async function POST(request: Request) {
         : undefined;
     if (status === 402) {
       return errorResponse(
-        "A conta da OpenRouter está sem créditos. Adicione créditos em openrouter.ai/settings/credits ou configure um modelo gratuito (sufixo \":free\") em OPENROUTER_MODEL, no .env.",
+        'A conta da OpenRouter está sem créditos. Adicione créditos em openrouter.ai/settings/credits ou configure um modelo gratuito (sufixo ":free") em OPENROUTER_MODEL, no .env.',
         502,
       );
     }
