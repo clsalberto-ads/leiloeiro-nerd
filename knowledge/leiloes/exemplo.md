@@ -18,5 +18,4 @@ encerramento.
 
 > Este arquivo é apenas um exemplo de estrutura. Ele não contém dados
 > reais de nenhum item cadastrado — valores de lance, status e prazos
-> específicos de um item vêm do banco de dados da plataforma (futura
-> integração via Tools/API), não da base de conhecimento em Markdown.
+> específicos de um item vêm do banco de dados da plataforma, não da base de conhecimento em Markdown.

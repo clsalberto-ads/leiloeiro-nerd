@@ -19,5 +19,3 @@ sempre consultar o edital correspondente.
 O atraso no pagamento pode resultar em multa, no cancelamento da
 arrematação e na perda de eventual caução, conforme definido nas regras
 gerais do leilão.
-
-> Conteúdo fictício, usado apenas para demonstrar o funcionamento do RAG.
