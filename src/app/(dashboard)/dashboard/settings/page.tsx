@@ -4,6 +4,7 @@ import { SettingsForm } from "./settings-form";
 import { BecomeSellerForm } from "@/components/become-seller-form";
 import { MpAccountSection } from "./mp-account-section";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,8 @@ export default async function SettingsPage({
       : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        <PageHeader title="Configurações" />
+    <PageContainer size="default">
+<PageHeader title="Configurações" />
         {session ? (
           <SettingsForm
             profile={{
@@ -54,7 +54,6 @@ export default async function SettingsPage({
             flash={typeof sp.mercadopago === "string" ? sp.mercadopago : undefined}
           />
         ) : null}
-      </main>
-    </div>
+      </PageContainer>
   );
 }

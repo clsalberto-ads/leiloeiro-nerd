@@ -10,6 +10,7 @@ import { toDashboardItemRow } from "./dashboard-item-row";
 import { BecomeSellerForm } from "@/components/become-seller-form";
 import { firstValue } from "@/lib/first-value";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -48,13 +49,11 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   // leiloeiro nao ganha `actions`: nao ha item novo para criar sem esse papel.
   if (session.user.role !== "seller" && session.user.role !== "both") {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-          <PageHeader title="Meus itens" />
+      <PageContainer size="wide">
+<PageHeader title="Meus itens" />
           <p className="text-muted-foreground">Você ainda não é leiloeiro.</p>
             <BecomeSellerForm />
-        </main>
-      </div>
+        </PageContainer>
     );
   }
 
@@ -93,9 +92,8 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        <PageHeader
+    <PageContainer size="wide">
+<PageHeader
           title="Meus itens"
           actions={
             <Button nativeButton={false} render={<Link href="/dashboard/items/new" />} size="sm">
@@ -112,7 +110,6 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
           </p>
         ) : null}
         <ItemsUrl items={items.map(toDashboardItemRow)} view={view} totalCount={total} />
-      </main>
-    </div>
+      </PageContainer>
   );
 }

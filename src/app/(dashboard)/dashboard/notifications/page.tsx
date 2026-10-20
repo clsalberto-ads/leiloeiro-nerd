@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { PageContainer } from "@/components/layout/page-container";
 
 // ponytail: como as demais páginas do dashboard, esta página NÃO renderiza o
 // `DashboardHeader` — o `(dashboard)/layout.tsx` já o fornece (junto do
@@ -96,10 +97,8 @@ export default async function NotificationsPage({
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-          <PageHeader
+    <PageContainer size="wide">
+<PageHeader
             title="Notificações"
             description="Clique em uma notificação não lida para marcá-la como lida"
           />
@@ -158,8 +157,6 @@ export default async function NotificationsPage({
               )}
             </CardContent>
           </Card>
-        </div>
-      </main>
-    </div>
+      </PageContainer>
   );
 }

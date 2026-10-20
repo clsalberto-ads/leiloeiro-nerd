@@ -7,6 +7,7 @@ import { PeriodSelect } from "./period/period-select";
 import { parsePeriod } from "./period/period";
 import { firstValue } from "@/lib/first-value";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageContainer } from "@/components/layout/page-container";
 
 // ponytail: `force-dynamic` e obrigatorio aqui, e nao porFORMANCE. A pagina le a
 // sessao E cinco agregados, todos dependentes de quem esta logado e de "agora"
@@ -46,9 +47,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // ("Seu painel"/"Meus lances") e o `PeriodSelect` sao os unicos acoes do
   // cabecalho da pagina; os links para itens e perfil sao do `DashboardSidebar`.
   return (
-  <div className="min-h-screen flex flex-col bg-background">
-    <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <PageHeader
+  <PageContainer size="default">
+<PageHeader
         title={isSeller ? "Seu painel" : "Meus lances"}
         description={session.user.email}
         actions={<PeriodSelect current={period} />}
@@ -58,7 +58,6 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       ) : (
         <BuyerPanel view={view} period={period} />
       )}
-    </main>
-  </div>
+    </PageContainer>
   );
 }

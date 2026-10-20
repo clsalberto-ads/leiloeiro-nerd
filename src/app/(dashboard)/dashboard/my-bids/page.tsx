@@ -8,6 +8,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format-brl";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,8 @@ export default async function MyBidsPage() {
   const slugById = new Map(sellers.map((s) => [s.id, s.slug]));
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-          <PageHeader title="Meus lances" description="Histórico dos seus lances" />
+    <PageContainer size="wide">
+<PageHeader title="Meus lances" description="Histórico dos seus lances" />
           {rows.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -57,8 +56,6 @@ export default async function MyBidsPage() {
               ))}
             </div>
           )}
-        </div>
-      </main>
-    </div>
+      </PageContainer>
   );
 }

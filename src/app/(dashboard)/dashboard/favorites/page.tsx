@@ -8,6 +8,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,8 @@ export default async function FavoritesPage() {
   const slugById = new Map(sellers.map((s) => [s.id, s.slug]));
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-          <PageHeader title="Favoritos" description="Itens que você marcou como favoritos" />
+    <PageContainer size="wide">
+<PageHeader title="Favoritos" description="Itens que você marcou como favoritos" />
           {items.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -51,8 +50,6 @@ export default async function FavoritesPage() {
               ))}
             </div>
           )}
-        </div>
-      </main>
-    </div>
+      </PageContainer>
   );
 }

@@ -5,6 +5,7 @@ import { drizzleItemRepository } from "@/infrastructure/database/repositories/dr
 import { isUuid } from "@/lib/uuid";
 import { PageHeader } from "@/components/layout/page-header";
 import { PaymentView } from "./payment-view";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,8 @@ export default async function PaymentPage({ params }: PageProps<"/dashboard/paym
   const item = await drizzleItemRepository.findById(payment.itemId);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-          <PageHeader
+    <PageContainer size="content">
+<PageHeader
             title="Pagamento do arremate"
             description={item ? `Item: ${item.title}` : undefined}
           />
@@ -38,8 +37,6 @@ export default async function PaymentPage({ params }: PageProps<"/dashboard/paym
             paymentLink={payment.paymentLink}
             deadline={payment.deadline.toISOString()}
           />
-        </div>
-      </main>
-    </div>
+      </PageContainer>
   );
 }

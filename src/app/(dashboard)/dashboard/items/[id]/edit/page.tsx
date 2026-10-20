@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { ItemForm } from "@/components/item-form";
+import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { isUuid } from "@/lib/uuid";
 
@@ -19,9 +20,9 @@ export default async function EditItemPage({ params }: PageProps<"/dashboard/ite
   const item = await drizzleItemRepository.findById(id);
   if (!item || item.sellerId !== session.user.id) notFound();
   return (
-    <div className="space-y-4">
+    <PageContainer className="space-y-4">
       <PageHeader title="Editar item" />
       <ItemForm item={item} mode="edit" />
-    </div>
+    </PageContainer>
   );
 }
