@@ -24,7 +24,11 @@ import {
 // nasce sozinha quando um status novo entra no enum — essa e uma decisao de
 // produto, e o enum crescer nao pode virar o evento que aumenta a barra de filtros
 // sozinha.
-const STATUS_TABS = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
+// ponytail (R6.2): a aba "Aguardando pagamento" entra entre encerrado e
+// cancelado — desde a fundação o status existia no enum e nenhum código o
+// produzia; agora a cobrança da tentativa 1 transita o item, e o vendedor
+// precisa VER os itens nesse estado (é a fila do dinheiro que falta chegar).
+const STATUS_TABS = ["draft", "active", "closed", "awaiting_payment", "cancelled"] as const satisfies readonly ItemStatus[];
 
 const TABS: { key: string; status: ItemStatus | null; label: string }[] = [
   { key: "all", status: null, label: "Todos" },

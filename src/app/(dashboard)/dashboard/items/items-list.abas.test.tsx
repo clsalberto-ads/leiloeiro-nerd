@@ -27,7 +27,7 @@ import { DEFAULT_TABLE_VIEW } from "./dashboard-table-state";
 // A lista inteira e renderizada (e nao so o trecho das abas) porque `TABS` nao e
 // exportado: um teste que le o que a lista mostra e o unico jeito de alcancar o
 // rotulo sem abrir um buraco na API do componente so para isto.
-const LIST_TABS = ["draft", "active", "closed", "cancelled"] as const satisfies readonly ItemStatus[];
+const LIST_TABS = ["draft", "active", "closed", "awaiting_payment", "cancelled"] as const satisfies readonly ItemStatus[];
 
 // ponytail: `navigate` e uma funcao que nao faz nada neste arquivo — a assercao e
 // sobre o `href` do HTML, e nao sobre navegacao. Passar e obrigatorio porque a

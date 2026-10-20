@@ -65,7 +65,11 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
   // conectou a conta MP depois do encerramento, ou a geração automática
   // falhou. O use case é idempotente: clicar de novo devolve a cobrança
   // existente em vez de cobrar duas vezes.
-  const canCharge = item.status === "closed";
+  // ponytail (R6.2): "gerar cobrança" também em awaiting_payment — é o botão
+  // de RETOMADA quando a MP falhou no meio: o item já transicionou, mas a
+  // cobrança não nasceu (o use case é idempotente: se a cobrança existe,
+  // devolve a mesma em vez de cobrar duas vezes).
+  const canCharge = item.status === "closed" || item.status === "awaiting_payment";
   if (!canPublish && !canDelete && !canCancel && !canCharge) return null;
 
   return (

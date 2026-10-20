@@ -48,10 +48,19 @@ function makeBid(overrides: Partial<Bid> = {}): Bid {
   };
 }
 
-class FakeItemRepo implements Pick<ItemRepository, "findById"> {
+class FakeItemRepo implements Pick<ItemRepository, "findById" | "setStatus"> {
   items = new Map<string, Item>();
+  statuses: Array<{ id: string; status: Item["status"] }> = [];
   async findById(id: string) {
     return this.items.get(id) ?? null;
+  }
+  async setStatus(id: string, status: Item["status"]) {
+    this.statuses.push({ id, status });
+    const item = this.items.get(id);
+    if (!item) return null;
+    const updated = { ...item, status };
+    this.items.set(id, updated);
+    return updated;
   }
 }
 
@@ -350,5 +359,49 @@ describe("createPayment", () => {
 
     await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("e-mail");
     expect(ctx.mpClient.calls).toHaveLength(0);
+  });
+});
+
+// ponytail (R6.2): o ciclo do item agora usa o status que existia no enum
+// desde a fundação — criada a cobrança da tentativa 1, o item deixa de ser
+// "encerrado" e passa a "aguardando pagamento" (a aba que o vendedor lê).
+// A transição vem ANTES da MP: se a chamada falhar, o estado já está certo e
+// a retomada funciona.
+describe("createPayment — transição awaiting_payment (R6.2)", () => {
+  it("item closed ganha cobrança → transita para awaiting_payment", async () => {
+    const ctx = makeDeps();
+    await createPayment(ctx.deps, "i1", NOW);
+
+    expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "awaiting_payment" }]);
+  });
+
+  it("item JÁ em awaiting_payment não re-transita (idempotente) e a retomada segue", async () => {
+    const ctx = makeDeps({
+      item: makeItem({ status: "awaiting_payment" as ItemStatus }),
+    });
+
+    const payment = await createPayment(ctx.deps, "i1", NOW);
+
+    expect(ctx.itemRepo.statuses).toEqual([]); // nenhuma transição extra
+    expect(payment.mpPaymentId).toBe("mp-123"); // cobrança criada de novo
+  });
+
+  it("item em awaiting_payment COM cobrança existente devolve a mesma (idempotência por tentativa)", async () => {
+    const ctx = makeDeps({
+      item: makeItem({ status: "awaiting_payment" as ItemStatus }),
+    });
+    const first = await createPayment(ctx.deps, "i1", NOW);
+    ctx.mpClient.calls.length = 0;
+
+    const again = await createPayment(ctx.deps, "i1", NOW);
+
+    expect(again.id).toBe(first.id);
+    expect(ctx.mpClient.calls).toHaveLength(0);
+  });
+
+  it("item active continua recusado (o ciclo começa em closed)", async () => {
+    const ctx = makeDeps({ item: makeItem({ status: "active" as ItemStatus }) });
+    await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("encerrado");
+    expect(ctx.itemRepo.statuses).toEqual([]);
   });
 });

@@ -34,7 +34,10 @@ export interface MpPaymentClient {
 export type SellerAccessTokenProvider = (userId: string) => Promise<string>;
 
 export interface CreatePaymentDeps {
-  itemRepo: Pick<ItemRepository, "findById">;
+  // setStatus entra AQUI pelo `awaiting_payment` (R6.2): criar a cobrança da
+  // tentativa 1 é o momento em que o item deixa de "encerrado" e passa a
+  // "aguardando pagamento" — quem venceu deve algo.
+  itemRepo: Pick<ItemRepository, "findById" | "setStatus">;
   bidRepo: BidRepository;
   paymentRepo: PaymentRepository;
   userRepo: Pick<UserRepository, "findByIds">;
@@ -91,7 +94,22 @@ export async function createPayment(
 
   const item = await itemRepo.findById(itemId);
   if (!item) throw new Error("Item não encontrado");
-  if (item.status !== "closed") throw new Error("Pagamento só é gerado para item encerrado");
+  // ponytail (R6.2): a cobrança nasce em item `closed`, mas a RETENTATIVA vem
+  // com ele já em `awaiting_payment` (a transição acontece antes da chamada à
+  // MP). Aceitar os dois é o que faz o vendedor poder clicar "gerar cobrança"
+  // de novo quando a primeira tentativa caiu no meio.
+  if (item.status !== "closed" && item.status !== "awaiting_payment") {
+    throw new Error("Pagamento só é gerado para item encerrado");
+  }
+
+  // Transição do ciclo (spec §4 do modelo de dados): o item que TEM cobrança
+  // aberta não é "encerrado" para o vendedor — ele está AGUARDANDO pagamento,
+  // e a aba/label que o dono lê precisa dizer isso. Antes da chamada à MP de
+  // propósito: se a MP falhar, o item já está no estado certo e o botão
+  // "gerar cobrança" (visível também em awaiting_payment) é a retomada.
+  if (item.status === "closed") {
+    await itemRepo.setStatus(itemId, "awaiting_payment");
+  }
 
   const attemptNumber = options.target?.attemptNumber ?? 1;
 
