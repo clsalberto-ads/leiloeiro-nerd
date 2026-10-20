@@ -167,6 +167,17 @@ export const drizzlePaymentRepository: PaymentRepository = {
     return rows.map(mapPayment);
   },
 
+  async setMpPaymentId(id: string, mpPaymentId: string): Promise<Payment | null> {
+    // Só em `pending`: a adoção acontece quando o CARTÃO paga uma cobrança
+    // que ainda está em aberto — depois disso os webhooks casam pelo id novo.
+    const [row] = await db
+      .update(payments)
+      .set({ mpPaymentId, updatedAt: new Date() })
+      .where(and(eq(payments.id, id), eq(payments.status, "pending")))
+      .returning();
+    return row ? mapPayment(row) : null;
+  },
+
   async markReminderSent(id: string, at: Date): Promise<Payment | null> {
     // Reivindicação atômica: só o primeiro tick que chega marca (e envia).
     const [row] = await db

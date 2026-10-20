@@ -14,7 +14,7 @@ export interface MpStatusFetcher {
   fetchMpPaymentStatus(
     accessToken: string,
     mpPaymentId: string,
-  ): Promise<{ status: string; statusDetail: string | null }>;
+  ): Promise<{ status: string; statusDetail: string | null; externalReference: string | null }>;
 }
 
 export type SellerAccessTokenProvider = (userId: string) => Promise<string>;
@@ -28,6 +28,12 @@ export interface HandlePaymentWebhookDeps {
   /** Opcional: e-mail `payment_confirmed` best-effort. Ausente = só in-app. */
   resend?: TransactionalEmailClient | null;
   userRepo?: Pick<UserRepository, "findByIds">;
+  /**
+   * (R6.1) Resolvedor de pagamentos de CARTÃO: o id do webhook não casa com
+   * nenhum PIX nosso (a cobrança do checkout nasce com id diferente) — é
+   * preciso descobrir de QUAIS vendedores tentar ler o pagamento.
+   */
+  connectedSellerIds?: () => Promise<string[]>;
 }
 
 export type WebhookOutcome =
@@ -59,7 +65,38 @@ export async function handlePaymentWebhook(
 ): Promise<WebhookOutcome> {
   const { paymentRepo, itemRepo, notifRepo, getAccessToken, fetchStatus } = deps;
 
-  const payment = await paymentRepo.findByMpPaymentId(mpPaymentId);
+  // 1. Casamento DIRETO: PIX nosso — o id do webhook É o id que gravamos.
+  let payment = await paymentRepo.findByMpPaymentId(mpPaymentId);
+
+  // 2. (R6.1) Casamento de CARTÃO (Checkout Pro): o id é de um pagamento que
+  //    só existe AGORA — a cobrança nossa nasceu com o id do PIX (ou null).
+  //    Percorre os vendedores conectados até um conseguir LER o pagamento (só
+  //    o coletor lê), e o `external_reference` da MP aponta o NOSSO item. A
+  //    cobrança pendente daquele item é a única que pode existir por
+  //    construção (cascata é sequencial) — e ela ADOTA o id real: os próximos
+  //    webhooks casam direto, sem resolvedor.
+  if (!payment && deps.connectedSellerIds) {
+    const sellers = await deps.connectedSellerIds();
+    for (const sellerId of sellers) {
+      try {
+        const token = await getAccessToken(sellerId);
+        const mpPayment = await fetchStatus.fetchMpPaymentStatus(token, mpPaymentId);
+        if (!mpPayment.externalReference) continue;
+        const item = await itemRepo.findById(mpPayment.externalReference);
+        if (!item || item.sellerId !== sellerId) continue;
+        const pending = (await paymentRepo.findByItemId(item.id)).find((p) => p.status === "pending");
+        if (!pending) continue;
+        const adopted = await paymentRepo.setMpPaymentId(pending.id, mpPaymentId);
+        if (adopted) payment = adopted;
+        break;
+      } catch {
+        // token de um vendedor que não é o coletor: 401/404 — segue para o
+        // próximo; qualquer outro erro também é "não é dele" aqui.
+        continue;
+      }
+    }
+  }
+
   if (!payment) return { result: "ignored", reason: "payment-not-found" };
   if (payment.status !== "pending") return { result: "ignored", reason: "not-pending" };
 

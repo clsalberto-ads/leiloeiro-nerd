@@ -95,4 +95,9 @@ export const drizzleMpSellerAccountRepository: MpSellerAccountRepository = {
   async remove(userId) {
     await db.delete(mpSellerAccounts).where(eq(mpSellerAccounts.userId, userId));
   },
+
+  async listUserIds(): Promise<string[]> {
+    const rows = await db.select({ userId: mpSellerAccounts.userId }).from(mpSellerAccounts);
+    return rows.map((r) => r.userId);
+  },
 };

@@ -101,4 +101,11 @@ export interface PaymentRepository {
    * pagamento: só o primeiro envia.
    */
   markReminderSent(id: string, at: Date): Promise<Payment | null>;
+  /**
+   * Adota o id REAL do pagamento de cartão (Checkout Pro): a cobrança nasce
+   * com o id do PIX (ou null, quando o PIX falhou) e, quando o cartão paga, o
+   * pagamento resultante tem OUTRO id — que passa a ser o da linha, para os
+   * webhooks seguintes casarem direto.
+   */
+  setMpPaymentId(id: string, mpPaymentId: string): Promise<Payment | null>;
 }

@@ -132,6 +132,13 @@ class FakePaymentRepo implements PaymentRepository {
   async findCascadeCandidates() {
     return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
+  async setMpPaymentId(id: string, mpPaymentId: string) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return null;
+    p.mpPaymentId = mpPaymentId;
+    return p;
+  }
+
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     return this.payments.filter(
       (p) =>
@@ -201,6 +208,9 @@ function makeMpClient(): MpPaymentClient & { calls: Array<Record<string, unknown
         qrCodeBase64: "data:image/png;base64,QR",
         qrCopiaECola: "00020126PIX",
       };
+    },
+    async createCheckoutPreference() {
+      return { preferenceId: "pref-1", initPoint: "https://mp.test/checkout/pref-1" };
     },
   };
 }
@@ -403,5 +413,50 @@ describe("createPayment — transição awaiting_payment (R6.2)", () => {
     const ctx = makeDeps({ item: makeItem({ status: "active" as ItemStatus }) });
     await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("encerrado");
     expect(ctx.itemRepo.statuses).toEqual([]);
+  });
+});
+
+// ponytail (R6.1): a cobrança nasce com DUAS portas — PIX (qr + copia-e-cola)
+// e o link do Checkout Pro (cartão) — cada uma best-effort para a outra.
+describe("createPayment — link de checkout (cartão)", () => {
+  it("grava o paymentLink junto do PIX", async () => {
+    const ctx = makeDeps();
+    const payment = await createPayment(ctx.deps, "i1", NOW);
+    expect(payment.mpPaymentId).toBe("mp-123");
+    expect(payment.pixCopiaECola).toBe("00020126PIX");
+    expect(payment.paymentLink).toBe("https://mp.test/checkout/pref-1");
+  });
+
+  it("PIX falha → cobrança nasce SÓ com o link (cartão como caminho completo)", async () => {
+    const ctx = makeDeps();
+    ctx.mpClient.createPixPayment = async () => {
+      throw new Error("PIX fora do ar");
+    };
+    const payment = await createPayment(ctx.deps, "i1", NOW);
+    expect(payment.mpPaymentId).toBeNull();
+    expect(payment.pixCopiaECola).toBeNull();
+    expect(payment.paymentLink).toBe("https://mp.test/checkout/pref-1");
+  });
+
+  it("link falha → cobrança nasce só com PIX (cartão é bônus, não dependência)", async () => {
+    const ctx = makeDeps();
+    ctx.mpClient.createCheckoutPreference = async () => {
+      throw new Error("preferência recusada");
+    };
+    const payment = await createPayment(ctx.deps, "i1", NOW);
+    expect(payment.mpPaymentId).toBe("mp-123");
+    expect(payment.paymentLink).toBeNull();
+  });
+
+  it("as DUAS falham → a cobrança não nasce (o próximo tick refaz)", async () => {
+    const ctx = makeDeps();
+    ctx.mpClient.createPixPayment = async () => {
+      throw new Error("pix caiu");
+    };
+    ctx.mpClient.createCheckoutPreference = async () => {
+      throw new Error("pref caiu");
+    };
+    await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("Nem PIX nem link");
+    expect(ctx.paymentRepo.created).toHaveLength(0);
   });
 });

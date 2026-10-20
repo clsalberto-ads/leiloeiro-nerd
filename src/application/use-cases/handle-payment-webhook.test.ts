@@ -111,6 +111,12 @@ class FakePaymentRepo implements PaymentRepository {
       ? [this.payment]
       : [];
   }
+  async setMpPaymentId(id: string, mpPaymentId: string) {
+    if (this.payment?.id !== id || this.payment.status !== "pending") return null;
+    this.payment = { ...this.payment, mpPaymentId };
+    return this.payment;
+  }
+
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     if (
       this.payment &&
@@ -190,7 +196,7 @@ function makeDeps(overrides: {
   notifRepo.fail = overrides.notifFail ?? false;
   const fetchStatus: MpStatusFetcher = {
     async fetchMpPaymentStatus() {
-      return { status: overrides.mpStatus ?? "approved", statusDetail: "accredited" };
+      return { status: overrides.mpStatus ?? "approved", statusDetail: "accredited", externalReference: null };
     },
   };
   const getAccessToken = vi.fn(async () => "APP_USR-vendedor");
@@ -351,5 +357,69 @@ describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
 
     expect(outcome).toMatchObject({ result: "approved" });
     expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
+  });
+});
+
+// ponytail (R6.1): pagamentos de CARTÃO chegam com um id que NÃO é o do PIX
+// gravado — a cobrança do checkout nasceu com outro id. O resolvedor percorre
+// os vendedores conectados até o COLETOR ler o pagamento (só ele lê), segue o
+// external_reference até o item, e a cobrança pendente ADOTA o id real — os
+// webhooks seguintes casam direto, sem resolvedor de novo.
+describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => {
+  function makeDepsCard(overrides: { mpStatus?: string; externalRef?: string | null } = {}) {
+    const ctx = makeDeps({ mpStatus: overrides.mpStatus ?? "approved" });
+    ctx.fetchStatus.fetchMpPaymentStatus = async (token, _id) => {
+      if (token !== "APP_USR-vendedor") throw new Error("401");
+      return {
+        status: overrides.mpStatus ?? "approved",
+        statusDetail: "accredited",
+        externalReference: overrides.externalRef === undefined ? "i1" : overrides.externalRef,
+      };
+    };
+    return ctx;
+  }
+
+  it("id desconhecido que É cartão nosso: resolve via vendedor + external_reference e ADOPTA o id", async () => {
+    const ctx = makeDepsCard();
+    // a cobrança pendente tem o id do PIX, não o do webhook
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
+
+    const outcome = await handlePaymentWebhook(
+      { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
+      "mp-cartao-999",
+    );
+
+    expect(outcome).toMatchObject({ result: "approved" });
+    expect(ctx.paymentRepo.payment?.mpPaymentId).toBe("mp-cartao-999");
+    expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
+  });
+
+  it("id de OUTRA loja (nenhum vendedor lê): ignorado sem adoção", async () => {
+    const ctx = makeDepsCard();
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
+    ctx.fetchStatus.fetchMpPaymentStatus = async () => {
+      throw new Error("401");
+    };
+
+    const outcome = await handlePaymentWebhook(
+      { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
+      "mp-alheio",
+    );
+
+    expect(outcome).toMatchObject({ result: "ignored", reason: "payment-not-found" });
+    expect(ctx.paymentRepo.payment?.mpPaymentId).toBe("mp-pix-1");
+    expect(ctx.itemRepo.statuses).toEqual([]);
+  });
+
+  it("cartão de item SEM cobrança pendente: ignora sem quebrar", async () => {
+    const ctx = makeDepsCard();
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1", status: "expired" as PaymentStatus }) };
+
+    const outcome = await handlePaymentWebhook(
+      { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
+      "mp-cartao-tarde",
+    );
+
+    expect(outcome).toMatchObject({ result: "ignored" });
   });
 });

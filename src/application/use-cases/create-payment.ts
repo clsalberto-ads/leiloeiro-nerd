@@ -28,6 +28,20 @@ export interface MpPaymentClient {
     expiresAt: Date;
     externalReference: string;
   }): Promise<MpPixPayment>;
+  /**
+   * (R6.1) Preferência do Checkout Pro — o link que habilita CARTÃO. A MESMA
+   * taxa (application_fee) e o MESMO externalReference do PIX: são duas
+   * PORTAS para pagar a mesma cobrança, não duas cobranças.
+   */
+  createCheckoutPreference(input: {
+    accessToken: string;
+    title: string;
+    amountCents: number;
+    feeCents: number;
+    payerEmail: string;
+    externalReference: string;
+    expiresAt: Date;
+  }): Promise<{ preferenceId: string; initPoint: string }>;
 }
 
 /** Token do vendedor válido (renova sozinho quando perto da expiração). */
@@ -144,15 +158,47 @@ export async function createPayment(
   const deadlineDays = options.deadlineDays ?? item.paymentDeadlineDays;
   const deadline = new Date(now.getTime() + deadlineDays * MS_PER_DAY);
 
-  const pix = await mpClient.createPixPayment({
-    accessToken,
-    amountCents: winner.amount,
-    feeCents: platformFeeCents,
-    description: `Arremate: ${item.title}`,
-    payerEmail: payer.email,
-    expiresAt: deadline,
-    externalReference: item.id,
-  });
+  // ponytail (R6.1): DUAS portas para a MESMA cobrança — PIX (QR +
+  // copia-e-cola, id do pagamento gravado para o webhook casar direto) e o
+  // link do Checkout Pro (cartão; o pagamento resultante resolve pelo
+  // external_reference, ver handle-payment-webhook). Cada uma é best-effort
+  // para a outra: PIX fora do ar → cobrança nasce só com link; preferência
+  // falha → cobrança nasce só com PIX. As DUAS falham → a cobrança não nasce,
+  // e o próximo tick/botão refaz.
+  let pix: MpPixPayment | null = null;
+  try {
+    pix = await mpClient.createPixPayment({
+      accessToken,
+      amountCents: winner.amount,
+      feeCents: platformFeeCents,
+      description: `Arremate: ${item.title}`,
+      payerEmail: payer.email,
+      expiresAt: deadline,
+      externalReference: item.id,
+    });
+  } catch (e) {
+    console.error("[create-payment] PIX falhou, seguindo para o link de checkout:", e);
+  }
+
+  let paymentLink: string | null = null;
+  try {
+    const preference = await mpClient.createCheckoutPreference({
+      accessToken,
+      title: `Arremate: ${item.title}`,
+      amountCents: winner.amount,
+      feeCents: platformFeeCents,
+      payerEmail: payer.email,
+      externalReference: item.id,
+      expiresAt: deadline,
+    });
+    paymentLink = preference.initPoint;
+  } catch (e) {
+    console.error("[create-payment] link de checkout falhou, seguindo só com PIX:", e);
+  }
+
+  if (!pix && !paymentLink) {
+    throw new Error("Nem PIX nem link de pagamento puderam ser criados no Mercado Pago");
+  }
 
   const payment = await paymentRepo.createPayment({
     itemId,
@@ -161,10 +207,10 @@ export async function createPayment(
     amount: winner.amount,
     platformFeeCents,
     sellerNetCents,
-    mpPaymentId: pix.mpPaymentId,
-    pixQrCode: pix.qrCodeBase64,
-    pixCopiaECola: pix.qrCopiaECola,
-    paymentLink: null,
+    mpPaymentId: pix?.mpPaymentId ?? null,
+    pixQrCode: pix?.qrCodeBase64 ?? null,
+    pixCopiaECola: pix?.qrCopiaECola ?? null,
+    paymentLink,
     deadline,
     attemptNumber,
   });

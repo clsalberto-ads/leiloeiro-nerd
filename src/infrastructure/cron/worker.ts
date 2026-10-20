@@ -5,6 +5,7 @@ import { verificarPrazos, sincronizarMp } from "@/application/use-cases/verifica
 import { handlePaymentWebhook } from "@/application/use-cases/handle-payment-webhook";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
+import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
 import { getMpPayment } from "@/infrastructure/mercado-pago/payments";
 import {
   AUCTION_QUEUE,
@@ -53,6 +54,8 @@ const worker = new Worker(
                 fetchStatus: { fetchMpPaymentStatus: getMpPayment },
                 resend: deps.resend,
                 userRepo: deps.userRepo,
+                connectedSellerIds: () =>
+                  drizzleMpSellerAccountRepository.listUserIds(),
               },
               mpPaymentId,
             ),

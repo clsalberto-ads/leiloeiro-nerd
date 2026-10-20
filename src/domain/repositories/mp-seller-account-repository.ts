@@ -46,4 +46,10 @@ export interface MpSellerAccountRepository {
   upsert(input: UpsertMpSellerAccountInput): Promise<MpSellerAccount>;
   /** Desconecta: apaga a conta. Ausência = não conectado. */
   remove(userId: string): Promise<void>;
+  /**
+   * Ids de TODOS os vendedores com conta conectada — o resolvedor de webhooks
+   * de CARTÃO (Checkout Pro) usa para descobrir de quem é o pagamento quando
+   * o id não casa com nenhum PIX nosso (ver handle-payment-webhook).
+   */
+  listUserIds(): Promise<string[]>;
 }

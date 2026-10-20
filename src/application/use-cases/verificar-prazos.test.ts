@@ -150,6 +150,13 @@ class FakePaymentRepo implements PaymentRepository {
   async findCascadeCandidates() {
     return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
+  async setMpPaymentId(id: string, mpPaymentId: string) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return null;
+    p.mpPaymentId = mpPaymentId;
+    return p;
+  }
+
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     return this.payments.filter(
       (p) =>
@@ -212,6 +219,9 @@ function makeMpClient() {
         qrCodeBase64: "data:image/png;base64,QR",
         qrCopiaECola: "000201PIX",
       };
+    },
+    async createCheckoutPreference() {
+      return { preferenceId: `pref-${calls.length}`, initPoint: "https://mp.test/checkout" };
     },
   };
   return client;
@@ -382,7 +392,12 @@ describe("verificarPrazos — cascata", () => {
 
   it("self-healing: cobrança da cascata que FALHOU num tick é refeita no seguinte", async () => {
     const ctx = makeDeps();
+    // as DUAS portas falham no primeiro tick (só o PIX falhar já não basta:
+    // o link do checkout carrega a cobrança sozinho agora)
     ctx.mpClient.createPixPayment = async () => {
+      throw new Error("MP fora do ar");
+    };
+    ctx.mpClient.createCheckoutPreference = async () => {
       throw new Error("MP fora do ar");
     };
 

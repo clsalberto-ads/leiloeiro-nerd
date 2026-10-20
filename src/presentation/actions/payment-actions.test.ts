@@ -22,7 +22,10 @@ vi.mock("@/infrastructure/database/repositories/drizzle-bid-repository", () => (
 vi.mock("@/infrastructure/database/repositories/drizzle-user-repository", () => ({ drizzleUserRepository: {} }));
 vi.mock("@/infrastructure/database/repositories/drizzle-notification-repository", () => ({ drizzleNotificationRepository: {} }));
 vi.mock("@/infrastructure/database/repositories/drizzle-mp-seller-account-repository", () => ({ drizzleMpSellerAccountRepository: {} }));
-vi.mock("@/infrastructure/mercado-pago/payments", () => ({ createMpPixPayment: vi.fn() }));
+vi.mock("@/infrastructure/mercado-pago/payments", () => ({
+  createMpPixPayment: vi.fn(),
+  createMpCheckoutPreference: vi.fn(),
+}));
 vi.mock("@/infrastructure/mercado-pago/seller-access-token", () => ({
   getValidSellerAccessToken: vi.fn(),
 }));

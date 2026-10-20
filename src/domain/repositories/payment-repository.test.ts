@@ -79,6 +79,13 @@ class FakePaymentRepository implements PaymentRepository {
     return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
 
+  async setMpPaymentId(id: string, mpPaymentId: string) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return null;
+    p.mpPaymentId = mpPaymentId;
+    return p;
+  }
+
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     return this.payments.filter(
       (p) =>

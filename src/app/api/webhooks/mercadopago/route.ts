@@ -83,6 +83,7 @@ export async function POST(request: Request): Promise<Response> {
         fetchStatus: { fetchMpPaymentStatus: getMpPayment },
         resend: process.env.RESEND_API_KEY ? createResendClient() : null,
         userRepo: drizzleUserRepository,
+        connectedSellerIds: () => drizzleMpSellerAccountRepository.listUserIds(),
       },
       String(dataId),
     );

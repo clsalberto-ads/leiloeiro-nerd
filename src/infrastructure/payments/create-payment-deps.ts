@@ -4,7 +4,7 @@ import { drizzlePaymentRepository } from "@/infrastructure/database/repositories
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
 import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
-import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
+import { createMpCheckoutPreference, createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
 import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
 import { createResendClient } from "@/infrastructure/email/resend";
 
@@ -32,7 +32,10 @@ export function createPaymentDeps() {
     notifRepo: drizzleNotificationRepository,
     getAccessToken: (userId: string) =>
       getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
-    mpClient: { createPixPayment: createMpPixPayment },
+    mpClient: {
+      createPixPayment: createMpPixPayment,
+      createCheckoutPreference: createMpCheckoutPreference,
+    },
     resend: process.env.RESEND_API_KEY ? createResendClient() : null,
   };
 }
