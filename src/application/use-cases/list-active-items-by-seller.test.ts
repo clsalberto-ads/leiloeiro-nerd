@@ -14,6 +14,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     minBidIncrement: 100,
     bidDeadline: new Date(),
     paymentDeadlineDays: 3,
+    cascadeDeadlineDays: null,
     status: "active",
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -23,6 +23,7 @@ function item(overrides: Partial<Item> = {}): Item {
     minBidIncrement: 500,
     bidDeadline: new Date("2026-12-01T12:00:00.000Z"),
     paymentDeadlineDays: 3,
+    cascadeDeadlineDays: null,
     status: "active",
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
     updatedAt: new Date("2026-09-01T00:00:00.000Z"),

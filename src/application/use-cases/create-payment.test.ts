@@ -27,6 +27,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     minBidIncrement: 100,
     bidDeadline: new Date("2026-10-19T00:00:00Z"),
     paymentDeadlineDays: 3,
+    cascadeDeadlineDays: null,
     status: "closed",
     createdAt: new Date("2026-09-01T00:00:00Z"),
     updatedAt: new Date("2026-10-19T00:00:00Z"),
@@ -108,6 +109,21 @@ class FakePaymentRepo implements PaymentRepository {
     if (!p || p.status !== "pending") return null;
     p.status = "approved";
     return p;
+  }
+  async markExpired(id: string) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return null;
+    p.status = "expired";
+    return p;
+  }
+  async findExpiredPending(now: Date) {
+    return this.payments.filter((p) => p.status === "pending" && p.deadline <= now);
+  }
+  async findExpired() {
+    return this.payments.filter((p) => p.status === "expired");
+  }
+  async findPendingCreatedBefore(cutoff: Date) {
+    return this.payments.filter((p) => p.status === "pending" && p.createdAt <= cutoff);
   }
 }
 

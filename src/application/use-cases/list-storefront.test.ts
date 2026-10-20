@@ -11,6 +11,7 @@ function item(id: string, over: Partial<Item> = {}): Item {
     id, sellerId: "u1", title: `Item ${id}`, description: "texto longo",
     type: "product", imageUrl: null, minInitialBid: 1000, minBidIncrement: 100,
     bidDeadline: new Date("2026-10-10T12:00:00Z"), paymentDeadlineDays: 3,
+    cascadeDeadlineDays: null,
     status: "active", createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-02T00:00:00Z"), ...over,
   };

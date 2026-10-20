@@ -43,6 +43,7 @@ function makeItem(): Item {
     minBidIncrement: 100,
     bidDeadline: new Date("2026-10-19T00:00:00Z"),
     paymentDeadlineDays: 3,
+    cascadeDeadlineDays: null,
     status: "closed",
     createdAt: new Date("2026-09-01T00:00:00Z"),
     updatedAt: new Date("2026-10-19T00:00:00Z"),
@@ -92,6 +93,25 @@ class FakePaymentRepo implements PaymentRepository {
     this.markedApproved.push(id);
     this.payment = { ...this.payment, status: "approved" };
     return this.payment;
+  }
+  async markExpired(id: string) {
+    if (this.payment?.id !== id) return null;
+    if (this.payment.status !== "pending") return null;
+    this.payment = { ...this.payment, status: "expired" };
+    return this.payment;
+  }
+  async findExpiredPending(now: Date) {
+    return this.payment && this.payment.status === "pending" && this.payment.deadline <= now
+      ? [this.payment]
+      : [];
+  }
+  async findExpired() {
+    return this.payment && this.payment.status === "expired" ? [this.payment] : [];
+  }
+  async findPendingCreatedBefore(cutoff: Date) {
+    return this.payment && this.payment.status === "pending" && this.payment.createdAt <= cutoff
+      ? [this.payment]
+      : [];
   }
 }
 

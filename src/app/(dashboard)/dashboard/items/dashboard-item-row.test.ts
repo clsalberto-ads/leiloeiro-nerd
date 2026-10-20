@@ -17,6 +17,7 @@ const ITEM: Item = {
   minBidIncrement: 500,
   bidDeadline: new Date("2026-10-01T12:00:00Z"),
   paymentDeadlineDays: 3,
+  cascadeDeadlineDays: null,
   status: "active",
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-02-01T00:00:00Z"),

@@ -59,4 +59,21 @@ export interface PaymentRepository {
    * perdedor recebe `null` e não tem nada a anunciar.
    */
   markApproved(id: string): Promise<Payment | null>;
+  /**
+   * Vence o pagamento, SÓ SE ele estiver `pending` (o mesmo invariante do
+   * `markApproved`): o cron e o webhook aprovando no mesmo instante são uma
+   * corrida real, e quem perde leva `null` — um pagamento que a MP aprovou
+   * NÃO pode terminar `expired`.
+   */
+  markExpired(id: string): Promise<Payment | null>;
+  /** Pendentes cujo prazo já passou — a fila do cron `verificar-prazos`. */
+  findExpiredPending(now: Date): Promise<Payment[]>;
+  /**
+   * TODOS os pagamentos `expired` do item-um-por-um — matéria-prima da
+   * CASCATA auto-recuperável: cada `expired` sem pagamento na tentativa
+   * seguinte é uma cascata pendente (falhou na hora? o próximo tick refaz).
+   */
+  findExpired(): Promise<Payment[]>;
+  /** Pendentes criados antes do corte — a fila do cron `sincronizar-mp`. */
+  findPendingCreatedBefore(cutoff: Date): Promise<Payment[]>;
 }

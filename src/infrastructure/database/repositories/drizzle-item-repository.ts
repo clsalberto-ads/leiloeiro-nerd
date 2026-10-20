@@ -34,6 +34,7 @@ function toItem(row: ItemRow): Item {
     minBidIncrement: row.minBidIncrement,
     bidDeadline: row.bidDeadline,
     paymentDeadlineDays: row.paymentDeadlineDays,
+    cascadeDeadlineDays: row.cascadeDeadlineDays,
     status: row.status,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

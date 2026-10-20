@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { payments } from "@/infrastructure/database/schema";
 import type {
@@ -110,5 +110,37 @@ export const drizzlePaymentRepository: PaymentRepository = {
       .where(and(eq(payments.id, id), eq(payments.status, "pending")))
       .returning();
     return row ? mapPayment(row) : null;
+  },
+
+  async markExpired(id: string): Promise<Payment | null> {
+    // Mesma transição condicional do markApproved: o cron não pode vencer o
+    // pagamento que o webhook acabou de aprovar.
+    const [row] = await db
+      .update(payments)
+      .set({ status: "expired", updatedAt: new Date() })
+      .where(and(eq(payments.id, id), eq(payments.status, "pending")))
+      .returning();
+    return row ? mapPayment(row) : null;
+  },
+
+  async findExpiredPending(now: Date): Promise<Payment[]> {
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(and(eq(payments.status, "pending"), lte(payments.deadline, now)));
+    return rows.map(mapPayment);
+  },
+
+  async findExpired(): Promise<Payment[]> {
+    const rows = await db.select().from(payments).where(eq(payments.status, "expired"));
+    return rows.map(mapPayment);
+  },
+
+  async findPendingCreatedBefore(cutoff: Date): Promise<Payment[]> {
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(and(eq(payments.status, "pending"), lte(payments.createdAt, cutoff)));
+    return rows.map(mapPayment);
   },
 };

@@ -6,14 +6,19 @@ import { drizzleNotificationRepository } from "@/infrastructure/database/reposit
 import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
 import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
 import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
-import type { CreatePaymentDeps } from "@/application/use-cases/create-payment";
 
 // ponytail: a montagem das dependências do `createPayment` mora AQUI, num
 // módulo SEM "use server" — a action de pagamento e o worker do cron usam
 // ESTA função, e não duas cópias que divergem em silêncio. (Vivia na action,
 // mas arquivo "use server" só pode EXPORTAR actions assíncronas — o build
 // recusa qualquer outra exportação, e o Turbopack pegou.)
-export function createPaymentDeps(): CreatePaymentDeps {
+//
+// SEM anotação de retorno de propósito: o retorno INFERIDO carrega o tipo
+// COMPLETO do drizzleItemRepository (com setStatus e o resto), e é isso que
+// deixa o worker montar o `handlePaymentWebhook` com o mesmo objeto. Uma
+// anotação `: CreatePaymentDeps` estreitaria o tipo para o Pick mínimo e
+// quebraria quem precisa de mais.
+export function createPaymentDeps() {
   return {
     itemRepo: drizzleItemRepository,
     bidRepo: drizzleBidRepository,

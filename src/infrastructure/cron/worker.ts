@@ -1,22 +1,73 @@
 import { Queue, Worker } from "bullmq";
 import { closeExpiredItems } from "@/application/use-cases/close-expired-items";
 import { createPayment } from "@/application/use-cases/create-payment";
+import { verificarPrazos, sincronizarMp } from "@/application/use-cases/verificar-prazos";
+import { handlePaymentWebhook } from "@/application/use-cases/handle-payment-webhook";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
-import { AUCTION_QUEUE, CLOSE_EXPIRED_EVERY_MS } from "./queue";
+import { getMpPayment } from "@/infrastructure/mercado-pago/payments";
+import {
+  AUCTION_QUEUE,
+  CLOSE_EXPIRED_EVERY_MS,
+  VERIFICAR_PRAZOS_EVERY_MS,
+  SINCRONIZAR_MP_EVERY_MS,
+} from "./queue";
 
 const CLOSE_EXPIRED_JOB = "close-expired-items";
+const VERIFICAR_PRAZOS_JOB = "verificar-prazos";
+const SINCRONIZAR_MP_JOB = "sincronizar-mp";
 
 const worker = new Worker(
   AUCTION_QUEUE,
   async (job) => {
+    // Um unico `Date` por execucao: o instante e o mesmo para todos os itens
+    // do lote, independente de quanto o primeiro levou.
+    const now = new Date();
+
+    if (job.name === VERIFICAR_PRAZOS_JOB) {
+      // Cascata + vencimento. `verificarPrazos` ja e best-effort por item.
+      const resultado = await verificarPrazos(createPaymentDeps(), now);
+      if (resultado.expired || resultado.cascaded || resultado.cancelledItems) {
+        console.log(
+          `[worker] verificar-prazos: ${resultado.expired} vencido(s), ` +
+            `${resultado.cascaded} cascata(s), ${resultado.cancelledItems} item(ns) cancelado(s)`,
+        );
+      }
+      return resultado;
+    }
+
+    if (job.name === SINCRONIZAR_MP_JOB) {
+      // Rede de seguranca do webhook: reusa o handler inteiro (que nunca
+      // dispara cascata — o unico gatilho dela e o verificar-prazos).
+      const deps = createPaymentDeps();
+      const resultado = await sincronizarMp(
+        {
+          paymentRepo: deps.paymentRepo,
+          handleWebhook: (mpPaymentId) =>
+            handlePaymentWebhook(
+              {
+                paymentRepo: deps.paymentRepo,
+                itemRepo: deps.itemRepo,
+                notifRepo: deps.notifRepo,
+                getAccessToken: deps.getAccessToken,
+                fetchStatus: { fetchMpPaymentStatus: getMpPayment },
+              },
+              mpPaymentId,
+            ),
+        },
+        now,
+      );
+      if (resultado.checked > 0) {
+        console.log(`[worker] sincronizar-mp: ${resultado.checked} pagamento(ns) reconciliado(s)`);
+      }
+      return resultado;
+    }
+
     if (job.name !== CLOSE_EXPIRED_JOB) {
       console.log(`[worker] processando job "${job.name}":`, job.data);
       return;
     }
-    // Um unico `Date` para todos os itens desta execucao: dois itens que venceram
-    // no mesmo minuto caem no mesmo dia, independente de quanto o UPDATE levou.
-    const now = new Date();
+
     const encerrados = await closeExpiredItems(drizzleItemRepository, now);
     if (encerrados.length > 0) {
       console.log(`[worker] ${encerrados.length} item(ns) expirado(s) encerrado(s): ${encerrados.join(", ")}`);
@@ -65,7 +116,7 @@ async function main(): Promise<void> {
   // ponytail: falha alto e logo, em vez de deixar o BullMQ e o drizzle caírem no
   // `localhost:6379` / no banco local sem dizer nada. O `watch` que este script
   // usava antes tornava isso pior a cada save: reiniciar o worker reexecutava
-  // este `main()`, re-registrava o agendador e escrevia de novo. Um worker que
+  // este `main()`, re-registrava o agendador e escreveu de novo. Um worker que
   // "funciona" apontando para o banco errado é o pior modo de falha possível
   // aqui — ele encerra itens de verdade e reporta sucesso no console.
   const redisUrl = process.env.REDIS_URL;
@@ -80,14 +131,14 @@ async function main(): Promise<void> {
   );
 
   const fila = new Queue(AUCTION_QUEUE, { connection: { url: redisUrl } });
-  await fila.upsertJobScheduler(
-    CLOSE_EXPIRED_JOB,
-    { every: CLOSE_EXPIRED_EVERY_MS },
-    { name: CLOSE_EXPIRED_JOB },
-  );
-  console.log(
-    `[worker] agendado "${CLOSE_EXPIRED_JOB}" a cada ${CLOSE_EXPIRED_EVERY_MS / 1000}s`,
-  );
+  for (const [nome, every] of [
+    [CLOSE_EXPIRED_JOB, CLOSE_EXPIRED_EVERY_MS],
+    [VERIFICAR_PRAZOS_JOB, VERIFICAR_PRAZOS_EVERY_MS],
+    [SINCRONIZAR_MP_JOB, SINCRONIZAR_MP_EVERY_MS],
+  ] as const) {
+    await fila.upsertJobScheduler(nome, { every }, { name: nome });
+    console.log(`[worker] agendado "${nome}" a cada ${every / 1000}s`);
+  }
 
   process.on("SIGTERM", async () => {
     await worker.close();

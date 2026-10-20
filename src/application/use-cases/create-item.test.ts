@@ -43,6 +43,7 @@ class FakeItemRepository implements ItemRepository {
       ...input,
       imageUrl: null,
       paymentDeadlineDays: input.paymentDeadlineDays ?? 3,
+      cascadeDeadlineDays: null,
       status: "draft",
       createdAt: new Date(),
       updatedAt: new Date(),

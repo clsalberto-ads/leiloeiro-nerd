@@ -60,6 +60,26 @@ class FakePaymentRepository implements PaymentRepository {
     payment.updatedAt = new Date("2026-01-01T00:00:00Z");
     return payment;
   }
+
+  async markExpired(id: string): Promise<Payment | null> {
+    const payment = this.payments.find((p) => p.id === id);
+    if (!payment || payment.status !== "pending") return null;
+    payment.status = "expired";
+    payment.updatedAt = new Date("2026-01-01T00:00:00Z");
+    return payment;
+  }
+
+  async findExpiredPending(now: Date): Promise<Payment[]> {
+    return this.payments.filter((p) => p.status === "pending" && p.deadline <= now);
+  }
+
+  async findExpired(): Promise<Payment[]> {
+    return this.payments.filter((p) => p.status === "expired");
+  }
+
+  async findPendingCreatedBefore(cutoff: Date): Promise<Payment[]> {
+    return this.payments.filter((p) => p.status === "pending" && p.createdAt <= cutoff);
+  }
 }
 
 function createPaymentInput(overrides: Partial<CreatePaymentInput> = {}): CreatePaymentInput {

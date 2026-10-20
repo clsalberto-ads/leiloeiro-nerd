@@ -55,6 +55,12 @@ export interface Item {
   minBidIncrement: number;
   bidDeadline: Date;
   paymentDeadlineDays: number;
+  /**
+   * Prazo de cada NOVA cobrança da cascata, em dias (spec §3.5).
+   * Ausente = o cron usa 1 dia (24h). É o prazo DA CASCATA — o inicial
+   * continua sendo `paymentDeadlineDays`.
+   */
+  cascadeDeadlineDays: number | null;
   status: ItemStatus;
   createdAt: Date;
   updatedAt: Date;
