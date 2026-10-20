@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { payments } from "@/infrastructure/database/schema";
 import type {
@@ -28,6 +28,7 @@ export function mapPayment(row: PaymentRow): Payment {
     status: row.status,
     deadline: row.deadline,
     attemptNumber: row.attemptNumber,
+    reminderSentAt: row.reminderSentAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -142,5 +143,32 @@ export const drizzlePaymentRepository: PaymentRepository = {
       .from(payments)
       .where(and(eq(payments.status, "pending"), lte(payments.createdAt, cutoff)));
     return rows.map(mapPayment);
+  },
+
+  async findPendingReminderDue(windowStart: Date, windowEnd: Date): Promise<Payment[]> {
+    // Pendentes que vencem DENTRO da janela e ainda não foram lembrados. O
+    // `reminderSentAt IS NULL` é o que impede o reenvio a cada tick.
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(
+        and(
+          eq(payments.status, "pending"),
+          gte(payments.deadline, windowStart),
+          lte(payments.deadline, windowEnd),
+          isNull(payments.reminderSentAt),
+        ),
+      );
+    return rows.map(mapPayment);
+  },
+
+  async markReminderSent(id: string, at: Date): Promise<Payment | null> {
+    // Reivindicação atômica: só o primeiro tick que chega marca (e envia).
+    const [row] = await db
+      .update(payments)
+      .set({ reminderSentAt: at, updatedAt: at })
+      .where(and(eq(payments.id, id), isNull(payments.reminderSentAt)))
+      .returning();
+    return row ? mapPayment(row) : null;
   },
 };

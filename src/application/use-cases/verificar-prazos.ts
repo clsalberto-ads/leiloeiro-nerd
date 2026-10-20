@@ -5,9 +5,21 @@ import type { NotificationRepository } from "@/domain/repositories/notification-
 import type { UserRepository } from "@/domain/repositories/user-repository";
 import { createPayment, type CreatePaymentDeps } from "./create-payment";
 import { formatBRL } from "@/lib/format-brl";
+import {
+  renderPaymentDueEmail,
+  renderPaymentExpiredEmail,
+} from "@/lib/email-templates";
+import {
+  appBaseUrl,
+  sendEmailBestEffort,
+  type TransactionalEmailClient,
+} from "@/lib/email-client";
 
 /** Prazo de cada nova cobrança da cascata quando o item não define o próprio. */
 export const DEFAULT_CASCADE_DAYS = 1; // 24h (spec §3.5)
+
+/** Janela do lembrete `payment_due`: vence em menos de 24h → avisa uma vez. */
+export const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface VerificarPrazosDeps extends CreatePaymentDeps {
   paymentRepo: PaymentRepository;
@@ -18,6 +30,8 @@ export interface VerificarPrazosDeps extends CreatePaymentDeps {
   itemRepo: Pick<ItemRepository, "findById" | "setStatus">;
   notifRepo: NotificationRepository;
   userRepo: Pick<UserRepository, "findByIds">;
+  /** Opcional: e-mails transacionais best-effort. Ausente = só in-app. */
+  resend?: TransactionalEmailClient | null;
 }
 
 export interface VerificarPrazosResult {
@@ -27,6 +41,8 @@ export interface VerificarPrazosResult {
   cascaded: number;
   /** Itens encerrados por adimplência esgotada (nenhum arrematante pagou). */
   cancelledItems: number;
+  /** Lembretes `payment_due` enviados (um por pagamento, garantido pela coluna). */
+  reminded: number;
 }
 
 /**
@@ -47,7 +63,7 @@ export async function verificarPrazos(
   now: Date = new Date(),
 ): Promise<VerificarPrazosResult> {
   const { paymentRepo, bidRepo, itemRepo, notifRepo } = deps;
-  const result: VerificarPrazosResult = { expired: 0, cascaded: 0, cancelledItems: 0 };
+  const result: VerificarPrazosResult = { expired: 0, cascaded: 0, cancelledItems: 0, reminded: 0 };
 
   // 1. Vence os pendentes com prazo passado.
   const due = await paymentRepo.findExpiredPending(now);
@@ -109,6 +125,65 @@ export async function verificarPrazos(
         });
       } catch (e) {
         console.error("[verificar-prazos] falha ao notificar expiração final:", e);
+      }
+
+      if (deps.resend) {
+        try {
+          const [lastBidder] = await deps.userRepo.findByIds([expired.bidderId]);
+          if (lastBidder?.email) {
+            await sendEmailBestEffort(deps.resend, {
+              to: lastBidder.email,
+              subject: "Prazo de pagamento vencido",
+              html: renderPaymentExpiredEmail({
+                bidderName: lastBidder.name,
+                itemTitle: item.title,
+                amount: expired.amount,
+                paymentUrl: `${appBaseUrl()}/dashboard/payments/${expired.id}`,
+              }),
+            });
+          }
+        } catch (e) {
+          console.error("[verificar-prazos] falha ao enviar e-mail de expiração:", e);
+        }
+      }
+    }
+  }
+
+  // 3. Lembrete `payment_due`: pendentes que vencem nas próximas 24h e ainda
+  //    não foram lembrados. A reivindicação é ATÔMICA (`markReminderSent` com
+  //    WHERE reminder_sent_at IS NULL): dois ticks não enviam dois lembretes.
+  //    O guarda de janela (total >= 24h) exclui as cobranças da CASCATA, que
+  //    nascem com prazo de 24h — o e-mail de chamada delas JÁ é o aviso, e um
+  //    lembrete em cima seria o mesmo e-mail duas vezes.
+  if (deps.resend) {
+    const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_MS);
+    const dueSoon = await paymentRepo.findPendingReminderDue(now, windowEnd);
+    for (const payment of dueSoon) {
+      const totalWindow = payment.deadline.getTime() - payment.createdAt.getTime();
+      // <= (e não <): a cobrança da cascata tem janela de EXATAMENTE 24h
+      // (1 dia) — o teste do lembrete trava esse limite inclusivo.
+      if (totalWindow <= REMINDER_WINDOW_MS) continue; // cascata: já avisada na criação
+      const claimed = await paymentRepo.markReminderSent(payment.id, now);
+      if (!claimed) continue; // outro tick venceu a disputa
+      try {
+        const item = await itemRepo.findById(payment.itemId);
+        const [bidder] = await deps.userRepo.findByIds([payment.bidderId]);
+        if (item && bidder?.email) {
+          await sendEmailBestEffort(deps.resend, {
+            to: bidder.email,
+            subject: "Seu pagamento vence em breve",
+            html: renderPaymentDueEmail({
+              bidderName: bidder.name,
+              itemTitle: item.title,
+              amount: payment.amount,
+              deadline: payment.deadline,
+              paymentUrl: `${appBaseUrl()}/dashboard/payments/${payment.id}`,
+            }),
+          });
+          result.reminded += 1;
+        }
+      } catch (e) {
+        console.error("[verificar-prazos] falha ao enviar lembrete de vencimento:", e);
       }
     }
   }

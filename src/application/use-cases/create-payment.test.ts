@@ -82,6 +82,7 @@ class FakePaymentRepo implements PaymentRepository {
       status: "pending",
       createdAt: NOW,
       updatedAt: NOW,
+      reminderSentAt: null,
     };
     this.payments.push(payment);
     return payment;
@@ -121,6 +122,21 @@ class FakePaymentRepo implements PaymentRepository {
   }
   async findExpired() {
     return this.payments.filter((p) => p.status === "expired");
+  }
+  async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
+    return this.payments.filter(
+      (p) =>
+        p.status === "pending" &&
+        p.reminderSentAt === null &&
+        p.deadline >= windowStart &&
+        p.deadline <= windowEnd,
+    );
+  }
+  async markReminderSent(id: string, at: Date) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.reminderSentAt !== null) return null;
+    p.reminderSentAt = at;
+    return p;
   }
   async findPendingCreatedBefore(cutoff: Date) {
     return this.payments.filter((p) => p.status === "pending" && p.createdAt <= cutoff);

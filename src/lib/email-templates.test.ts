@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderOutbidEmail } from "./email-templates";
+import { renderOutbidEmail, renderPaymentDueEmail, renderPaymentConfirmedEmail, renderPaymentExpiredEmail, renderNextBidderCalledEmail } from "./email-templates";
 
 // ponytail: o e-mail e o UNICO sink do app que nao escapa. `bidderName` e
 // `itemTitle` renderizam por JSX em todo o resto (bid-history, public-item-card,
@@ -51,5 +51,58 @@ describe("renderOutbidEmail", () => {
     const html = renderOutbidEmail({ ...base, itemTitle: "&lt;script&gt;" });
     expect(html).toContain("&amp;lt;script&amp;gt;");
     expect(html).not.toContain("<script>");
+  });
+});
+
+// ponytail: os QUATRO templates de pagamento da Fase 3. Mesmo contrato do
+// outbid: conteúdo pt-BR com dinheiro formatado (centavos → R$ 1.234,56) e
+// ESCAPAGEM dos campos controlados pelo usuário (título do item é do
+// vendedor; nome vem do cadastro). O link de ação é o que muda por template.
+describe("templates de pagamento", () => {
+  const base = {
+    bidderName: "Ana",
+    itemTitle: "Console <b>raro</b>",
+    amount: 10_000,
+    paymentUrl: "http://localhost:3000/dashboard/payments/p1",
+  };
+  const deadline = new Date("2026-10-23T12:00:00Z");
+
+  it("payment_due: avisa prazo e escapa o título", () => {
+    const html = renderPaymentDueEmail({ ...base, deadline });
+    expect(html).toContain("R$ 100,00");
+    expect(html).toContain("23/10");
+    expect(html).toContain("Pagar agora");
+    expect(html).toContain("&lt;b&gt;"); // a forma ESCAPADA é o que sai
+    expect(html).not.toContain("<b>raro</b>");
+  });
+
+  it("payment_confirmed: congratula com valor e link do comprovante", () => {
+    const html = renderPaymentConfirmedEmail(base);
+    expect(html).toContain("Parabéns");
+    expect(html).toContain("R$ 100,00");
+    expect(html).toContain("Ver comprovante");
+    expect(html).toContain(encodeURIComponent("").length === 0 ? "payments/p1" : "payments/p1");
+  });
+
+  it("payment_expired: informa encerramento e escapa o título", () => {
+    const html = renderPaymentExpiredEmail(base);
+    expect(html).toContain("venceu");
+    expect(html).toContain("&lt;b&gt;");
+    expect(html).not.toContain("<b>raro</b>");
+  });
+
+  it("next_bidder_called: 'você está na sequência' com prazo e valor", () => {
+    const html = renderNextBidderCalledEmail({ ...base, deadline });
+    expect(html).toContain("Você está na sequência");
+    expect(html).toContain("R$ 100,00");
+    expect(html).toContain("Pagar o arremate");
+  });
+
+  it("todos escapam o nome do arrematante", () => {
+    const evil = { ...base, bidderName: 'Ana"<script>' };
+    expect(renderPaymentDueEmail({ ...evil, deadline })).not.toContain("<script>");
+    expect(renderPaymentConfirmedEmail(evil)).not.toContain("<script>");
+    expect(renderPaymentExpiredEmail(evil)).not.toContain("<script>");
+    expect(renderNextBidderCalledEmail({ ...evil, deadline })).not.toContain("<script>");
   });
 });

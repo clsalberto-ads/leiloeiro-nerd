@@ -91,6 +91,12 @@ export const payments = pgTable("payments", {
   status: paymentStatusEnum("status").notNull().default("pending"),
   deadline: timestamp("deadline", { withTimezone: true }).notNull(),
   attemptNumber: integer("attempt_number").notNull().default(1),
+  // ponytail: a marca de "lembrete de vencimento JÁ ENVIADO" para este
+  // pagamento. O cron de prazos roda a cada 10min: sem esta coluna, um
+  // pagamento nas últimas 24h de prazo receberia o e-mail `payment_due` 144
+  // vezes. O `markReminderSent` atômico (WHERE reminder_sent_at IS NULL) é
+  // quem garante que só o primeiro tick envia.
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("payments_item_id_idx").on(t.itemId), index("payments_status_deadline_idx").on(t.status, t.deadline)]);

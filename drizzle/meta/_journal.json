@@ -50,6 +50,13 @@
       "when": 1792439999764,
       "tag": "0006_panoramic_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792501019104,
+      "tag": "0007_mushy_scourge",
+      "breakpoints": true
     }
   ]
 }

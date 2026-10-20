@@ -27,6 +27,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     attemptNumber: 1,
     createdAt: new Date("2026-10-20T12:00:00Z"),
     updatedAt: new Date("2026-10-20T12:00:00Z"),
+    reminderSentAt: null,
     ...overrides,
   };
 }
@@ -108,6 +109,23 @@ class FakePaymentRepo implements PaymentRepository {
   async findExpired() {
     return this.payment && this.payment.status === "expired" ? [this.payment] : [];
   }
+  async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
+    if (
+      this.payment &&
+      this.payment.status === "pending" &&
+      this.payment.reminderSentAt === null &&
+      this.payment.deadline >= windowStart &&
+      this.payment.deadline <= windowEnd
+    ) {
+      return [this.payment];
+    }
+    return [];
+  }
+  async markReminderSent(id: string, at: Date) {
+    if (this.payment?.id !== id || this.payment.reminderSentAt !== null) return null;
+    this.payment = { ...this.payment, reminderSentAt: at };
+    return this.payment;
+  }
   async findPendingCreatedBefore(cutoff: Date) {
     return this.payment && this.payment.status === "pending" && this.payment.createdAt <= cutoff
       ? [this.payment]
@@ -174,6 +192,25 @@ function makeDeps(overrides: {
     },
   };
   const getAccessToken = vi.fn(async () => "APP_USR-vendedor");
+  const userRepo = {
+    async findByIds(ids: string[]) {
+      return ids
+        .map((id) =>
+          id === "bidder-1"
+            ? {
+                id,
+                name: "Ana",
+                email: "ana@exemplo.test",
+                phone: null,
+                slug: null,
+                address: null,
+                role: "bidder" as const,
+              }
+            : undefined,
+        )
+        .filter((u): u is NonNullable<typeof u> => Boolean(u));
+    },
+  };
 
   const deps = {
     paymentRepo,
@@ -181,8 +218,9 @@ function makeDeps(overrides: {
     notifRepo,
     getAccessToken,
     fetchStatus,
+    userRepo,
   };
-  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchStatus };
+  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchStatus, userRepo };
 }
 
 describe("handlePaymentWebhook", () => {
@@ -264,6 +302,48 @@ describe("handlePaymentWebhook", () => {
 
   it("falha na notificação não desfaz a aprovação (best-effort)", async () => {
     const ctx = makeDeps({ mpStatus: "approved", notifFail: true });
+
+    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+
+    expect(outcome).toMatchObject({ result: "approved" });
+    expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
+  });
+});
+
+// ponytail: o e-mail `payment_confirmed` é best-effort e OPCIONAL nas deps —
+// estes testes travam que ele É enviado quando o cliente existe, e que a
+// ausência dele não muda NADA no fluxo de aprovação.
+describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
+  function fakeResend() {
+    const sent: Array<{ to: string; subject: string; html: string }> = [];
+    return {
+      sent,
+      emails: {
+        send: async (args: { to: string; subject: string; html: string }) => {
+          sent.push(args);
+          return { data: { id: "email-1" }, error: null };
+        },
+      },
+    };
+  }
+
+  it("aprovado com resend configurado envia o e-mail de confirmação", async () => {
+    const ctx = makeDeps({ mpStatus: "approved" });
+    const resend = fakeResend();
+
+    await handlePaymentWebhook(
+      { ...ctx.deps, resend, userRepo: ctx.deps.userRepo },
+      "mp-123",
+    );
+
+    expect(resend.sent).toHaveLength(1);
+    expect(resend.sent[0]).toMatchObject({ to: "ana@exemplo.test", subject: "Pagamento confirmado!" });
+    expect(resend.sent[0]!.html).toContain("Console raro");
+    expect(resend.sent[0]!.html).toContain("R$ 100,00");
+  });
+
+  it("sem resend o fluxo aprova exatamente igual (e-mail é opcional)", async () => {
+    const ctx = makeDeps({ mpStatus: "approved" });
 
     const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
 

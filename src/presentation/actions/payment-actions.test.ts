@@ -51,6 +51,7 @@ function payment(overrides: Record<string, unknown> = {}) {
     pixCopiaECola: "000201PIX",
     paymentLink: null,
     deadline: new Date("2026-10-23T12:00:00Z"),
+    reminderSentAt: null,
     ...overrides,
   };
 }

@@ -21,6 +21,12 @@ export interface Payment {
   status: PaymentStatus;
   deadline: Date;
   attemptNumber: number;
+  /**
+   * Quando o e-mail `payment_due` (24h antes do vencimento) foi enviado.
+   * `null` = ainda não enviado — é o que o cron consulta e o que
+   * `markReminderSent` reivindica atomicamente.
+   */
+  reminderSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,4 +82,15 @@ export interface PaymentRepository {
   findExpired(): Promise<Payment[]>;
   /** Pendentes criados antes do corte — a fila do cron `sincronizar-mp`. */
   findPendingCreatedBefore(cutoff: Date): Promise<Payment[]>;
+  /**
+   * Pendentes cujo vencimento está dentro da janela (`.guardado pelo cron de
+   * prazos para o lembrete `payment_due`) e que AINDA não receberam lembrete.
+   */
+  findPendingReminderDue(windowStart: Date, windowEnd: Date): Promise<Payment[]>;
+  /**
+   * Marca o lembrete como enviado, SÓ se ainda não estava (`WHERE
+   * reminder_sent_at IS NULL`) — dois ticks do cron disputando o mesmo
+   * pagamento: só o primeiro envia.
+   */
+  markReminderSent(id: string, at: Date): Promise<Payment | null>;
 }

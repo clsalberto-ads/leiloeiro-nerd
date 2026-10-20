@@ -51,6 +51,8 @@ const worker = new Worker(
                 notifRepo: deps.notifRepo,
                 getAccessToken: deps.getAccessToken,
                 fetchStatus: { fetchMpPaymentStatus: getMpPayment },
+                resend: deps.resend,
+                userRepo: deps.userRepo,
               },
               mpPaymentId,
             ),

@@ -66,6 +66,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     attemptNumber: 1,
     createdAt: new Date("2026-10-18T12:00:00Z"),
     updatedAt: new Date("2026-10-18T12:00:00Z"),
+    reminderSentAt: null,
     ...overrides,
   };
 }
@@ -109,6 +110,7 @@ class FakePaymentRepo implements PaymentRepository {
       status: "pending",
       createdAt: NOW,
       updatedAt: NOW,
+      reminderSentAt: null,
     };
     this.payments.push(payment);
     return payment;
@@ -147,6 +149,21 @@ class FakePaymentRepo implements PaymentRepository {
   }
   async findExpired() {
     return this.payments.filter((p) => p.status === "expired");
+  }
+  async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
+    return this.payments.filter(
+      (p) =>
+        p.status === "pending" &&
+        p.reminderSentAt === null &&
+        p.deadline >= windowStart &&
+        p.deadline <= windowEnd,
+    );
+  }
+  async markReminderSent(id: string, at: Date) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.reminderSentAt !== null) return null;
+    p.reminderSentAt = at;
+    return p;
   }
   async findPendingCreatedBefore(cutoff: Date) {
     return this.payments.filter((p) => p.status === "pending" && p.createdAt <= cutoff);
@@ -441,3 +458,86 @@ describe("sincronizarMp — rede de segurança", () => {
 // taxa/pix (o teste acima já valida o resultado; isto evita tree-shake do
 // import no bundle de teste)
 void createPayment;
+
+// ponytail: os E-MAILS do cron. O lembrete `payment_due` é o caso delicado:
+// o cron roda a cada 10min e a coluna `reminder_sent_at` (mais o
+// `markReminderSent` atômico) é o que faz o arrematante receber UM e-mail,
+// e não 144. O guarda de janela exclui cobranças de cascata (nascem com
+// prazo de 24h — o e-mail de chamada já é o aviso).
+describe("verificarPrazos — e-mails", () => {
+  const HOUR = 60 * 60 * 1000;
+
+  function fakeResend() {
+    const sent: Array<{ to: string; subject: string }> = [];
+    return {
+      sent,
+      emails: {
+        send: async (args: { to: string; subject: string }) => {
+          sent.push(args);
+          return { data: { id: "e1" }, error: null };
+        },
+      },
+    };
+  }
+
+  it("pendente com vencimento em <24h e janela longa recebe lembrete payment_due UMA vez", async () => {
+    // criado há 2 dias, vence em 12h: janela de 3 dias > 24h → lembrete
+    const ctx = makeDeps({
+      payments: [
+        makePayment({
+          createdAt: new Date(NOW.getTime() - 2 * DAY),
+          deadline: new Date(NOW.getTime() + 12 * HOUR),
+        }),
+      ],
+    });
+    const resend = fakeResend();
+    const deps = { ...ctx.deps, resend };
+
+    const first = await verificarPrazos(deps, NOW);
+    expect(first.reminded).toBe(1);
+    expect(resend.sent[0]).toMatchObject({ subject: "Seu pagamento vence em breve" });
+
+    // segundo tick: o lembrete JÁ foi enviado (coluna marcada)
+    const second = await verificarPrazos({ ...ctx.deps, resend }, NOW);
+    expect(second.reminded).toBe(0);
+    expect(resend.sent).toHaveLength(1);
+  });
+
+  it("cobrança de cascata (janela de 24h) NÃO recebe lembrete — a chamada já avisou", async () => {
+    const ctx = makeDeps({
+      payments: [
+        makePayment({
+          createdAt: new Date(NOW.getTime() - 1 * HOUR),
+          deadline: new Date(NOW.getTime() + 23 * HOUR), // janela ~24h
+        }),
+      ],
+    });
+    const resend = fakeResend();
+
+    const result = await verificarPrazos({ ...ctx.deps, resend }, NOW);
+
+    expect(result.reminded).toBe(0);
+    expect(resend.sent).toHaveLength(0);
+  });
+
+  it("pendente com vencimento longe (>24h) não recebe lembrete ainda", async () => {
+    const ctx = makeDeps({
+      payments: [makePayment({ deadline: new Date(NOW.getTime() + 3 * DAY) })],
+    });
+    const resend = fakeResend();
+
+    const result = await verificarPrazos({ ...ctx.deps, resend }, NOW);
+
+    expect(result.reminded).toBe(0);
+  });
+
+  it("lances esgotados envia payment_expired por e-mail ao último acionado", async () => {
+    const ctx = makeDeps({ bids: [makeBid()] }); // só o vencedor → esgota
+    const resend = fakeResend();
+
+    await verificarPrazos({ ...ctx.deps, resend }, NOW);
+
+    expect(resend.sent).toHaveLength(1);
+    expect(resend.sent[0]).toMatchObject({ subject: "Prazo de pagamento vencido" });
+  });
+});

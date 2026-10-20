@@ -6,6 +6,7 @@ import { drizzleNotificationRepository } from "@/infrastructure/database/reposit
 import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
 import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
 import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
+import { createResendClient } from "@/infrastructure/email/resend";
 
 // ponytail: a montagem das dependências do `createPayment` mora AQUI, num
 // módulo SEM "use server" — a action de pagamento e o worker do cron usam
@@ -18,6 +19,10 @@ import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-
 // deixa o worker montar o `handlePaymentWebhook` com o mesmo objeto. Uma
 // anotação `: CreatePaymentDeps` estreitaria o tipo para o Pick mínimo e
 // quebraria quem precisa de mais.
+//
+// O `resend` só existe com RESEND_API_KEY no ambiente: o cliente com chave
+// ausente lança no primeiro envio, e "null" é o contrato dos use cases para
+// "pular e-mail e seguir o fluxo".
 export function createPaymentDeps() {
   return {
     itemRepo: drizzleItemRepository,
@@ -28,5 +33,6 @@ export function createPaymentDeps() {
     getAccessToken: (userId: string) =>
       getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
     mpClient: { createPixPayment: createMpPixPayment },
+    resend: process.env.RESEND_API_KEY ? createResendClient() : null,
   };
 }

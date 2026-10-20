@@ -1,7 +1,10 @@
 import type { ItemRepository } from "@/domain/repositories/item-repository";
 import type { Payment, PaymentRepository } from "@/domain/repositories/payment-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
+import type { UserRepository } from "@/domain/repositories/user-repository";
 import { formatBRL } from "@/lib/format-brl";
+import { renderPaymentConfirmedEmail } from "@/lib/email-templates";
+import { appBaseUrl, sendEmailBestEffort, type TransactionalEmailClient } from "@/lib/email-client";
 
 // ponytail: a porta que pergunta À MP qual é o status de verdade. O corpo do
 // webhook só carrega o `id`; o status vem desta consulta, feita com o token
@@ -22,6 +25,9 @@ export interface HandlePaymentWebhookDeps {
   notifRepo: NotificationRepository;
   getAccessToken: SellerAccessTokenProvider;
   fetchStatus: MpStatusFetcher;
+  /** Opcional: e-mail `payment_confirmed` best-effort. Ausente = só in-app. */
+  resend?: TransactionalEmailClient | null;
+  userRepo?: Pick<UserRepository, "findByIds">;
 }
 
 export type WebhookOutcome =
@@ -71,7 +77,7 @@ export async function handlePaymentWebhook(
     await itemRepo.setStatus(payment.itemId, "paid");
 
     // Best-effort: o pagamento já está aprovado; a notificação é o aviso, não
-    // a escrita. (O e-mail payment_confirmed entra na fase de templates.)
+    // a escrita. In-app E e-mail são independentes — um cair não derruba o outro.
     try {
       await notifRepo.create({
         userId: payment.bidderId,
@@ -81,6 +87,26 @@ export async function handlePaymentWebhook(
       });
     } catch (e) {
       console.error("[webhook] falha ao notificar pagamento confirmado:", e);
+    }
+
+    if (deps.resend && deps.userRepo) {
+      try {
+        const [buyer] = await deps.userRepo.findByIds([payment.bidderId]);
+        if (buyer?.email) {
+          await sendEmailBestEffort(deps.resend, {
+            to: buyer.email,
+            subject: "Pagamento confirmado!",
+            html: renderPaymentConfirmedEmail({
+              bidderName: buyer.name,
+              itemTitle: item.title,
+              amount: payment.amount,
+              paymentUrl: `${appBaseUrl()}/dashboard/payments/${payment.id}`,
+            }),
+          });
+        }
+      } catch (e) {
+        console.error("[webhook] falha ao enviar e-mail de pagamento confirmado:", e);
+      }
     }
 
     return { result: "approved", payment: approved };

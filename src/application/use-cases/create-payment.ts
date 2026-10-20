@@ -5,6 +5,8 @@ import type { UserRepository } from "@/domain/repositories/user-repository";
 import type { NotificationRepository } from "@/domain/repositories/notification-repository";
 import { splitPayment } from "@/lib/platform-fee";
 import { formatBRL } from "@/lib/format-brl";
+import { renderNextBidderCalledEmail } from "@/lib/email-templates";
+import { appBaseUrl, sendEmailBestEffort, type TransactionalEmailClient } from "@/lib/email-client";
 
 // ponytail: a PORTA de pagamento do Mercado Pago. A assinatura fala a lingua do
 // use case (centavos), nao da API da MP (reais) — a conversao mora na
@@ -39,6 +41,8 @@ export interface CreatePaymentDeps {
   notifRepo: NotificationRepository;
   getAccessToken: SellerAccessTokenProvider;
   mpClient: MpPaymentClient;
+  /** Opcional: e-mail `next_bidder_called` da cascata. Ausente = só in-app. */
+  resend?: TransactionalEmailClient | null;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -150,7 +154,7 @@ export async function createPayment(
   // Best-effort: o pagamento já existe; avisar o arrematante é importante, mas
   // perder o aviso não desfaz a cobrança nem pode derrubar o job do worker.
   // O caminho da página vai NO TEXTO da notificação — é o destino do
-  // arrematante até a Fase de e-mails.
+  // arrematante nas duas horas seguintes.
   const notifyType = options.notify ?? "won";
   try {
     if (notifyType === "won") {
@@ -170,6 +174,26 @@ export async function createPayment(
     }
   } catch (e) {
     console.error("[create-payment] falha ao notificar o arrematante:", e);
+  }
+
+  // E-mail da CASCATA (o `won` é só in-app — a spec não define template de
+  // vitória). O `payer` já foi consultado para o PIX: o mesmo endereço.
+  if (notifyType === "next_bidder_called" && deps.resend) {
+    try {
+      await sendEmailBestEffort(deps.resend, {
+        to: payer.email,
+        subject: "Você foi chamado para pagar um item!",
+        html: renderNextBidderCalledEmail({
+          bidderName: payer.name,
+          itemTitle: item.title,
+          amount: winner.amount,
+          deadline,
+          paymentUrl: `${appBaseUrl()}/dashboard/payments/${payment.id}`,
+        }),
+      });
+    } catch (e) {
+      console.error("[create-payment] falha ao enviar e-mail da cascata:", e);
+    }
   }
 
   return payment;

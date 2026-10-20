@@ -6,6 +6,8 @@ import { drizzleItemRepository } from "@/infrastructure/database/repositories/dr
 import { drizzlePaymentRepository } from "@/infrastructure/database/repositories/drizzle-payment-repository";
 import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
 import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
+import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
+import { createResendClient } from "@/infrastructure/email/resend";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +65,8 @@ export async function POST(request: Request): Promise<Response> {
         getAccessToken: (userId) =>
           getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
         fetchStatus: { fetchMpPaymentStatus: getMpPayment },
+        resend: process.env.RESEND_API_KEY ? createResendClient() : null,
+        userRepo: drizzleUserRepository,
       },
       String(dataId),
     );
