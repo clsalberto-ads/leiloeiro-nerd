@@ -88,6 +88,9 @@ class FakePaymentRepo implements PaymentRepository {
   async findById(id: string) {
     return this.payments.find((p) => p.id === id) ?? null;
   }
+  async findByMpPaymentId(mpPaymentId: string) {
+    return this.payments.find((p) => p.mpPaymentId === mpPaymentId) ?? null;
+  }
   async findByItemId(itemId: string) {
     return this.payments.filter((p) => p.itemId === itemId);
   }
@@ -98,6 +101,12 @@ class FakePaymentRepo implements PaymentRepository {
     const p = this.payments.find((x) => x.id === id);
     if (!p) return null;
     p.status = "cancelled";
+    return p;
+  }
+  async markApproved(id: string) {
+    const p = this.payments.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return null;
+    p.status = "approved";
     return p;
   }
 }

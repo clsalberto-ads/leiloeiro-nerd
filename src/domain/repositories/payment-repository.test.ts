@@ -31,6 +31,10 @@ class FakePaymentRepository implements PaymentRepository {
     return this.payments.find((p) => p.id === id) ?? null;
   }
 
+  async findByMpPaymentId(mpPaymentId: string): Promise<Payment | null> {
+    return this.payments.find((p) => p.mpPaymentId === mpPaymentId) ?? null;
+  }
+
   async findByItemId(itemId: string): Promise<Payment[]> {
     return this.payments.filter((p) => p.itemId === itemId);
   }
@@ -45,6 +49,14 @@ class FakePaymentRepository implements PaymentRepository {
       return null;
     }
     payment.status = "cancelled";
+    payment.updatedAt = new Date("2026-01-01T00:00:00Z");
+    return payment;
+  }
+
+  async markApproved(id: string): Promise<Payment | null> {
+    const payment = this.payments.find((p) => p.id === id);
+    if (!payment || payment.status !== "pending") return null;
+    payment.status = "approved";
     payment.updatedAt = new Date("2026-01-01T00:00:00Z");
     return payment;
   }

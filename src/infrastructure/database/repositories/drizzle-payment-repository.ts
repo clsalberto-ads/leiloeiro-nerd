@@ -65,6 +65,15 @@ export const drizzlePaymentRepository: PaymentRepository = {
     return row ? mapPayment(row) : null;
   },
 
+  async findByMpPaymentId(mpPaymentId: string): Promise<Payment | null> {
+    const [row] = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.mpPaymentId, mpPaymentId))
+      .limit(1);
+    return row ? mapPayment(row) : null;
+  },
+
   async findByItemId(itemId: string): Promise<Payment[]> {
     const rows = await db
       .select()
@@ -87,6 +96,18 @@ export const drizzlePaymentRepository: PaymentRepository = {
       .update(payments)
       .set({ status: "cancelled", updatedAt: new Date() })
       .where(eq(payments.id, id))
+      .returning();
+    return row ? mapPayment(row) : null;
+  },
+
+  async markApproved(id: string): Promise<Payment | null> {
+    // Transição ÚNICA pending → approved: só quem muda devolve a linha
+    // (ver o contrato no `PaymentRepository.markApproved`). O `status` no
+    // SET usa `as const` implícito do enum do drizzle.
+    const [row] = await db
+      .update(payments)
+      .set({ status: "approved", updatedAt: new Date() })
+      .where(and(eq(payments.id, id), eq(payments.status, "pending")))
       .returning();
     return row ? mapPayment(row) : null;
   },
