@@ -363,13 +363,15 @@ src/
 - [x] Componente de countdown para `bidDeadline`
 
 ### 🟠 Fase 3 — Pagamentos e Automação (Semanas 6–8)
-- [ ] Integração Mercado Pago (PIX + Link)
-- [ ] Página de pagamento com QR Code
-- [ ] Webhook de confirmação de pagamento
-- [ ] Cron job: encerramento de leilões
-- [ ] Cron job: verificação de prazos de pagamento
-- [ ] Lógica de cascata (2º, 3º lugar...)
-- [ ] E-mails transacionais (Resend)
+- [x] Integração Mercado Pago (PIX via Payments API, modelo marketplace: token OAuth do vendedor + `application_fee` de 5% da plataforma)
+- [x] Conexão da conta Mercado Pago do leiloeiro (OAuth em `/dashboard/settings`, com callback em `/api/mercadopago/callback`)
+- [x] Página de pagamento com QR Code (`/dashboard/payments/[id]`: QR + copia-e-cola + countdown + polling 10s local)
+- [x] Webhook de confirmação de pagamento (`/api/webhooks/mercadopago`: assinatura HMAC `x-signature` + idempotência por `mpPaymentId` + transição atômica `pending→approved` → item `paid`)
+- [x] Cron job: encerramento de leilões (`close-expired-items`, 60s — gera a cobrança do vencedor no mesmo ciclo)
+- [x] Cron job: verificação de prazos de pagamento (`verificar-prazos`, 10min — vencimento + cascata + lembrete `payment_due` 24h antes)
+- [x] Cron job: sincronização com a MP (`sincronizar-mp`, 15min — rede de segurança do webhook)
+- [x] Lógica de cascata (próximo maior lance sem tentativa anterior → nova cobrança com a mesma taxa; esgotou lances → item `cancelled`; auto-recuperável a cada tick)
+- [x] E-mails transacionais (Resend: `payment_due` com deduplicação por `reminder_sent_at`, `payment_confirmed`, `payment_expired`, `next_bidder_called` — todos best-effort)
 
 ### 🔴 Fase 4 — Refinamento e Lançamento (Semanas 9–10)
 - [ ] Dashboard completo (leiloeiro + arrematante)
@@ -393,10 +395,13 @@ DATABASE_URL=postgresql://user:password@host:5432/leiloeironerd
 BETTER_AUTH_SECRET=your-secret-here
 BETTER_AUTH_URL=https://leiloeironerd.com
 
-# Mercado Pago
+# Mercado Pago — plataforma (webhook) e OAuth marketplace (vendedores)
 MERCADO_PAGO_ACCESS_TOKEN=TEST-xxxx
 MERCADO_PAGO_PUBLIC_KEY=TEST-xxxx
 MERCADO_PAGO_WEBHOOK_SECRET=xxxx
+MERCADO_PAGO_CLIENT_ID=xxxx
+MERCADO_PAGO_CLIENT_SECRET=xxxx
+MERCADO_PAGO_REDIRECT_URI=http://localhost:3000/api/mercadopago/callback
 
 # Resend
 RESEND_API_KEY=re_xxxx
