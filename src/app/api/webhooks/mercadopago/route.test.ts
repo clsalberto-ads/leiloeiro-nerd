@@ -10,6 +10,7 @@ vi.mock("@/application/use-cases/handle-payment-webhook", () => ({
 }));
 
 import { POST } from "./route";
+import { resetRateLimits } from "@/lib/rate-limit";
 
 const SECRET = "segredo-do-webhook";
 
@@ -31,6 +32,7 @@ const VALID_BODY = JSON.stringify({ type: "payment", data: { id: "123456" } });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetRateLimits();
   process.env.MERCADO_PAGO_WEBHOOK_SECRET = SECRET;
   mocks.handlePaymentWebhook.mockResolvedValue({ result: "ignored", reason: "payment-not-found" });
 });
@@ -93,5 +95,26 @@ describe("POST /api/webhooks/mercadopago", () => {
     );
 
     expect(res.status).toBe(200);
+  });
+});
+
+// ponytail: o teto de 100/min por IP (spec §3.7). A assinatura é válida —
+// o que se prova aqui é que VOLUME é recusado antes de processar.
+describe("rate limit do webhook", () => {
+  it("excedendo 100 req/min por IP, a 101ª responde 429 sem processar", async () => {
+    mocks.handlePaymentWebhook.mockClear();
+    // 100 chamadas legítimas (corpo e assinatura válidos)
+    for (let i = 0; i < 100; i += 1) {
+      const res = await POST(
+        makeRequest(VALID_BODY, { "x-signature": signatureFor(VALID_BODY, "123456", SECRET) }),
+      );
+      expect(res.status).toBe(200);
+    }
+    // a 101ª: recusada pelo teto
+    const res = await POST(
+      makeRequest(VALID_BODY, { "x-signature": signatureFor(VALID_BODY, "123456", SECRET) }),
+    );
+    expect(res.status).toBe(429);
+    expect(mocks.handlePaymentWebhook).toHaveBeenCalledTimes(100);
   });
 });

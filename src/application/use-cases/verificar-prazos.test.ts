@@ -147,8 +147,8 @@ class FakePaymentRepo implements PaymentRepository {
   async findExpiredPending(now: Date) {
     return this.payments.filter((p) => p.status === "pending" && p.deadline <= now);
   }
-  async findExpired() {
-    return this.payments.filter((p) => p.status === "expired");
+  async findCascadeCandidates() {
+    return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     return this.payments.filter(
@@ -539,5 +539,55 @@ describe("verificarPrazos — e-mails", () => {
 
     expect(resend.sent).toHaveLength(1);
     expect(resend.sent[0]).toMatchObject({ subject: "Prazo de pagamento vencido" });
+  });
+});
+
+// ponytail: o cancelamento ERA um beco sem saída — a versão que só via
+// `expired` deixava o item `closed` para sempre. Estes testes travam que
+// desistir da cobrança chama o próximo (e esgotando, encerra o item).
+describe("verificarPrazos — cancelamento dispara cascata", () => {
+  it("cobrança CANCELADA pelo arrematante chama o próximo da fila", async () => {
+    const ctx = makeDeps({
+      payments: [
+        makePayment({ id: "p1", bidderId: "bidder-1", status: "cancelled" as PaymentStatus }),
+      ],
+    });
+
+    const result = await verificarPrazos(ctx.deps, NOW);
+
+    expect(result.cascaded).toBe(1);
+    expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toMatchObject({
+      bidderId: "bidder-2",
+    });
+  });
+
+  it("cancelada sem mais lances: item cancelled + payment_expired ao último", async () => {
+    const ctx = makeDeps({
+      bids: [makeBid()], // só o vencedor
+      payments: [
+        makePayment({ status: "cancelled" as PaymentStatus }),
+      ],
+    });
+
+    const result = await verificarPrazos(ctx.deps, NOW);
+
+    expect(result.cascaded).toBe(0);
+    expect(result.cancelledItems).toBe(1);
+    expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "cancelled" }]);
+  });
+
+  it("cobrança APROVADA nunca é candidata de cascata (nem REFUNDED)", async () => {
+    const ctx = makeDeps({
+      payments: [
+        makePayment({ status: "approved" as PaymentStatus }),
+        makePayment({ id: "p2", status: "refunded" as PaymentStatus }),
+      ],
+    });
+
+    const result = await verificarPrazos(ctx.deps, NOW);
+
+    expect(result.cascaded).toBe(0);
+    expect(result.cancelledItems).toBe(0);
+    expect(ctx.itemRepo.statuses).toEqual([]);
   });
 });

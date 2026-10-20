@@ -74,8 +74,9 @@ class FakePaymentRepository implements PaymentRepository {
     return this.payments.filter((p) => p.status === "pending" && p.deadline <= now);
   }
 
-  async findExpired(): Promise<Payment[]> {
-    return this.payments.filter((p) => p.status === "expired");
+  async findCascadeCandidates(): Promise<Payment[]> {
+    // expired OU cancelled quebram a cadeia (ver o contrato no domínio)
+    return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
 
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {

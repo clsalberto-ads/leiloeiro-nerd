@@ -78,26 +78,26 @@ export async function verificarPrazos(
   }
 
   // 2. Cascata sobre TODO `expired` cuja tentativa seguinte ainda não existe.
-  const expiredPayments = await paymentRepo.findExpired();
-  for (const expired of expiredPayments) {
-    const nextAttempt = expired.attemptNumber + 1;
+  const chainBroken = await paymentRepo.findCascadeCandidates();
+  for (const broken of chainBroken) {
+    const nextAttempt = broken.attemptNumber + 1;
     // já existe a próxima cobrança? a cascata deste pagamento já ocorreu
-    if (await paymentRepo.findByChainIndex(expired.itemId, nextAttempt)) continue;
+    if (await paymentRepo.findByChainIndex(broken.itemId, nextAttempt)) continue;
 
-    const item = await itemRepo.findById(expired.itemId);
+    const item = await itemRepo.findById(broken.itemId);
     // item sumido, já pago ou já cancelado: nada a fazer
     if (!item || item.status === "paid" || item.status === "cancelled") continue;
 
     const attempted = new Set(
-      (await paymentRepo.findByItemId(expired.itemId)).map((p) => p.bidderId),
+      (await paymentRepo.findByItemId(broken.itemId)).map((p) => p.bidderId),
     );
-    const bids = await bidRepo.findByItemId(expired.itemId);
+    const bids = await bidRepo.findByItemId(broken.itemId);
     // o próximo da fila: maior lance de quem AINDA não teve tentativa
     const next = bids.find((b) => !attempted.has(b.bidderId));
 
     if (next) {
       try {
-        await createPayment(deps, expired.itemId, now, {
+        await createPayment(deps, broken.itemId, now, {
           target: { bidderId: next.bidderId, bidId: next.id, attemptNumber: nextAttempt },
           deadlineDays: item.cascadeDeadlineDays ?? DEFAULT_CASCADE_DAYS,
           notify: "next_bidder_called",
@@ -107,21 +107,21 @@ export async function verificarPrazos(
         // best-effort por item: a falha de UM não trava os outros, e o
         // próximo tick refaz (o `expired` continua sem a próxima tentativa).
         console.error(
-          `[verificar-prazos] falha ao gerar cobranca da cascata do item ${expired.itemId} (tentativa ${nextAttempt}):`,
+          `[verificar-prazos] falha ao gerar cobranca da cascata do item ${broken.itemId} (tentativa ${nextAttempt}):`,
           e,
         );
       }
     } else {
       // Lances esgotados: status-fim explícito da spec — nenhum arrematante
       // validou pagamento. O item é cancelado e o ÚLTIMO acionado é avisado.
-      await itemRepo.setStatus(expired.itemId, "cancelled");
+      await itemRepo.setStatus(broken.itemId, "cancelled");
       result.cancelledItems += 1;
       try {
         await notifRepo.create({
-          userId: expired.bidderId,
+          userId: broken.bidderId,
           type: "payment_expired",
           title: "Prazo de pagamento vencido",
-          content: `Seu prazo para pagar R$ ${formatBRL(expired.amount)} pelo item "${item.title}" venceu e a sua cobrança foi encerrada.`,
+          content: `Seu prazo para pagar R$ ${formatBRL(broken.amount)} pelo item "${item.title}" venceu e a sua cobrança foi encerrada.`,
         });
       } catch (e) {
         console.error("[verificar-prazos] falha ao notificar expiração final:", e);
@@ -129,7 +129,7 @@ export async function verificarPrazos(
 
       if (deps.resend) {
         try {
-          const [lastBidder] = await deps.userRepo.findByIds([expired.bidderId]);
+          const [lastBidder] = await deps.userRepo.findByIds([broken.bidderId]);
           if (lastBidder?.email) {
             await sendEmailBestEffort(deps.resend, {
               to: lastBidder.email,
@@ -137,8 +137,8 @@ export async function verificarPrazos(
               html: renderPaymentExpiredEmail({
                 bidderName: lastBidder.name,
                 itemTitle: item.title,
-                amount: expired.amount,
-                paymentUrl: `${appBaseUrl()}/dashboard/payments/${expired.id}`,
+                amount: broken.amount,
+                paymentUrl: `${appBaseUrl()}/dashboard/payments/${broken.id}`,
               }),
             });
           }

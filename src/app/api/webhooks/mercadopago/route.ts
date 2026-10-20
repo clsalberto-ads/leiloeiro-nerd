@@ -8,8 +8,16 @@ import { drizzleNotificationRepository } from "@/infrastructure/database/reposit
 import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
 import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
 import { createResendClient } from "@/infrastructure/email/resend";
+import { isRateLimited } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+// ponytail: rate limit do webhook (spec §3.7: 100 req/min por IP). A MP
+// reenvia com backoff — 100/min é folga para o retry deles e teto curto para
+// qualquer martelada. O mesmo limitador deslizante do /api/chat; recusas não
+// estendem a janela.
+const WEBHOOK_RATE_LIMIT = 100;
+const WEBHOOK_RATE_WINDOW_MS = 60_000;
 
 // ponytail: o webhook é a ÚNICA entrada da MP no sistema — pública, assinada
 // e idempotente. A ordem dos filtros importa:
@@ -21,6 +29,14 @@ export const dynamic = "force-dynamic";
 //      Pagamento inexistente/ignorado é 200: sucesso de PROTOCOLO, e o
 //      reprocessamento não vai mudar o resultado (idempotência do use case).
 export async function POST(request: Request): Promise<Response> {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+  if (isRateLimited(`mp-webhook:${ip}`, WEBHOOK_RATE_LIMIT, WEBHOOK_RATE_WINDOW_MS)) {
+    return Response.json({ error: "Muitas requisições." }, { status: 429 });
+  }
+
   const rawBody = await request.text();
 
   let body: { type?: unknown; data?: { id?: unknown } };

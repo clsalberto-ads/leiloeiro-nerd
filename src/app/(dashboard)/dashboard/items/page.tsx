@@ -67,7 +67,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
     params.cobranca === "gerada"
       ? "Cobrança gerada para o arrematante vencedor."
       : params.cobranca === "erro"
-        ? "Não foi possível gerar a cobrança — verifique sua conta Mercado Pago nas configurações."
+        ? "Não foi possível gerar a cobrança — confira se o item teve lances e sua conta Mercado Pago nas configurações."
         : null;
   const { items, total } = await listSellerItems(
     drizzleItemRepository,

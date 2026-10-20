@@ -106,8 +106,10 @@ class FakePaymentRepo implements PaymentRepository {
       ? [this.payment]
       : [];
   }
-  async findExpired() {
-    return this.payment && this.payment.status === "expired" ? [this.payment] : [];
+  async findCascadeCandidates() {
+    return this.payment && (this.payment.status === "expired" || this.payment.status === "cancelled")
+      ? [this.payment]
+      : [];
   }
   async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
     if (

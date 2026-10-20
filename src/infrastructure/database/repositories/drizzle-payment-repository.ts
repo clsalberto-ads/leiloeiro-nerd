@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { payments } from "@/infrastructure/database/schema";
 import type {
@@ -132,8 +132,13 @@ export const drizzlePaymentRepository: PaymentRepository = {
     return rows.map(mapPayment);
   },
 
-  async findExpired(): Promise<Payment[]> {
-    const rows = await db.select().from(payments).where(eq(payments.status, "expired"));
+  async findCascadeCandidates(): Promise<Payment[]> {
+    // A cadeia quebrou por EXPIRAÇÃO ou por CANCELAMENTO — os dois caminhos
+    // chamam o próximo da fila (ver o contrato no domínio).
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(inArray(payments.status, ["expired", "cancelled"]));
     return rows.map(mapPayment);
   },
 

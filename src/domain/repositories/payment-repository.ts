@@ -75,11 +75,19 @@ export interface PaymentRepository {
   /** Pendentes cujo prazo já passou — a fila do cron `verificar-prazos`. */
   findExpiredPending(now: Date): Promise<Payment[]>;
   /**
-   * TODOS os pagamentos `expired` do item-um-por-um — matéria-prima da
-   * CASCATA auto-recuperável: cada `expired` sem pagamento na tentativa
+   * Pagamentos que QUEBRARAM a cadeia — `expired` OU `cancelled` — matéria-
+   * -prima da CASCATA auto-recuperável: cada um sem pagamento na tentativa
    * seguinte é uma cascata pendente (falhou na hora? o próximo tick refaz).
+   *
+   * ponytail: `cancelled` ESTÁ aqui de propósito. O arrematante que cancela a
+   * própria cobrança (ou a MP recusa) desistiu EXPLICITAMENTE — é ainda mais
+   * motivo para chamar o próximo da fila do que o vencimento. A versão que só
+   * via `expired` deixava o item `closed` PARA SEMPRE: cancelado não expira,
+   * `findExpiredPending` não o via, e nem os próximos lances eram chamados
+   * nem o item era encerrado. `refunded` fica DE FORA: reembolso é fluxo de
+   * admin, com dinheiro que voltou — não é desistência de arrematante.
    */
-  findExpired(): Promise<Payment[]>;
+  findCascadeCandidates(): Promise<Payment[]>;
   /** Pendentes criados antes do corte — a fila do cron `sincronizar-mp`. */
   findPendingCreatedBefore(cutoff: Date): Promise<Payment[]>;
   /**
