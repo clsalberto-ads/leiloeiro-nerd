@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { decryptToken, encryptToken } from "@/infrastructure/mercado-pago/token-cipher";
 import { db } from "@/infrastructure/database/drizzle";
 import { mpSellerAccounts } from "@/infrastructure/database/schema";
 import type {
@@ -51,7 +52,15 @@ export const drizzleMpSellerAccountRepository: MpSellerAccountRepository = {
       .from(mpSellerAccounts)
       .where(eq(mpSellerAccounts.userId, userId))
       .limit(1);
-    return row ?? null;
+    if (!row) return null;
+    // ponytail: a cifra mora NO REPOSITÓRIO — o domínio e os use cases seguem
+    // vendo o token limpo; para eles nada mudou. O refresh junto porque ele
+    // fabrica tokens NOVOS (vale tanto quanto o access).
+    return {
+      accessToken: decryptToken(row.accessToken),
+      refreshToken: row.refreshToken === null ? null : decryptToken(row.refreshToken),
+      tokenExpiresAt: row.tokenExpiresAt,
+    };
   },
 
   async upsert(input: UpsertMpSellerAccountInput) {
@@ -61,8 +70,8 @@ export const drizzleMpSellerAccountRepository: MpSellerAccountRepository = {
       .insert(mpSellerAccounts)
       .values({
         userId: input.userId,
-        accessToken: input.accessToken,
-        refreshToken: input.refreshToken,
+        accessToken: encryptToken(input.accessToken),
+        refreshToken: input.refreshToken === null ? null : encryptToken(input.refreshToken),
         mpUserId: input.mpUserId,
         tokenExpiresAt: input.tokenExpiresAt,
         connectedAt: new Date(),
@@ -71,8 +80,8 @@ export const drizzleMpSellerAccountRepository: MpSellerAccountRepository = {
       .onConflictDoUpdate({
         target: mpSellerAccounts.userId,
         set: {
-          accessToken: input.accessToken,
-          refreshToken: input.refreshToken,
+          accessToken: encryptToken(input.accessToken),
+          refreshToken: input.refreshToken === null ? null : encryptToken(input.refreshToken),
           mpUserId: input.mpUserId,
           tokenExpiresAt: input.tokenExpiresAt,
           connectedAt: new Date(),
