@@ -1,33 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
-import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
 import { drizzlePaymentRepository } from "@/infrastructure/database/repositories/drizzle-payment-repository";
-import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
-import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
-import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
-import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
-import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
+import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
 import { createPayment } from "@/application/use-cases/create-payment";
 import { isUuid } from "@/lib/uuid";
 import { toActionError } from "@/lib/action-error";
-
-// ponytail: a ligação das actions de pagamento com as portas de infraestrutura
-// mora AQUI (e na action de status), num único lugar — o worker usa as MESMAS
-// dependências para não haver duas montagens divergindo em silêncio.
-export function createPaymentDeps() {
-  return {
-    itemRepo: drizzleItemRepository,
-    bidRepo: drizzleBidRepository,
-    paymentRepo: drizzlePaymentRepository,
-    userRepo: drizzleUserRepository,
-    notifRepo: drizzleNotificationRepository,
-    getAccessToken: (userId: string) =>
-      getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
-    mpClient: { createPixPayment: createMpPixPayment },
-  };
-}
 
 export type PaymentActionResult = { ok?: boolean; error?: string };
 
@@ -121,4 +102,41 @@ export async function cancelPaymentAction(paymentId: string): Promise<PaymentAct
   const updated = await drizzlePaymentRepository.markCancelled(paymentId);
   if (!updated) return { error: "Não foi possível cancelar o pagamento." };
   return { ok: true };
+}
+
+// ponytail: as duas variantes de FORMULÁRIO traduzem o id do FormData e
+// redirecionam, porque os formulários do dashboard (dropdown da lista de
+// itens, página de pagamento) navegam — quem devolve `{ ok }` para um
+// `<form action>` sem useActionState tem o resultado engolido pelo navegador.
+// O parâmetro de flash (`?cobranca=`) é o FECHADO de propósito: só `gerada`
+// e `erro` existem, e a mensagem da tela é fixa — query string nunca vira
+// texto livre na página.
+const DASHBOARD_ITEMS_PATH = "/dashboard/items";
+
+export async function createPaymentFormAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<void> {
+  const itemId = String(formData.get("itemId") ?? "");
+  const result = await createPaymentAction(itemId);
+  if (result.ok) {
+    revalidatePath(DASHBOARD_ITEMS_PATH);
+    redirect(`${DASHBOARD_ITEMS_PATH}?cobranca=gerada`);
+  }
+  revalidatePath(DASHBOARD_ITEMS_PATH);
+  redirect(`${DASHBOARD_ITEMS_PATH}?cobranca=erro`);
+}
+
+export async function cancelPaymentFormAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<void> {
+  const paymentId = String(formData.get("paymentId") ?? "");
+  // O resultado decide nada aqui DE PROPÓSITO: o destino é a MESMA página,
+  // que re-renderiza o estado atual (`cancelled` ou o erro visível do porquê
+  // não cancelou — ex.: já aprovado). Cancelar com feedback é o estado, não
+  // uma mensagem.
+  await cancelPaymentAction(paymentId);
+  revalidatePath(`/dashboard/payments/${paymentId}`);
+  redirect(`/dashboard/payments/${paymentId}`);
 }

@@ -110,12 +110,14 @@ export async function createPayment(
 
   // Best-effort: o pagamento já existe; avisar o arrematante é importante, mas
   // perder o aviso não desfaz a cobrança nem pode derrubar o job do worker.
+  // O caminho da página vai NO TEXTO da notificação — é o único destino do
+  // arrematante até a Fase de e-mails, e a notificação é onde ele chega.
   try {
     await notifRepo.create({
       userId: winner.bidderId,
       type: "won",
       title: "Você arrematou um item!",
-      content: `Parabéns! Você venceu o leilão de "${item.title}" com R$ ${formatBRL(winner.amount)}. Pague até ${deadline.toLocaleDateString("pt-BR")} na página do pagamento.`,
+      content: `Parabéns! Você venceu o leilão de "${item.title}" com R$ ${formatBRL(winner.amount)}. Pague até ${deadline.toLocaleDateString("pt-BR")} em /dashboard/payments/${payment.id}`,
     });
   } catch (e) {
     console.error("[create-payment] falha ao notificar o arrematante vencedor:", e);

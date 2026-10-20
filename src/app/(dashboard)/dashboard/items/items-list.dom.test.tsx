@@ -433,15 +433,21 @@ describe("ItemsList — as acoes por status", () => {
     ]);
   });
 
-  it("oferece Cancelar num item em leilao e num encerrado", async () => {
+  it("oferece Cancelar num item em leilao; Cancelar e Gerar cobrança num encerrado", async () => {
     renderList({ items: [CONSOLE, SERVICO] });
 
     fireEvent.click(actionsFrom("Console retrô"));
     expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Cancelar"]);
     fireEvent.keyDown(actionsFrom("Console retrô"), { key: "Escape" });
 
+    // ponytail: "Gerar cobrança" só existe no encerrado — é o resgate manual
+    // da cobrança do arremate (o worker gera no automático; o vendedor
+    // recupera por aqui quando conectou a conta MP depois do encerramento).
     fireEvent.click(actionsFrom("Serviço de reparo"));
-    expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Cancelar"]);
+    expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+      "Cancelar",
+      "Gerar cobrança",
+    ]);
   });
 
   it("nao oferece nenhuma acao num item cancelado", () => {

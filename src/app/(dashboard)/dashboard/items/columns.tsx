@@ -16,6 +16,7 @@ import {
 import { formatBRL } from "@/lib/format-brl";
 import { APP_TIMEZONE } from "@/lib/timezone";
 import { cancelItemAction, deleteItemAction, publishItemAction } from "@/presentation/actions/item-actions";
+import { createPaymentFormAction } from "@/presentation/actions/payment-actions";
 import type { DashboardItemRow } from "./dashboard-item-row";
 
 // ponytail: as colunas moram no proprio arquivo porque e assim que o guia de
@@ -33,6 +34,7 @@ type ItemFormAction = (formData: FormData) => void | Promise<void>;
 const publishItemFormAction: ItemFormAction = publishItemAction.bind(null, null) as unknown as ItemFormAction;
 const deleteItemFormAction: ItemFormAction = deleteItemAction.bind(null, null) as unknown as ItemFormAction;
 const cancelItemFormAction: ItemFormAction = cancelItemAction.bind(null, null) as unknown as ItemFormAction;
+const createPaymentActionBound: ItemFormAction = createPaymentFormAction.bind(null, null) as unknown as ItemFormAction;
 
 // ponytail: o `<form>` fica FORA do menu e o item do menu e que dispara o
 // `requestSubmit`. Com o form DENTRO do item, o clique fecharia o menu (o base-ui
@@ -50,6 +52,7 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
   const refPublicar = useRef<HTMLFormElement>(null);
   const refExcluir = useRef<HTMLFormElement>(null);
   const refCancelar = useRef<HTMLFormElement>(null);
+  const refCobranca = useRef<HTMLFormElement>(null);
 
   // ponytail: quem pode o quê e a mesma regra da lista antiga em `<li>`: rascunho
   // publica e exclui; em leilao e encerrado, cancela. Item pago, aguardando
@@ -58,7 +61,12 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
   const canPublish = item.status === "draft";
   const canDelete = item.status === "draft";
   const canCancel = item.status === "active" || item.status === "closed";
-  if (!canPublish && !canDelete && !canCancel) return null;
+  // ponytail: "Gerar cobrança" é o resgate MANUAL do worker — vendedor
+  // conectou a conta MP depois do encerramento, ou a geração automática
+  // falhou. O use case é idempotente: clicar de novo devolve a cobrança
+  // existente em vez de cobrar duas vezes.
+  const canCharge = item.status === "closed";
+  if (!canPublish && !canDelete && !canCancel && !canCharge) return null;
 
   return (
     <>
@@ -75,6 +83,11 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
       {canCancel ? (
         <form ref={refCancelar} action={cancelItemFormAction} hidden>
           <input type="hidden" name="id" value={item.id} />
+        </form>
+      ) : null}
+      {canCharge ? (
+        <form ref={refCobranca} action={createPaymentActionBound} hidden>
+          <input type="hidden" name="itemId" value={item.id} />
         </form>
       ) : null}
       <DropdownMenu>
@@ -96,6 +109,11 @@ function ItemActions({ item }: { item: DashboardItemRow }) {
           {canCancel ? (
             <DropdownMenuItem variant="destructive" onClick={() => refCancelar.current?.requestSubmit()}>
               Cancelar
+            </DropdownMenuItem>
+          ) : null}
+          {canCharge ? (
+            <DropdownMenuItem onClick={() => refCobranca.current?.requestSubmit()}>
+              Gerar cobrança
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>

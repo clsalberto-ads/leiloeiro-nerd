@@ -60,6 +60,15 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
 
   const params = await searchParams;
   const view = parseDashboardParams((name) => firstValue(params[name]));
+  // ponytail: o `?cobranca=` vem do botão "Gerar cobrança" (redirect da
+  // action). O valor é FECHADO de propósito — só `gerada`/`erro` existem, e o
+  // texto é fixo: query string nunca vira texto livre na página.
+  const cobrancaFlash =
+    params.cobranca === "gerada"
+      ? "Cobrança gerada para o arrematante vencedor."
+      : params.cobranca === "erro"
+        ? "Não foi possível gerar a cobrança — verifique sua conta Mercado Pago nas configurações."
+        : null;
   const { items, total } = await listSellerItems(
     drizzleItemRepository,
     session.user.id,
@@ -94,6 +103,14 @@ export default async function ItemsPage({ searchParams }: PageProps<"/dashboard/
             </Button>
           }
         />
+        {cobrancaFlash ? (
+          <p
+            role="status"
+            className={`text-sm ${params.cobranca === "gerada" ? "text-emerald-600" : "text-destructive"}`}
+          >
+            {cobrancaFlash}
+          </p>
+        ) : null}
         <ItemsUrl items={items.map(toDashboardItemRow)} view={view} totalCount={total} />
       </main>
     </div>

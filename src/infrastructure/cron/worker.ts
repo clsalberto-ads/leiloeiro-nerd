@@ -2,13 +2,7 @@ import { Queue, Worker } from "bullmq";
 import { closeExpiredItems } from "@/application/use-cases/close-expired-items";
 import { createPayment } from "@/application/use-cases/create-payment";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
-import { drizzleBidRepository } from "@/infrastructure/database/repositories/drizzle-bid-repository";
-import { drizzlePaymentRepository } from "@/infrastructure/database/repositories/drizzle-payment-repository";
-import { drizzleUserRepository } from "@/infrastructure/database/repositories/drizzle-user-repository";
-import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
-import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
-import { createMpPixPayment } from "@/infrastructure/mercado-pago/payments";
-import { getValidSellerAccessToken } from "@/infrastructure/mercado-pago/seller-access-token";
+import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
 import { AUCTION_QUEUE, CLOSE_EXPIRED_EVERY_MS } from "./queue";
 
 const CLOSE_EXPIRED_JOB = "close-expired-items";
@@ -36,22 +30,10 @@ const worker = new Worker(
     // ciclo (ou o botao "gerar cobranca" do vendedor) recupera, porque o
     // `createPayment` e idempotente.
     let cobrancas = 0;
+    const paymentDeps = createPaymentDeps();
     for (const itemId of encerrados) {
       try {
-        await createPayment(
-          {
-            itemRepo: drizzleItemRepository,
-            bidRepo: drizzleBidRepository,
-            paymentRepo: drizzlePaymentRepository,
-            userRepo: drizzleUserRepository,
-            notifRepo: drizzleNotificationRepository,
-            getAccessToken: (userId) =>
-              getValidSellerAccessToken(drizzleMpSellerAccountRepository, userId),
-            mpClient: { createPixPayment: createMpPixPayment },
-          },
-          itemId,
-          now,
-        );
+        await createPayment(paymentDeps, itemId, now);
         cobrancas += 1;
       } catch (err) {
         console.error(`[worker] falha ao gerar cobranca do item ${itemId}:`, err);
