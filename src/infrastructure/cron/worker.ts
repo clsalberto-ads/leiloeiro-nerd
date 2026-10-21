@@ -4,9 +4,9 @@ import { createPayment } from "@/application/use-cases/create-payment";
 import { verificarPrazos, sincronizarMp } from "@/application/use-cases/verificar-prazos";
 import { handlePaymentWebhook } from "@/application/use-cases/handle-payment-webhook";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
-import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
-import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
-import { getMpPayment } from "@/infrastructure/mercado-pago/payments";
+import { createPagBankPaymentDeps } from "@/infrastructure/pagbank/create-payment-deps";
+import { drizzlePagBankSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-pagbank-seller-account-repository";
+import { getPagBankOrder } from "@/infrastructure/pagbank/orders";
 import {
   AUCTION_QUEUE,
   CLOSE_EXPIRED_EVERY_MS,
@@ -36,7 +36,7 @@ const JOBS: Record<string, { every: number; run: JobHandler }> = {
       // A cobrança do arremate e GERADA no mesmo job do encerramento — a spec
       // não deixa o item encerrado esperar um segundo gatilho.
       let cobrancas = 0;
-      const paymentDeps = createPaymentDeps();
+      const paymentDeps = createPagBankPaymentDeps();
       for (const itemId of encerrados) {
         try {
           await createPayment(paymentDeps, itemId, now);
@@ -51,7 +51,7 @@ const JOBS: Record<string, { every: number; run: JobHandler }> = {
   [VERIFICAR_PRAZOS_JOB]: {
     every: VERIFICAR_PRAZOS_EVERY_MS,
     async run(now) {
-      const resultado = await verificarPrazos(createPaymentDeps(), now);
+      const resultado = await verificarPrazos(createPagBankPaymentDeps(), now);
       if (resultado.expired || resultado.cascaded || resultado.cancelledItems) {
         console.log(
           `[worker] verificar-prazos: ${resultado.expired} vencido(s), ` +
@@ -64,7 +64,7 @@ const JOBS: Record<string, { every: number; run: JobHandler }> = {
   [SINCRONIZAR_MP_JOB]: {
     every: SINCRONIZAR_MP_EVERY_MS,
     async run(now) {
-      const deps = createPaymentDeps();
+      const deps = createPagBankPaymentDeps();
       const resultado = await sincronizarMp(
         {
           paymentRepo: deps.paymentRepo,
@@ -75,11 +75,20 @@ const JOBS: Record<string, { every: number; run: JobHandler }> = {
                 itemRepo: deps.itemRepo,
                 notifRepo: deps.notifRepo,
                 getAccessToken: deps.getAccessToken,
-                fetchStatus: { fetchMpPaymentStatus: getMpPayment },
+                fetchStatus: {
+                fetchMpPaymentStatus: async (token: string, id: string) => {
+                  const order = await getPagBankOrder(token, id);
+                  return {
+                    status: order.chargeStatus ?? order.status,
+                    statusDetail: null,
+                    externalReference: order.referenceId,
+                  };
+                },
+              },
                 resend: deps.resend,
                 userRepo: deps.userRepo,
                 connectedSellerIds: () =>
-                  drizzleMpSellerAccountRepository.listUserIds(),
+                  drizzlePagBankSellerAccountRepository.listUserIds(),
               },
               mpPaymentId,
             ),

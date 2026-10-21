@@ -5,14 +5,14 @@ import { decryptToken, encryptToken } from "./token-cipher";
 // reproduzível; os CASOS são o que importa — roundtrip, IV por linha,
 // adulteração e legado.
 const TEST_KEY = "a".repeat(64);
-const ORIGINAL_KEY = process.env.MP_TOKEN_ENCRYPTION_KEY;
+const ORIGINAL_KEY = process.env.PAGBANK_TOKEN_ENCRYPTION_KEY;
 
 beforeEach(() => {
-  process.env.MP_TOKEN_ENCRYPTION_KEY = TEST_KEY;
+  process.env.PAGBANK_TOKEN_ENCRYPTION_KEY = TEST_KEY;
 });
 
 afterEach(() => {
-  process.env.MP_TOKEN_ENCRYPTION_KEY = ORIGINAL_KEY;
+  process.env.PAGBANK_TOKEN_ENCRYPTION_KEY = ORIGINAL_KEY;
   vi.restoreAllMocks();
 });
 
@@ -48,13 +48,13 @@ describe("token-cipher", () => {
   });
 
   it("chave ausente ou de tamanho errado é erro na hora de usar, com a instrução", () => {
-    delete process.env.MP_TOKEN_ENCRYPTION_KEY;
+    delete process.env.PAGBANK_TOKEN_ENCRYPTION_KEY;
     expect(() => encryptToken("x")).toThrow("openssl rand -hex 32");
-    process.env.MP_TOKEN_ENCRYPTION_KEY = "curta";
+    process.env.PAGBANK_TOKEN_ENCRYPTION_KEY = "curta";
     expect(() => encryptToken("x")).toThrow("32 bytes");
   });
 });
 
 afterAll(() => {
-  process.env.MP_TOKEN_ENCRYPTION_KEY = ORIGINAL_KEY;
+  process.env.PAGBANK_TOKEN_ENCRYPTION_KEY = ORIGINAL_KEY;
 });

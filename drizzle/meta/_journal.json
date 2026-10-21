@@ -64,6 +64,13 @@
       "when": 1792549273872,
       "tag": "0008_overjoyed_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1760000000000,
+      "tag": "0009_migrate_mp_to_pagbank",
+      "breakpoints": true
     }
   ]
 }

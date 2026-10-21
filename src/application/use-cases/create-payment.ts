@@ -18,16 +18,45 @@ export interface MpPixPayment {
   qrCopiaECola: string | null;
 }
 
-export interface MpPaymentClient {
-  createPixPayment(input: {
+export interface PagBankPixResult {
+  orderId: string;
+  chargeId: string | null;
+  qrCodeBase64: string | null;
+  qrCodeText: string | null;
+  status: string;
+}
+
+export interface PagBankCheckoutResult {
+  checkoutId: string;
+  checkoutUrl: string;
+}
+
+export type PagBankPaymentClient = {
+  createPix: (input: {
     accessToken: string;
     amountCents: number;
-    feeCents: number;
+    platformFeeCents: number;
+    platformAccountId: string;
+    sellerAccountId: string;
     description: string;
     payerEmail: string;
+    referenceId: string;
     expiresAt: Date;
-    externalReference: string;
-  }): Promise<MpPixPayment>;
+    notificationUrl: string;
+  }) => Promise<PagBankPixResult>;
+  createCheckout: (input: {
+    accessToken: string;
+    amountCents: number;
+    platformFeeCents: number;
+    platformAccountId: string;
+    sellerAccountId: string;
+    description: string;
+    payerEmail: string;
+    referenceId: string;
+    redirectUrl: string;
+    notificationUrl: string;
+    expiresAt: Date;
+  }) => Promise<PagBankCheckoutResult>;
   /**
    * (R6.1) Preferência do Checkout Pro — o link que habilita CARTÃO. A MESMA
    * taxa (application_fee) e o MESMO externalReference do PIX: são duas
@@ -57,7 +86,11 @@ export interface CreatePaymentDeps {
   userRepo: Pick<UserRepository, "findByIds">;
   notifRepo: NotificationRepository;
   getAccessToken: SellerAccessTokenProvider;
-  mpClient: MpPaymentClient;
+  getAccountId: (userId: string) => Promise<string | null>;
+  platformAccountId: string;
+  notificationUrl: string;
+  createPix: PagBankPaymentClient["createPix"];
+  createCheckout: PagBankPaymentClient["createCheckout"];
   /** Opcional: e-mail `next_bidder_called` da cascata. Ausente = só in-app. */
   resend?: TransactionalEmailClient | null;
 }
@@ -104,7 +137,7 @@ export async function createPayment(
   now: Date = new Date(),
   options: CreatePaymentOptions = {},
 ): Promise<Payment> {
-  const { itemRepo, bidRepo, paymentRepo, userRepo, notifRepo, getAccessToken, mpClient } = deps;
+  const { itemRepo, bidRepo, paymentRepo, userRepo, notifRepo, getAccessToken } = deps;
 
   const item = await itemRepo.findById(itemId);
   if (!item) throw new Error("Item não encontrado");
@@ -150,6 +183,7 @@ export async function createPayment(
   }
 
   const accessToken = await getAccessToken(item.sellerId);
+  const sellerAccountId = await deps.getAccountId(item.sellerId);
 
   const [payer] = await userRepo.findByIds([winner.bidderId]);
   if (!payer?.email) throw new Error("Arrematante sem e-mail para a cobrança");
@@ -165,33 +199,41 @@ export async function createPayment(
   // para a outra: PIX fora do ar → cobrança nasce só com link; preferência
   // falha → cobrança nasce só com PIX. As DUAS falham → a cobrança não nasce,
   // e o próximo tick/botão refaz.
-  let pix: MpPixPayment | null = null;
+  let pix: PagBankPixResult | null = null;
   try {
-    pix = await mpClient.createPixPayment({
+    pix = await deps.createPix({
       accessToken,
       amountCents: winner.amount,
-      feeCents: platformFeeCents,
+      platformFeeCents,
+      platformAccountId: deps.platformAccountId,
+      sellerAccountId: sellerAccountId ?? "",
       description: `Arremate: ${item.title}`,
       payerEmail: payer.email,
+      referenceId: item.id,
       expiresAt: deadline,
-      externalReference: item.id,
+      notificationUrl: deps.notificationUrl,
     });
   } catch (e) {
     console.error("[create-payment] PIX falhou, seguindo para o link de checkout:", e);
   }
 
+  let checkout: PagBankCheckoutResult | null = null;
   let paymentLink: string | null = null;
   try {
-    const preference = await mpClient.createCheckoutPreference({
+    checkout = await deps.createCheckout({
       accessToken,
-      title: `Arremate: ${item.title}`,
       amountCents: winner.amount,
-      feeCents: platformFeeCents,
+      platformFeeCents,
+      platformAccountId: deps.platformAccountId,
+      sellerAccountId: sellerAccountId ?? "",
+      description: `Arremate: ${item.title}`,
       payerEmail: payer.email,
-      externalReference: item.id,
+      referenceId: item.id,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dashboard/payments/`,
+      notificationUrl: deps.notificationUrl,
       expiresAt: deadline,
     });
-    paymentLink = preference.initPoint;
+    paymentLink = checkout.checkoutUrl;
   } catch (e) {
     console.error("[create-payment] link de checkout falhou, seguindo só com PIX:", e);
   }
@@ -207,9 +249,9 @@ export async function createPayment(
     amount: winner.amount,
     platformFeeCents,
     sellerNetCents,
-    mpPaymentId: pix?.mpPaymentId ?? null,
+    mpPaymentId: pix?.orderId ?? null,
     pixQrCode: pix?.qrCodeBase64 ?? null,
-    pixCopiaECola: pix?.qrCopiaECola ?? null,
+    pixCopiaECola: pix?.qrCodeText ?? null,
     paymentLink,
     deadline,
     attemptNumber,

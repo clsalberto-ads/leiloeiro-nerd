@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-// ponytail: a conta Mercado Pago do vendedor é o DINHEIRO dele — o access
+// ponytail: a conta PagBank do vendedor é o DINHEIRO dele — o access
 // token move dinheiro e o refresh token fabrica novos tokens por ~6 meses.
 // Guardados em texto puro, um dump do banco (backup vazado, SQL injection
 // em outro app do mesmo host, snapshot de staging) entrega a conta inteira.
@@ -24,16 +24,16 @@ const KEY_BYTES = 32;
  * Lê em cada chamada (e não no import) para o teste poder definir o env.
  */
 function loadKey(): Buffer {
-  const raw = process.env.MP_TOKEN_ENCRYPTION_KEY;
+  const raw = process.env.PAGBANK_TOKEN_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
-      "MP_TOKEN_ENCRYPTION_KEY ausente: gere com `openssl rand -hex 32` e defina no .env antes de conectar contas Mercado Pago",
+      "PAGBANK_TOKEN_ENCRYPTION_KEY ausente: gere com `openssl rand -hex 32` e defina no .env antes de conectar contas PagBank",
     );
   }
   const key = Buffer.from(raw, "hex");
   if (key.length !== KEY_BYTES) {
     throw new Error(
-      `MP_TOKEN_ENCRYPTION_KEY deve ter 32 bytes em hex (64 caracteres) — recebidos ${key.length}`,
+      `PAGBANK_TOKEN_ENCRYPTION_KEY deve ter 32 bytes em hex (64 caracteres) — recebidos ${key.length}`,
     );
   }
   return key;
@@ -63,11 +63,11 @@ export function encryptToken(plaintext: string): string {
  */
 export function decryptToken(ciphertext: string): string {
   if (!ciphertext.startsWith(`${FORMAT_VERSION}:`)) {
-    throw new Error("Token Mercado Pago legado em texto puro: reconecte a conta nas configurações");
+    throw new Error("Token PagBank legado em texto puro: reconecte a conta nas configurações");
   }
   const [version, ivB64, tagB64, dataB64] = ciphertext.split(":");
   if (version !== FORMAT_VERSION || !ivB64 || !tagB64 || !dataB64) {
-    throw new Error("Token Mercado Pago cifrado em formato desconhecido");
+    throw new Error("Token PagBank cifrado em formato desconhecido");
   }
   const key = loadKey();
   try {
@@ -81,6 +81,6 @@ export function decryptToken(ciphertext: string): string {
   } catch {
     // tag errada = chave trocada OU linha adulterada; os dois pedem a mesma
     // resposta (reconectar), e nenhum detalhe interno sobe.
-    throw new Error("Falha ao decifrar token Mercado Pago: verifique a MP_TOKEN_ENCRYPTION_KEY ou reconecte a conta");
+    throw new Error("Falha ao decifrar token PagBank: verifique a PAGBANK_TOKEN_ENCRYPTION_KEY ou reconecte a conta");
   }
 }

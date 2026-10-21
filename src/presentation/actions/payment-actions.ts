@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/presentation/actions/auth-actions";
 import { drizzleItemRepository } from "@/infrastructure/database/repositories/drizzle-item-repository";
 import { drizzlePaymentRepository } from "@/infrastructure/database/repositories/drizzle-payment-repository";
-import { createPaymentDeps } from "@/infrastructure/payments/create-payment-deps";
+import { createPagBankPaymentDeps } from "@/infrastructure/pagbank/create-payment-deps";
 import { createPayment } from "@/application/use-cases/create-payment";
 import { isUuid } from "@/lib/uuid";
 import { toActionError } from "@/lib/action-error";
@@ -30,7 +30,7 @@ export async function createPaymentAction(
     if (!item) return { error: "Item não encontrado" };
     if (item.sellerId !== session.user.id) return { error: "Sem permissão" };
 
-    const payment = await createPayment(createPaymentDeps(), itemId);
+    const payment = await createPayment(createPagBankPaymentDeps(), itemId);
     return { ok: true, paymentId: payment.id };
   } catch (err) {
     return { error: toActionError(err, "Não foi possível gerar a cobrança.") };

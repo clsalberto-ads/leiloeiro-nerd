@@ -1,8 +1,8 @@
 import { getSession } from "@/presentation/actions/auth-actions";
-import { drizzleMpSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-mp-seller-account-repository";
+import { drizzlePagBankSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-pagbank-seller-account-repository";
 import { SettingsForm } from "./settings-form";
 import { BecomeSellerForm } from "@/components/become-seller-form";
-import { MpAccountSection } from "./mp-account-section";
+import { PagBankAccountSection } from "./pagbank-account-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageContainer } from "@/components/layout/page-container";
 
@@ -18,9 +18,9 @@ export default async function SettingsPage({
   // ponytail: `findByUserId` é a porta SEM token — a página de configurações
   // só pode conhecer o ESTADO da conexão. Sessão ausente ou papel de comprador
   // não consultam nada: a seção só existe para quem vende.
-  const mpAccount =
+  const pagbankAccount =
     session && isSeller
-      ? await drizzleMpSellerAccountRepository.findByUserId(session.user.id)
+      ? await drizzlePagBankSellerAccountRepository.findByUserId(session.user.id)
       : null;
 
   return (
@@ -45,13 +45,13 @@ export default async function SettingsPage({
         ) : null}
 
         {isSeller ? (
-          <MpAccountSection
+          <PagBankAccountSection
             account={
-              mpAccount
-                ? { connectedAt: mpAccount.connectedAt, mpUserId: mpAccount.mpUserId }
+              pagbankAccount
+                ? { connectedAt: pagbankAccount.connectedAt, accountId: pagbankAccount.accountId }
                 : null
             }
-            flash={typeof sp.mercadopago === "string" ? sp.mercadopago : undefined}
+            flash={typeof sp.pagbank === "string" ? (sp.pagbank as string) : undefined}
           />
         ) : null}
       </PageContainer>
