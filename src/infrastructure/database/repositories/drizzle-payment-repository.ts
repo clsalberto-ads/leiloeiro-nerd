@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/infrastructure/database/drizzle";
 import { payments } from "@/infrastructure/database/schema";
 import type {
@@ -135,10 +135,29 @@ export const drizzlePaymentRepository: PaymentRepository = {
   async findCascadeCandidates(): Promise<Payment[]> {
     // A cadeia quebrou por EXPIRAÇÃO ou por CANCELAMENTO — os dois caminhos
     // chamam o próximo da fila (ver o contrato no domínio).
+    //
+    // ponytail: `NOT EXISTS` no SUBQUERY é o que impede esta consulta de
+    // crescer infinito. Sem ele, TODO payment expirado/cancelado do banco
+    // voltava a cada 10 minutos — mesmo os de CASCATAS já concluídas (que
+    // têm a tentativa seguinte e são `continue` no use case). O NOT EXISTS
+    // devolve só o TOPO de cada cadeia quebrada: o último `expired`/
+    // `cancelled` SEM sucessor, que é exatamente o que a cascata precisa.
+    // O use case continua fazendo `findByChainIndex` (defesa em profundidade
+    // para quem chamar a porta fora do cron), mas a CONSULTA não devolve
+    // ruído.
     const rows = await db
       .select()
       .from(payments)
-      .where(inArray(payments.status, ["expired", "cancelled"]));
+      .where(
+        and(
+          inArray(payments.status, ["expired", "cancelled"]),
+          sql`NOT EXISTS (
+            SELECT 1 FROM payments p2
+            WHERE p2.item_id = ${payments.itemId}
+              AND p2.attempt_number = ${payments.attemptNumber} + 1
+          )`,
+        ),
+      );
     return rows.map(mapPayment);
   },
 

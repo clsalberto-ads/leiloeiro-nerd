@@ -77,7 +77,8 @@ export async function verificarPrazos(
     }
   }
 
-  // 2. Cascata sobre TODO `expired` cuja tentativa seguinte ainda não existe.
+  // 2. Cascata sobre TODO candidato de cadeia quebrada (expired/cancelled)
+  //    cuja tentativa seguinte ainda não existe.
   const chainBroken = await paymentRepo.findCascadeCandidates();
   for (const broken of chainBroken) {
     const nextAttempt = broken.attemptNumber + 1;
