@@ -9,32 +9,56 @@ direto à documentação e ferramentas da API do Mercado Pago via IA.
 https://mcp.mercadopago.com/mcp
 ```
 
-## Configuração por cliente
+## Configuração no Zed (já configurado)
 
-### Cursor
-1. O arquivo `.cursor/mcp.json` já está criado neste repositório
-2. Abra o Cursor → **Settings → Tools & MCPs**
-3. Clique **"Connect"** ao lado de `mercadopago-mcp-server`
-4. Você será redirecionado para o site do Mercado Pago
-5. Selecione o **país** (Brasil) e **autorize** a conexão
-6. Volte ao Cursor — a conexão estará ativa
+O `~/.config/zed/settings.json` já tem o `context_servers.mercadopago`:
+
+```json
+{
+  "context_servers": {
+    "mercadopago": {
+      "source": "remote",
+      "url": "https://mcp.mercadopago.com/mcp"
+    }
+  }
+}
+```
+
+### Para ativar:
+
+1. **Reinicie o Zed** (ou recarregue as configurações)
+2. Abra o **Agent Panel** (Ctrl+Shift+A ou Cmd+Shift+A)
+3. Nas configurações do agente, o servidor `mercadopago` deve aparecer
+4. Ao usar pela primeira vez, o Zed pedirá **autorização OAuth** — você é
+   redirecionado para o site do Mercado Pago, seleciona **Brasil**,
+   clica **Autorizar** e volta ao Zed
+5. Pronto — o assistente do Zed agora tem acesso às tools da MP
+
+## Configuração em outros clientes
 
 ### VS Code
-1. Abra a paleta de comandos (Ctrl+Shift+P)
-2. Digite "MCP: Add Server" e selecione
-3. Escolha "HTTP"
-4. Nome: `mercadopago`
-5. URL: `https://mcp.mercadopago.com/mcp`
-6. Autorize quando solicitado
+```
+Ctrl+Shift+P → "MCP: Add Server" → HTTP → mercadopago → https://mcp.mercadopago.com/mcp
+```
 
 ### Claude Code
 ```bash
 claude mcp add mercadopago --transport http https://mcp.mercadopago.com/mcp
 ```
 
-## Tools disponíveis
+### Cursor
+Adicione ao `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "mercadopago-mcp-server": {
+      "url": "https://mcp.mercadopago.com/mcp"
+    }
+  }
+}
+```
 
-Após conectar, o seu assistente de IA pode:
+## Tools disponíveis após conectar
 
 | Tool | O que faz |
 |------|-----------|
@@ -46,7 +70,7 @@ Após conectar, o seu assistente de IA pode:
 
 ## Testar a conexão
 
-No seu IDE, pergunte ao assistente:
+No assistente do Zed, pergunte:
 
 ```
 Busque na documentação do Mercado Pago como integrar o Checkout Pro.
