@@ -3,12 +3,8 @@ import { verificarPrazos, sincronizarMp, DEFAULT_CASCADE_DAYS } from "./verifica
 import { createPayment, type MpPaymentClient } from "./create-payment";
 import type { Bid, BidPlacement, BidRepository } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository } from "@/domain/repositories/item-repository";
-import type {
-  CreatePaymentInput,
-  Payment,
-  PaymentRepository,
-  PaymentStatus,
-} from "@/domain/repositories/payment-repository";
+import type { Payment, PaymentStatus } from "@/domain/repositories/payment-repository";
+import { FakePaymentRepository } from "@/test/fakes/payment-repository";
 import type { UserRepository, UserProfile } from "@/domain/repositories/user-repository";
 import type { NotificationRepository, CreateNotificationInput } from "@/domain/repositories/notification-repository";
 
@@ -100,95 +96,7 @@ class FakeBidRepo implements BidRepository {
   }
 }
 
-class FakePaymentRepo implements PaymentRepository {
-  payments: Payment[] = [];
-  async createPayment(input: CreatePaymentInput): Promise<Payment> {
-    const payment: Payment = {
-      id: `p${this.payments.length + 1}`,
-      ...input,
-      attemptNumber: input.attemptNumber ?? 1,
-      status: "pending",
-      createdAt: NOW,
-      updatedAt: NOW,
-      reminderSentAt: null,
-    };
-    this.payments.push(payment);
-    return payment;
-  }
-  async findById(id: string) {
-    return this.payments.find((p) => p.id === id) ?? null;
-  }
-  async findByMpPaymentId(mpPaymentId: string) {
-    return this.payments.find((p) => p.mpPaymentId === mpPaymentId) ?? null;
-  }
-  async findByItemId(itemId: string) {
-    return this.payments.filter((p) => p.itemId === itemId);
-  }
-  async findByChainIndex(itemId: string, attemptNumber: number) {
-    return (
-      this.payments.find((p) => p.itemId === itemId && p.attemptNumber === attemptNumber) ?? null
-    );
-  }
-  async markCancelled(id: string) {
-    return this.transition(id, "cancelled");
-  }
-  async markApproved(id: string) {
-    return this.transition(id, "approved");
-  }
-  async markExpired(id: string) {
-    return this.transition(id, "expired");
-  }
-  private transition(id: string, status: PaymentStatus) {
-    const p = this.payments.find((x) => x.id === id);
-    if (!p || p.status !== "pending") return null;
-    p.status = status;
-    return p;
-  }
-  async findExpiredPending(now: Date) {
-    return this.payments.filter((p) => p.status === "pending" && p.deadline <= now);
-  }
-  async findCascadeCandidates() {
-    return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
-  }
-  async findPendingByItemIds(itemIds: string[]) {
-    const map = new Map<string, Payment>();
-    for (const p of this.payments) {
-      if (p.status === "pending" && itemIds.includes(p.itemId)) {
-        const existing = map.get(p.itemId);
-        if (!existing || p.attemptNumber > existing.attemptNumber) {
-          map.set(p.itemId, p);
-        }
-      }
-    }
-    return map;
-  }
 
-  async setMpPaymentId(id: string, mpPaymentId: string) {
-    const p = this.payments.find((x) => x.id === id);
-    if (!p || p.status !== "pending") return null;
-    p.mpPaymentId = mpPaymentId;
-    return p;
-  }
-
-  async findPendingReminderDue(windowStart: Date, windowEnd: Date) {
-    return this.payments.filter(
-      (p) =>
-        p.status === "pending" &&
-        p.reminderSentAt === null &&
-        p.deadline >= windowStart &&
-        p.deadline <= windowEnd,
-    );
-  }
-  async markReminderSent(id: string, at: Date) {
-    const p = this.payments.find((x) => x.id === id);
-    if (!p || p.reminderSentAt !== null) return null;
-    p.reminderSentAt = at;
-    return p;
-  }
-  async findPendingCreatedBefore(cutoff: Date) {
-    return this.payments.filter((p) => p.status === "pending" && p.createdAt <= cutoff);
-  }
-}
 
 class FakeUserRepo implements Pick<UserRepository, "findByIds"> {
   users = new Map<string, UserProfile>();
@@ -250,7 +158,7 @@ function makeDeps(overrides: { item?: Item; bids?: Bid[]; payments?: Payment[] }
       makeBid(),
       makeBid({ id: "b2", bidderId: "bidder-2", bidderName: "Bia", amount: 8_000, rank: 2 }),
     ];
-  const paymentRepo = new FakePaymentRepo();
+  const paymentRepo = new FakePaymentRepository();
   paymentRepo.payments = overrides.payments ?? [
     makePayment(),
     makePayment({ id: "p9", bidderId: "bidder-9", bidId: "b9", attemptNumber: 9 }), // ruído: pendente de OUTRO item? não — mesmo item, mas nunca expira? deadline igual... ver abaixo
