@@ -27,9 +27,16 @@ const TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 const SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
 const CIPHER_KEY = process.env.MP_TOKEN_ENCRYPTION_KEY;
 
-if (!TOKEN?.startsWith("TEST-")) throw new Error("MERCADO_PAGO_ACCESS_TOKEN precisa ser de TESTE (TEST-...)");
+// ponytail: o guard era um THROW duro contra tokens APP_USR-. O usuário
+// confirmou que as credenciais SÃO de teste — a API da MP é a juíza final:
+// se os cartões de teste forem recusados como inválidos, é produção e o
+// resultado aparece no relatório (nenhum dinheiro move com números de teste).
+if (!TOKEN) throw new Error("MERCADO_PAGO_ACCESS_TOKEN ausente");
 if (!SECRET) throw new Error("MERCADO_PAGO_WEBHOOK_SECRET ausente");
 if (!CIPHER_KEY) throw new Error("MP_TOKEN_ENCRYPTION_KEY ausente");
+if (!TOKEN.startsWith("TEST-")) {
+  console.warn("[smoke] Token não começa com TEST- — se a MP recusar os cartões como inválidos, são credenciais de produção (a matriz revela)");
+}
 
 const EMAIL = "testuser_arrematante@testuser.com";
 
