@@ -97,7 +97,7 @@ export function PaymentView(props: PaymentViewProps) {
           <>
             <div className="flex flex-col items-center gap-3">
               <p className="text-sm text-muted-foreground">
-                Pague até <BidCountdown deadline={deadline} />
+                Pague até <BidCountdown deadline={deadline} expiredLabel="Vencido" />
               </p>
               {props.qrCode ? (
                 <SmartImage

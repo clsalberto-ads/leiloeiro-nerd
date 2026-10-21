@@ -31,7 +31,10 @@ function formatAbsolute(d: Date): string {
   });
 }
 
-export function BidCountdown({ deadline }: { deadline: Date }) {
+export function BidCountdown({
+  deadline,
+  expiredLabel = "Encerrado",
+}: { deadline: Date; expiredLabel?: string }) {
   const [ms, setMs] = useState<number>(() => Math.max(0, deadline.getTime() - Date.now()));
 
   useEffect(() => {
@@ -40,7 +43,11 @@ export function BidCountdown({ deadline }: { deadline: Date }) {
     return () => clearInterval(id);
   }, [deadline]);
 
-  if (ms <= 0) return <span className="font-medium text-muted-foreground" role="timer">Encerrado</span>;
+  // ponytail (R3.1): o rótulo final é PROP porque o componente serve a dois
+  // contextos com palavras diferentes: leilão vence = "Encerrado"; pagamento
+  // vence = "Vencido". "Encerrado" num prazo de PIX diz que a LOJA fechou —
+  // é a palavra errada na cabeça de quem está olhando um boleto.
+  if (ms <= 0) return <span className="font-medium text-muted-foreground" role="timer">{expiredLabel}</span>;
 
   const formatted = format(ms);
   const formattedDate = formatAbsolute(deadline);

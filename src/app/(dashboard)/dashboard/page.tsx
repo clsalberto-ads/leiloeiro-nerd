@@ -1,10 +1,11 @@
 import { getSession } from "@/presentation/actions/auth-actions";
 import { getDashboardSummary } from "@/application/use-cases/dashboard-summary";
+import { getDashboardMonetaryKPIs } from "@/application/use-cases/analytics/get-dashboard-monetary-kpis";
 import { drizzleAnalyticsRepository } from "@/infrastructure/database/repositories/drizzle-analytics-repository";
 import { SellerPanel } from "./charts/seller-view";
 import { BuyerPanel } from "./charts/buyer-view";
 import { PeriodSelect } from "./period/period-select";
-import { parsePeriod } from "./period/period";
+import { parsePeriod, type PeriodKey } from "./period/period";
 import { firstValue } from "@/lib/first-value";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageContainer } from "@/components/layout/page-container";
@@ -40,12 +41,18 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   const isSeller = view.role === "seller";
 
-  // ponytail: o "Ola, {nome}" NAO se repete aqui — quem manda no nome e no
-  // "Sair" e o `DashboardHeader`, que o `(dashboard)/layout.tsx` ja renderiza
-  // acima desta pagina. A `description` carrega so o e-mail, que o header nao
-  // mostra: e o dado que confirma de qual conta o painel esta aberto. O titulo
-  // ("Seu painel"/"Meus lances") e o `PeriodSelect` sao os unicos acoes do
-  // cabecalho da pagina; os links para itens e perfil sao do `DashboardSidebar`.
+  // ponytail (R3.7): os KPIs monetários são uma SEGUNDA consulta, paralela em
+  // dados mas sequencial em código — só para vendedor, e com o período que a
+  // página já parseou. O `getDashboardMonetaryKPIs` já existia desde a Fase B
+  // e não tinha consumidor; aqui ele alimenta a linha de resumo financeiro
+  // que torna a taxa de 5% VISÍVEL para o vendedor.
+  const monetary = isSeller
+    ? await getDashboardMonetaryKPIs(drizzleAnalyticsRepository, session.user.id, {
+        key: period as PeriodKey,
+        days,
+      })
+    : null;
+
   return (
   <PageContainer size="default">
 <PageHeader
@@ -54,7 +61,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         actions={<PeriodSelect current={period} />}
       />
       {isSeller ? (
-        <SellerPanel view={view} period={period} />
+        <SellerPanel view={view} period={period} monetary={monetary} />
       ) : (
         <BuyerPanel view={view} period={period} />
       )}

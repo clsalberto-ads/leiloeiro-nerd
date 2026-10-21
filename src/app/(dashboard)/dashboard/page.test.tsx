@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   analise: {
     sellerSummary: vi.fn(),
+    getRevenueApproved: vi.fn().mockResolvedValue({ amountCents: 0 }),
+    getPendingPaymentsAmount: vi.fn().mockResolvedValue({ amountCents: 0 }),
+    getApprovedCount: vi.fn().mockResolvedValue({ count: 0 }),
+    getAverageTicketApproved: vi.fn().mockResolvedValue({ amountCents: 0 }),
     sellerSeries: vi.fn(),
     buyerSummary: vi.fn(),
   },

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ChevronRightIcon, StoreIcon } from "lucide-react";
 import { getItemDetailAction } from "@/presentation/actions/public-actions";
 import { ItemGallery } from "@/components/item-gallery";
 import { BidCountdown } from "@/components/bid-countdown";
@@ -21,7 +23,25 @@ export default async function ItemDetailPage({ params }: PageProps<"/[slug]/[ite
   const galleryUrls = imageUrls.length ? imageUrls : item.imageUrl ? [item.imageUrl] : [];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-4">
+      {/* ponytail (R3.3): breadcrumb — o caminho de VOLTA à vitrine. Sem ele o
+          visitante que chega num item por link compartilhado fica preso: o
+          único link de saída era o logo, que vai para a HOME, não para a
+          vitrine de onde o item veio. A home da vitrine é o destino natural. */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link
+          href={`/${slug}`}
+          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          <StoreIcon aria-hidden="true" className="size-4" />
+          Vitrine
+        </Link>
+        <ChevronRightIcon aria-hidden="true" className="size-3.5" />
+        <span className="font-medium text-foreground" aria-current="page">
+          {item.title}
+        </span>
+      </nav>
+
       {/* Uma coluna no mobile, duas no desktop (md+). A galeria fica à esquerda e
           os detalhes/lance à direita. */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">

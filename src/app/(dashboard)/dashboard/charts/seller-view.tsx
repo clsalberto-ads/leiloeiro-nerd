@@ -6,11 +6,21 @@ import { Indicator } from "./indicator";
 import { ItemsByStatusChart } from "./items-by-status-chart";
 import { SellerSeriesChart } from "./series-chart-seller";
 import type { SellerView } from "@/application/use-cases/dashboard-summary";
+import type { DashboardMonetaryKPIs } from "@/application/use-cases/analytics/get-dashboard-monetary-kpis";
 import type { PeriodKey } from "../period/period";
 import { periodLabel } from "../period/period";
 import { formatBRL } from "@/lib/format-brl";
+import { calculateFeeCents, PLATFORM_FEE_PERCENT } from "@/domain/value-objects/fee";
 
-export function SellerPanel({ view, period }: { view: SellerView; period: PeriodKey }) {
+export function SellerPanel({
+  view,
+  period,
+  monetary,
+}: {
+  view: SellerView;
+  period: PeriodKey;
+  monetary?: DashboardMonetaryKPIs | null;
+}) {
   const { summary, series } = view;
 
   // ponytail: tela VAZIA antes dos indicadores, e nao grafico com zero. Um
@@ -43,6 +53,37 @@ export function SellerPanel({ view, period }: { view: SellerView; period: Period
           change="preço de abertura, não receita"
         />
       </div>
+
+      {/* ponytail (R3.7): resumo financeiro — a taxa de 5% da plataforma é
+          VISÍVEL para o vendedor. Sem isto, o vendedor via o valor do arremate
+          e não tinha como saber quanto ficava com ele. O `calculateFeeCents`
+          é a MESMA função que cria o PIX (fonte única da regra de 5%); o
+          "receita líquida" é o que a vendedor realmente recebe.
+          A linha some quando não há pagamentos (vendedor novo). */}
+      {monetary && monetary.revenueCents > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Indicator title="Receita bruta" value={monetary.revenueCents} format="currency" />
+          <Indicator
+            title="Taxa da plataforma"
+            value={calculateFeeCents(monetary.revenueCents)}
+            format="currency"
+            change={`${PLATFORM_FEE_PERCENT * 100}% de intermediação`}
+          />
+          <Indicator
+            title="Receita líquida"
+            value={monetary.revenueCents - calculateFeeCents(monetary.revenueCents)}
+            format="currency"
+          />
+          <Indicator title="Ticket médio" value={monetary.avgTicketCents} format="currency" />
+        </div>
+      ) : null}
+
+      {monetary && monetary.pendingCents > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Aguardando pagamento: <strong className="text-foreground">R$ {formatBRL(monetary.pendingCents)}</strong> em
+          cobranças pendentes.
+        </p>
+      ) : null}
 
       <SellerSeriesChart
         bidsPerDay={series.bidsPerDay}
