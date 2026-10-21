@@ -333,12 +333,11 @@ describe("verificarPrazos — cascata", () => {
     expect(first.cascaded).toBe(0);
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeUndefined();
 
-    // MP voltou: o próximo tick reencontra o expired sem a tentativa 2
+    // PagBank voltou: o próximo tick reencontra o expired sem a tentativa 2
     const newClient = makeMpClient();
     ctx.deps.createPix = newClient.createPix;
     ctx.deps.createCheckout = newClient.createCheckout;
     ctx.mpClient = newClient;
-    shouldThrow = false;
     const second = await verificarPrazos(ctx.deps, NOW);
     expect(second.cascaded).toBe(1);
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeDefined();
