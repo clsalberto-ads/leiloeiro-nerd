@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPayment, type MpPaymentClient } from "./create-payment";
+import { createPayment, type PagBankPaymentClient } from "./create-payment";
 import type { Bid, BidPlacement, BidRepository } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository, ItemStatus } from "@/domain/repositories/item-repository";
 import { FakePaymentRepository } from "@/test/fakes/payment-repository";
@@ -116,20 +116,20 @@ class FakeNotifRepo implements NotificationRepository {
   async delete() {}
 }
 
-function makeMpClient(): MpPaymentClient & { calls: Array<Record<string, unknown>> } {
+function makeMpClient(): PagBankPaymentClient & { calls: Array<Record<string, unknown>> } {
   const calls: Array<Record<string, unknown>> = [];
   return {
     calls,
-    async createPixPayment(input) {
+    async createPix(input) {
       calls.push(input as unknown as Record<string, unknown>);
       return {
-        mpPaymentId: "mp-123",
+        orderId: "mp-123",
         qrCodeBase64: "data:image/png;base64,QR",
-        qrCopiaECola: "00020126PIX",
+        qrCodeText: "00020126PIX",
       };
     },
-    async createCheckoutPreference() {
-      return { preferenceId: "pref-1", initPoint: "https://mp.test/checkout/pref-1" };
+    async createCheckout() {
+      return { checkoutId: "pref-1", checkoutUrl: "https://mp.test/checkout/pref-1" };
     },
   };
 }
@@ -211,7 +211,7 @@ describe("createPayment", () => {
       amount: 10_000,
       platformFeeCents: 500,
       sellerNetCents: 9_500,
-      mpPaymentId: "mp-123",
+      orderId: "mp-123",
       pixQrCode: "data:image/png;base64,QR",
       pixCopiaECola: "00020126PIX",
       attemptNumber: 1,
@@ -348,7 +348,7 @@ describe("createPayment — link de checkout (cartão)", () => {
 
   it("PIX falha → cobrança nasce SÓ com o link (cartão como caminho completo)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createPixPayment = async () => {
+    ctx.mpClient.createPix = async () => {
       throw new Error("PIX fora do ar");
     };
     const payment = await createPayment(ctx.deps, "i1", NOW);
@@ -359,7 +359,7 @@ describe("createPayment — link de checkout (cartão)", () => {
 
   it("link falha → cobrança nasce só com PIX (cartão é bônus, não dependência)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createCheckoutPreference = async () => {
+    ctx.mpClient.createCheckout = async () => {
       throw new Error("preferência recusada");
     };
     const payment = await createPayment(ctx.deps, "i1", NOW);
@@ -369,10 +369,10 @@ describe("createPayment — link de checkout (cartão)", () => {
 
   it("as DUAS falham → a cobrança não nasce (o próximo tick refaz)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createPixPayment = async () => {
+    ctx.mpClient.createPix = async () => {
       throw new Error("pix caiu");
     };
-    ctx.mpClient.createCheckoutPreference = async () => {
+    ctx.mpClient.createCheckout = async () => {
       throw new Error("pref caiu");
     };
     await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("Nem PIX nem link");

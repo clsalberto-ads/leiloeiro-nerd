@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { verificarPrazos, sincronizarMp, DEFAULT_CASCADE_DAYS } from "./verificar-prazos";
-import { createPayment, type MpPaymentClient } from "./create-payment";
+import { createPayment, type PagBankPaymentClient } from "./create-payment";
 import type { Bid, BidPlacement, BidRepository } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository } from "@/domain/repositories/item-repository";
 import type { Payment, PaymentStatus } from "@/domain/repositories/payment-repository";
@@ -53,7 +53,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     amount: 10_000,
     platformFeeCents: 500,
     sellerNetCents: 9_500,
-    mpPaymentId: "mp-1",
+    orderId: "mp-1",
     pixQrCode: null,
     pixCopiaECola: null,
     paymentLink: null,
@@ -131,18 +131,18 @@ class FakeNotifRepo implements NotificationRepository {
 
 function makeMpClient() {
   const calls: Array<Record<string, unknown>> = [];
-  const client: MpPaymentClient & { calls: typeof calls } = {
+  const client: PagBankPaymentClient & { calls: typeof calls } = {
     calls,
-    async createPixPayment(input) {
+    async createPix(input) {
       calls.push(input as unknown as Record<string, unknown>);
       return {
-        mpPaymentId: `mp-${calls.length}`,
+        orderId: `mp-${calls.length}`,
         qrCodeBase64: "data:image/png;base64,QR",
-        qrCopiaECola: "000201PIX",
+        qrCodeText: "000201PIX",
       };
     },
-    async createCheckoutPreference() {
-      return { preferenceId: `pref-${calls.length}`, initPoint: "https://mp.test/checkout" };
+    async createCheckout() {
+      return { checkoutId: `pref-${calls.length}`, checkoutUrl: "https://mp.test/checkout" };
     },
   };
   return client;
@@ -315,10 +315,10 @@ describe("verificarPrazos — cascata", () => {
     const ctx = makeDeps();
     // as DUAS portas falham no primeiro tick (só o PIX falhar já não basta:
     // o link do checkout carrega a cobrança sozinho agora)
-    ctx.mpClient.createPixPayment = async () => {
+    ctx.mpClient.createPix = async () => {
       throw new Error("MP fora do ar");
     };
-    ctx.mpClient.createCheckoutPreference = async () => {
+    ctx.mpClient.createCheckout = async () => {
       throw new Error("MP fora do ar");
     };
 
@@ -344,13 +344,13 @@ describe("sincronizarMp — rede de segurança", () => {
     const stale = payment({ createdAt: new Date(NOW.getTime() - 2 * DAY) });
     const fresh = payment({
       id: "p2",
-      mpPaymentId: "mp-2",
+      orderId: "mp-2",
       createdAt: new Date(NOW.getTime() - 30 * 60 * 1000),
       deadline: new Date(NOW.getTime() + DAY),
     });
     const semMp = payment({
       id: "p3",
-      mpPaymentId: null,
+      orderId: null,
       createdAt: new Date(NOW.getTime() - 2 * DAY),
       deadline: new Date(NOW.getTime() + DAY),
     });
@@ -373,7 +373,7 @@ describe("sincronizarMp — rede de segurança", () => {
       id: "p2",
       bidderId: "bidder-2",
       bidId: "b2",
-      mpPaymentId: "mp-2",
+      orderId: "mp-2",
       createdAt: new Date(NOW.getTime() - 2 * DAY),
       deadline: new Date(NOW.getTime() + DAY),
     });

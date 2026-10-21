@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handlePaymentWebhook, type MpStatusFetcher } from "./handle-payment-webhook";
+import { handlePaymentWebhook, type PagBankStatusFetcher } from "./handle-payment-webhook";
 import type { Item, ItemRepository } from "@/domain/repositories/item-repository";
 import type {
   CreatePaymentInput,
@@ -18,7 +18,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     amount: 10_000,
     platformFeeCents: 500,
     sellerNetCents: 9_500,
-    mpPaymentId: "mp-123",
+    orderId: "mp-123",
     pixQrCode: null,
     pixCopiaECola: null,
     paymentLink: null,
@@ -70,7 +70,7 @@ class FakePaymentRepo implements PaymentRepository {
   async findById(id: string) {
     return this.payment?.id === id ? this.payment : null;
   }
-  async findByMpPaymentId(mpPaymentId: string) {
+  async findByMpPaymentId(orderId: string) {
     return this.payment?.mpPaymentId === mpPaymentId ? this.payment : null;
   }
   async findByItemId(itemId: string) {
@@ -118,7 +118,7 @@ class FakePaymentRepo implements PaymentRepository {
     return new Map();
   }
 
-  async setMpPaymentId(id: string, mpPaymentId: string) {
+  async setMpPaymentId(id: string, orderId: string) {
     if (this.payment?.id !== id || this.payment.status !== "pending") return null;
     this.payment = { ...this.payment, mpPaymentId };
     return this.payment;
@@ -201,7 +201,7 @@ function makeDeps(overrides: {
   const itemRepo = new FakeItemRepo(makeItem());
   const notifRepo = new FakeNotifRepo();
   notifRepo.fail = overrides.notifFail ?? false;
-  const fetchStatus: MpStatusFetcher = {
+  const fetchMpPaymentStatus: PagBankStatusFetcher = {
     async fetchMpPaymentStatus() {
       return { status: overrides.mpStatus ?? "approved", statusDetail: "accredited", externalReference: null };
     },
@@ -232,10 +232,10 @@ function makeDeps(overrides: {
     itemRepo,
     notifRepo,
     getAccessToken,
-    fetchStatus,
+    fetchMpPaymentStatus,
     userRepo,
   };
-  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchStatus, userRepo };
+  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchMpPaymentStatus, userRepo };
 }
 
 describe("handlePaymentWebhook", () => {
@@ -308,7 +308,7 @@ describe("handlePaymentWebhook", () => {
 
   it("falha na consulta à MP sobe (o 500 faz a MP reenviar depois)", async () => {
     const ctx = makeDeps();
-    ctx.fetchStatus.fetchMpPaymentStatus = async () => {
+    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async () => {
       throw new Error("MP fora do ar");
     };
 
@@ -375,7 +375,7 @@ describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
 describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => {
   function makeDepsCard(overrides: { mpStatus?: string; externalRef?: string | null } = {}) {
     const ctx = makeDeps({ mpStatus: overrides.mpStatus ?? "approved" });
-    ctx.fetchStatus.fetchMpPaymentStatus = async (token, _id) => {
+    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async (token, _id) => {
       if (token !== "APP_USR-vendedor") throw new Error("401");
       return {
         status: overrides.mpStatus ?? "approved",
@@ -389,7 +389,7 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
   it("id desconhecido que É cartão nosso: resolve via vendedor + external_reference e ADOPTA o id", async () => {
     const ctx = makeDepsCard();
     // a cobrança pendente tem o id do PIX, não o do webhook
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1" }) };
 
     const outcome = await handlePaymentWebhook(
       { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
@@ -403,8 +403,8 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
 
   it("id de OUTRA loja (nenhum vendedor lê): ignorado sem adoção", async () => {
     const ctx = makeDepsCard();
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
-    ctx.fetchStatus.fetchMpPaymentStatus = async () => {
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1" }) };
+    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async () => {
       throw new Error("401");
     };
 
@@ -420,7 +420,7 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
 
   it("cartão de item SEM cobrança pendente: ignora sem quebrar", async () => {
     const ctx = makeDepsCard();
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1", status: "expired" as PaymentStatus }) };
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1", status: "expired" as PaymentStatus }) };
 
     const outcome = await handlePaymentWebhook(
       { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
@@ -441,8 +441,8 @@ describe("handlePaymentWebhook — fallback do token (R5.4)", () => {
     const ctx = makeDeps({ mpStatus: "approved" });
     ctx.getAccessToken.mockRejectedValue(new Error("Vendedor sem conta Mercado Pago conectada"));
     process.env.MERCADO_PAGO_ACCESS_TOKEN = PLATFORM_TOKEN;
-    // o fetchStatus aceita o token da plataforma no lugar do do vendedor
-    ctx.fetchStatus.fetchMpPaymentStatus = async (token: string) => {
+    // o fetchMpPaymentStatus aceita o token da plataforma no lugar do do vendedor
+    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async (token: string) => {
       if (token !== PLATFORM_TOKEN) throw new Error("401");
       return { status: "approved", statusDetail: "accredited", externalReference: null };
     };

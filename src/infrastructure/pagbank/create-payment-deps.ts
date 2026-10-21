@@ -5,6 +5,7 @@ import { drizzleUserRepository } from "@/infrastructure/database/repositories/dr
 import { drizzleNotificationRepository } from "@/infrastructure/database/repositories/drizzle-notification-repository";
 import { drizzlePagBankSellerAccountRepository } from "@/infrastructure/database/repositories/drizzle-pagbank-seller-account-repository";
 import { createPixOrder, getPagBankOrder } from "@/infrastructure/pagbank/orders";
+import { createResendClient } from "@/infrastructure/email/resend";
 import { createPagBankCheckout } from "@/infrastructure/pagbank/checkout";
 import { getValidPagBankAccessToken } from "@/infrastructure/pagbank/seller-access-token";
 
@@ -35,10 +36,7 @@ export function createPagBankPaymentDeps() {
     createPix: createPixOrder,
     createCheckout: createPagBankCheckout,
     getOrder: getPagBankOrder,
-    resend: process.env.RESEND_API_KEY
-      ? // lazy import para não puxar o SDK quando não há chave
-        new (require("@/infrastructure/email/resend").createResendClient().constructor)()
-      : null,
+    resend: process.env.RESEND_API_KEY ? createResendClient() : null,
   };
 }
 
