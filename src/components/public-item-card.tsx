@@ -3,6 +3,7 @@ import type { StorefrontItem } from "@/domain/repositories/item-repository";
 import { TYPE_LABELS } from "@/domain/repositories/item-repository";
 import { formatBRL } from "@/lib/format-brl";
 import { BidCountdown } from "@/components/bid-countdown";
+import { SmartImage } from "@/components/smart-image";
 
 export function PublicItemCard({
   item,
@@ -23,8 +24,7 @@ export function PublicItemCard({
     >
       {resolvedImageUrl ? (
         <div className="aspect-square w-full overflow-hidden bg-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={resolvedImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+          <SmartImage src={resolvedImageUrl} alt={item.title} fill className="h-full w-full transition-transform group-hover:scale-105" />
         </div>
       ) : (
         <div className="flex aspect-square w-full items-center justify-center bg-muted text-2xl font-semibold text-muted-foreground">

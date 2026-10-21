@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
-import { Trash2Icon } from "lucide-react";
+import { BellOffIcon, Trash2Icon } from "lucide-react";
 import { getSession } from "@/presentation/actions/auth-actions";
-import { listNotificationsAction, markAllAsReadAction, markAsReadAction, deleteNotificationAction } from "@/presentation/actions/notification-actions";
+import {
+  listNotificationsAction,
+  markAllAsReadAction,
+  markAsReadAction,
+  deleteNotificationAction,
+} from "@/presentation/actions/notification-actions";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { PageContainer } from "@/components/layout/page-container";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { EmptyState } from "@/components/empty-state";
 
 // ponytail: como as demais páginas do dashboard, esta página NÃO renderiza o
 // `DashboardHeader` — o `(dashboard)/layout.tsx` já o fornece (junto do
@@ -81,6 +88,21 @@ function NotificationBody({ n }: { n: PageNotification }) {
   );
 }
 
+/** Os três filtros, com aba ativa destacada — Links, não client state. */
+const STATUS_FILTERS = [
+  { key: "all", label: "Todas" },
+  { key: "unread", label: "Não lidas" },
+  { key: "read", label: "Lidas" },
+] as const;
+
+function buildHref(status: string, page: number) {
+  const params = new URLSearchParams();
+  if (status !== "all") params.set("status", status);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return `/dashboard/notifications${qs ? `?${qs}` : ""}`;
+}
+
 export default async function NotificationsPage({
   searchParams,
 }: {
@@ -95,68 +117,121 @@ export default async function NotificationsPage({
   const offset = (page - 1) * limit;
   const { items, total } = await listNotificationsAction({ status, limit, offset });
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const unreadCount = items.filter((n) => !n.read).length;
 
   return (
     <PageContainer size="wide">
-<PageHeader
-            title="Notificações"
-            description="Clique em uma notificação não lida para marcá-la como lida"
-          />
-          <Card>
-            <CardContent className="flex flex-col gap-4 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Link href="/dashboard/notifications?status=all&page=1" className="inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm hover:bg-muted">Todas</Link>
-                  <Link href="/dashboard/notifications?status=unread&page=1" className="inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm hover:bg-muted">Não lidas</Link>
-                  <Link href="/dashboard/notifications?status=read&page=1" className="inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm hover:bg-muted">Lidas</Link>
-                </div>
-                <form action={markAllAsReadAction}>
-                  <Button type="submit" variant="ghost" size="sm">
-                    Marcar todas como lidas
+      <PageHeader title="Notificações" description="Clique em uma notificação não lida para marcá-la como lida" />
+
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-4">
+          {/* filtros de status + marcar todas — o design system de fato */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              {STATUS_FILTERS.map((filter) => (
+                <Button
+                  key={filter.key}
+                  nativeButton={false}
+                  render={
+                    <a
+                      href={buildHref(filter.key, 1)}
+                      aria-current={status === filter.key ? "page" : undefined}
+                    />
+                  }
+                  variant={status === filter.key ? "default" : "outline"}
+                  size="sm"
+                >
+                  {filter.label}
+                </Button>
+              ))}
+              {status === "unread" && unreadCount > 0 ? (
+                <Badge variant="secondary" className="ml-1">
+                  {unreadCount}
+                </Badge>
+              ) : null}
+            </div>
+            <form action={markAllAsReadAction}>
+              <Button type="submit" variant="ghost" size="sm" disabled={total === 0}>
+                Marcar todas como lidas
+              </Button>
+            </form>
+          </div>
+
+          <Separator />
+
+          {items.length === 0 ? (
+            <EmptyState
+              title="Nenhuma notificação"
+              description={
+                status === "unread"
+                  ? "Você não tem notificações não lidas."
+                  : status === "read"
+                    ? "Você já leu todas as notificações deste filtro."
+                    : "Assim que algo acontecer nos seus leilões, você será avisado aqui."
+              }
+              icon={<BellOffIcon aria-hidden="true" className="size-6 text-muted-foreground" />}
+            />
+          ) : (
+            <ul className="divide-y">
+              {items.map((n: PageNotification) => (
+                <li key={n.id} className="flex items-start gap-3 py-3">
+                  <span
+                    aria-hidden="true"
+                    className={`mt-1.5 size-2 shrink-0 rounded-full ${
+                      n.read ? "bg-transparent" : "bg-primary"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <NotificationBody n={n} />
+                  </div>
+                  <form action={async () => { "use server"; await deleteNotificationAction(n.id); }}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Excluir notificação: ${n.title}`}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {totalPages > 1 && (
+            <>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Página {page} de {totalPages} · {total} notificaç{total === 1 ? "ão" : "ões"}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    nativeButton={false}
+                    render={<a href={buildHref(status, Math.max(1, page - 1))} />}
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                  >
+                    Anterior
                   </Button>
-                </form>
-              </div>
-              {items.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
-              ) : (
-                <ul className="divide-y">
-                  {items.map((n: PageNotification) => (
-                    <li key={n.id} className="flex items-start gap-3 py-3">
-                      <span
-                        aria-hidden="true"
-                        className={`mt-1.5 size-2 shrink-0 rounded-full ${
-                          n.read ? "bg-transparent" : "bg-primary"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <NotificationBody n={n} />
-                      </div>
-                      <form action={async () => { "use server"; await deleteNotificationAction(n.id); }}>
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Excluir notificação: ${n.title}`}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2Icon aria-hidden="true" />
-                        </Button>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2">
-                  <Link href={page <= 1 ? "/dashboard/notifications?status="+status+"&page="+page : "/dashboard/notifications?status="+status+"&page="+(page-1)} className={page <= 1 ? "pointer-events-none inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm opacity-50" : "inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm hover:bg-muted"}>Anterior</Link>
-                  <span className="text-xs text-muted-foreground">
-                    {page}/{totalPages}
-                  </span>
-                  <Link href={page >= totalPages ? "/dashboard/notifications?status="+status+"&page="+page : "/dashboard/notifications?status="+status+"&page="+(page+1)} className={page >= totalPages ? "pointer-events-none inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm opacity-50" : "inline-flex h-7 items-center justify-center rounded-md border px-2.5 text-sm hover:bg-muted"}>Próxima</Link>
+                  <Button
+                    nativeButton={false}
+                    render={<a href={buildHref(status, Math.min(totalPages, page + 1))} />}
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                  >
+                    Próxima
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-      </PageContainer>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

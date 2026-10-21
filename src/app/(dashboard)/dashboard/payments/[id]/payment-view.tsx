@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cancelPaymentFormAction, getPaymentStatusAction } from "@/presentation/actions/payment-actions";
 import { formatBRL } from "@/lib/format-brl";
+import { SmartImage } from "@/components/smart-image";
 
 type PaymentStatus = "pending" | "approved" | "expired" | "cancelled" | "refunded";
 
@@ -99,10 +100,11 @@ export function PaymentView(props: PaymentViewProps) {
                 Pague até <BidCountdown deadline={deadline} />
               </p>
               {props.qrCode ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <SmartImage
                   src={props.qrCode}
                   alt="QR Code PIX para pagamento do arremate"
+                  width={256}
+                  height={256}
                   className="h-64 w-64 rounded-lg border p-2"
                 />
               ) : (

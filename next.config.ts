@@ -40,6 +40,15 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // ponytail (R2.3): domínios de imagem que o next/image pode otimizar.
+  // UploadThing (utfs.io) serve TODAS as fotos do app; o QR do MP é data URL
+  // (otimização não se aplica — `<Image unoptimized>`).
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "utfs.io" },
+      { protocol: "https", hostname: "*.utfs.io" },
+    ],
+  },
   async headers() {
     return [
       {

@@ -1,5 +1,6 @@
 import type { SellerStorefront } from "@/domain/repositories/user-repository";
 import { APP_TIMEZONE } from "@/domain/timezone";
+import { SmartImage } from "@/components/smart-image";
 
 // ponytail: o hero mostra SO FATOS VERIFICAVEIS — quantos itens estao em leilao e
 // desde quando o vendedor existe. Os dois sao checaveis pelo visitante na propria
@@ -20,11 +21,12 @@ export function StorefrontHero({ seller }: { seller: SellerStorefront }) {
   return (
     <div className="flex items-center gap-4" data-slot="storefront-hero">
       {seller.image ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
+        <SmartImage
           src={seller.image}
           alt={seller.name}
-          className="size-20 shrink-0 rounded-full border object-cover"
+          width={80}
+          height={80}
+          className="size-20 shrink-0 rounded-full border"
         />
       ) : (
         <div

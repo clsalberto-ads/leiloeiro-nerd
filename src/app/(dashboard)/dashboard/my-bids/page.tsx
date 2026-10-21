@@ -6,9 +6,10 @@ import { drizzleUserRepository } from "@/infrastructure/database/repositories/dr
 import { listMyBids } from "@/application/use-cases/list-my-bids";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format-brl";
-import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function MyBidsPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <p className="text-muted-foreground">Nenhum lance ainda</p>
-                <Link href="/dashboard" className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 mt-4">Voltar ao dashboard</Link>
+                <Button nativeButton={false} render={<Link href="/dashboard" />} className="mt-4">Voltar ao dashboard</Button>
               </CardContent>
             </Card>
           ) : (
@@ -46,7 +47,7 @@ export default async function MyBidsPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span>Valor: {formatBRL(row.bid.amount)}</span>
                       {row.item ? (
-                        <Link href={`/${slugById.get(row.item.sellerId) ?? row.item.sellerId}/${row.item.id}`} className="inline-flex h-7 items-center justify-center rounded-lg border px-2.5 text-sm hover:bg-muted">Ver item</Link>
+                        <Button nativeButton={false} render={<Link href={`/${slugById.get(row.item.sellerId) ?? row.item.sellerId}/${row.item.id}`} />} variant="outline" size="sm">Ver item</Button>
                       ) : (
                         <span className="text-muted-foreground text-sm">Indisponível</span>
                       )}
