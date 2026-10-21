@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPayment, type PagBankPaymentClient } from "./create-payment";
+import { createPayment, type CreatePaymentDeps, type PagBankPaymentClient } from "./create-payment";
 import type { Bid, BidPlacement, BidRepository } from "@/domain/repositories/bid-repository";
 import type { Item, ItemRepository, ItemStatus } from "@/domain/repositories/item-repository";
 import { FakePaymentRepository } from "@/test/fakes/payment-repository";
@@ -116,22 +116,27 @@ class FakeNotifRepo implements NotificationRepository {
   async delete() {}
 }
 
-function makeMpClient(): PagBankPaymentClient & { calls: Array<Record<string, unknown>> } {
+function makePixClient() {
   const calls: Array<Record<string, unknown>> = [];
-  return {
-    calls,
-    async createPix(input) {
-      calls.push(input as unknown as Record<string, unknown>);
-      return {
-        orderId: "mp-123",
-        qrCodeBase64: "data:image/png;base64,QR",
-        qrCodeText: "00020126PIX",
-      };
-    },
-    async createCheckout() {
-      return { checkoutId: "pref-1", checkoutUrl: "https://mp.test/checkout/pref-1" };
-    },
+  const fn = async (input: Record<string, unknown>) => {
+    calls.push(input);
+    return {
+      mpPaymentId: "pb-order-123",
+      chargeId: "pb-charge-123",
+      qrCodeBase64: "data:image/png;base64,QR",
+      qrCodeText: "00020126PIX",
+      status: "PENDING",
+    };
   };
+  return { fn, calls };
+}
+
+function makeCheckoutClient() {
+  const fn = async () => ({
+    checkoutId: "pb-checkout-1",
+    checkoutUrl: "https://pagbank.test/checkout/pb-checkout-1",
+  });
+  return { fn };
 }
 
 function makeDeps(overrides: {
@@ -171,8 +176,11 @@ function makeDeps(overrides: {
   for (const u of overrides.users ?? defaultUsers) userRepo.users.set(u.id, u);
   const notifRepo = new FakeNotifRepo();
   notifRepo.fail = overrides.notifFail ?? false;
-  const mpClient = makeMpClient();
-  const getAccessToken = vi.fn(async () => overrides.token ?? "APP_USR-vendedor");
+  const pixClient = makePixClient();
+  const checkoutClient = makeCheckoutClient();
+  const getAccessToken = vi.fn(async () => overrides.token ?? "pagbank-token");
+  const getAccountId = vi.fn(async () => "pagbank-account-123");
+  const mpClient = { calls: pixClient.calls };
 
   return {
     deps: {
@@ -181,9 +189,13 @@ function makeDeps(overrides: {
       paymentRepo,
       userRepo,
       notifRepo,
-      mpClient,
       getAccessToken,
-    },
+      getAccountId,
+      platformAccountId: "platform-account",
+      notificationUrl: "http://localhost:3000/api/webhooks/pagbank",
+      createPix: pixClient.fn,
+      createCheckout: checkoutClient.fn,
+    } as unknown as CreatePaymentDeps,
     itemRepo,
     bidRepo,
     paymentRepo,
@@ -201,9 +213,9 @@ describe("createPayment", () => {
 
     // A taxa é o coração do requisito: R$ 100,00 → R$ 5,00 da plataforma
     expect(ctx.mpClient.calls[0]).toMatchObject({
-      accessToken: "APP_USR-vendedor",
+      accessToken: "pagbank-token",
       amountCents: 10_000,
-      feeCents: 500,
+      platformFeeCents: 500,
       description: "Arremate: Console raro",
       payerEmail: "ana@exemplo.test",
     });
@@ -211,7 +223,7 @@ describe("createPayment", () => {
       amount: 10_000,
       platformFeeCents: 500,
       sellerNetCents: 9_500,
-      orderId: "mp-123",
+      mpPaymentId: "pb-order-123",
       pixQrCode: "data:image/png;base64,QR",
       pixCopiaECola: "00020126PIX",
       attemptNumber: 1,
@@ -279,7 +291,7 @@ describe("createPayment", () => {
 
     const failing = makeDeps({ notifFail: true });
     const stillCreated = await createPayment(failing.deps, "i1", NOW);
-    expect(stillCreated.mpPaymentId).toBe("mp-123");
+    expect(stillCreated.mpPaymentId).toBe("pb-order-123");
     expect(failing.paymentRepo.payments).toHaveLength(1);
   });
 
@@ -312,7 +324,7 @@ describe("createPayment — transição awaiting_payment (R6.2)", () => {
     const payment = await createPayment(ctx.deps, "i1", NOW);
 
     expect(ctx.itemRepo.statuses).toEqual([]); // nenhuma transição extra
-    expect(payment.mpPaymentId).toBe("mp-123"); // cobrança criada de novo
+    expect(payment.mpPaymentId).toBe("pb-order-123"); // cobrança criada de novo
   });
 
   it("item em awaiting_payment COM cobrança existente devolve a mesma (idempotência por tentativa)", async () => {
@@ -341,38 +353,38 @@ describe("createPayment — link de checkout (cartão)", () => {
   it("grava o paymentLink junto do PIX", async () => {
     const ctx = makeDeps();
     const payment = await createPayment(ctx.deps, "i1", NOW);
-    expect(payment.mpPaymentId).toBe("mp-123");
+    expect(payment.mpPaymentId).toBe("pb-order-123");
     expect(payment.pixCopiaECola).toBe("00020126PIX");
-    expect(payment.paymentLink).toBe("https://mp.test/checkout/pref-1");
+    expect(payment.paymentLink).toBe("https://pagbank.test/checkout/pb-checkout-1");
   });
 
   it("PIX falha → cobrança nasce SÓ com o link (cartão como caminho completo)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createPix = async () => {
+    ctx.deps.createPix = async () => {
       throw new Error("PIX fora do ar");
     };
     const payment = await createPayment(ctx.deps, "i1", NOW);
     expect(payment.mpPaymentId).toBeNull();
     expect(payment.pixCopiaECola).toBeNull();
-    expect(payment.paymentLink).toBe("https://mp.test/checkout/pref-1");
+    expect(payment.paymentLink).toBe("https://pagbank.test/checkout/pb-checkout-1");
   });
 
   it("link falha → cobrança nasce só com PIX (cartão é bônus, não dependência)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createCheckout = async () => {
+    ctx.deps.createCheckout = async () => {
       throw new Error("preferência recusada");
     };
     const payment = await createPayment(ctx.deps, "i1", NOW);
-    expect(payment.mpPaymentId).toBe("mp-123");
+    expect(payment.mpPaymentId).toBe("pb-order-123");
     expect(payment.paymentLink).toBeNull();
   });
 
   it("as DUAS falham → a cobrança não nasce (o próximo tick refaz)", async () => {
     const ctx = makeDeps();
-    ctx.mpClient.createPix = async () => {
+    ctx.deps.createPix = async () => {
       throw new Error("pix caiu");
     };
-    ctx.mpClient.createCheckout = async () => {
+    ctx.deps.createCheckout = async () => {
       throw new Error("pref caiu");
     };
     await expect(createPayment(ctx.deps, "i1", NOW)).rejects.toThrow("Nem PIX nem link");

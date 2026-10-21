@@ -76,7 +76,7 @@ const JOBS: Record<string, { every: number; run: JobHandler }> = {
                 notifRepo: deps.notifRepo,
                 getAccessToken: deps.getAccessToken,
                 fetchStatus: {
-                fetchMpPaymentStatus: async (token: string, id: string) => {
+                fetchOrderStatus: async (token: string, id: string) => {
                   const order = await getPagBankOrder(token, id);
                   return {
                     status: order.chargeStatus ?? order.status,

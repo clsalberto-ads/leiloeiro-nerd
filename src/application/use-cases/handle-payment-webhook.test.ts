@@ -18,7 +18,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     amount: 10_000,
     platformFeeCents: 500,
     sellerNetCents: 9_500,
-    orderId: "mp-123",
+    mpPaymentId: "pb-order-123",
     pixQrCode: null,
     pixCopiaECola: null,
     paymentLink: null,
@@ -70,7 +70,7 @@ class FakePaymentRepo implements PaymentRepository {
   async findById(id: string) {
     return this.payment?.id === id ? this.payment : null;
   }
-  async findByMpPaymentId(orderId: string) {
+  async findByMpPaymentId(mpPaymentId: string) {
     return this.payment?.mpPaymentId === mpPaymentId ? this.payment : null;
   }
   async findByItemId(itemId: string) {
@@ -118,7 +118,7 @@ class FakePaymentRepo implements PaymentRepository {
     return new Map();
   }
 
-  async setMpPaymentId(id: string, orderId: string) {
+  async setMpPaymentId(id: string, mpPaymentId: string) {
     if (this.payment?.id !== id || this.payment.status !== "pending") return null;
     this.payment = { ...this.payment, mpPaymentId };
     return this.payment;
@@ -201,8 +201,8 @@ function makeDeps(overrides: {
   const itemRepo = new FakeItemRepo(makeItem());
   const notifRepo = new FakeNotifRepo();
   notifRepo.fail = overrides.notifFail ?? false;
-  const fetchMpPaymentStatus: PagBankStatusFetcher = {
-    async fetchMpPaymentStatus() {
+  const fetchStatus: PagBankStatusFetcher = {
+    async fetchOrderStatus() {
       return { status: overrides.mpStatus ?? "approved", statusDetail: "accredited", externalReference: null };
     },
   };
@@ -232,17 +232,17 @@ function makeDeps(overrides: {
     itemRepo,
     notifRepo,
     getAccessToken,
-    fetchMpPaymentStatus,
+    fetchStatus,
     userRepo,
   };
-  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchMpPaymentStatus, userRepo };
+  return { deps, paymentRepo, itemRepo, notifRepo, getAccessToken, fetchStatus, userRepo };
 }
 
 describe("handlePaymentWebhook", () => {
   it("aprova: pagamento approved + item paid + notificação payment_confirmed", async () => {
     const ctx = makeDeps({ mpStatus: "approved" });
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "approved" });
     expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
@@ -257,8 +257,8 @@ describe("handlePaymentWebhook", () => {
     // segundo recebe null do UPDATE condicional
     const ctx = makeDeps({ mpStatus: "approved", approveOnce: true });
 
-    const first = await handlePaymentWebhook(ctx.deps, "mp-123");
-    const second = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const first = await handlePaymentWebhook(ctx.deps, "pb-order-123");
+    const second = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(first).toMatchObject({ result: "approved" });
     expect(second).toMatchObject({ result: "ignored", reason: "not-pending" });
@@ -270,7 +270,7 @@ describe("handlePaymentWebhook", () => {
       payment: makePayment({ status: "approved" as PaymentStatus }),
     });
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "ignored", reason: "not-pending" });
     expect(ctx.getAccessToken).not.toHaveBeenCalled();
@@ -289,7 +289,7 @@ describe("handlePaymentWebhook", () => {
   it("rejected/cancelled da MP sincroniza o status local — SEM cascata e SEM item paid", async () => {
     const ctx = makeDeps({ mpStatus: "cancelled" });
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "cancelled" });
     expect(ctx.itemRepo.statuses).toEqual([]); // item continua closed: cascata é do cron
@@ -298,7 +298,7 @@ describe("handlePaymentWebhook", () => {
   it("status intermediário (pending/in_process) é 200-silêncio: nada muda", async () => {
     const ctx = makeDeps({ mpStatus: "in_process" });
 
-    expect(await handlePaymentWebhook(ctx.deps, "mp-123")).toMatchObject({
+    expect(await handlePaymentWebhook(ctx.deps, "pb-order-123")).toMatchObject({
       result: "ignored",
       reason: "status-unchanged",
     });
@@ -308,17 +308,17 @@ describe("handlePaymentWebhook", () => {
 
   it("falha na consulta à MP sobe (o 500 faz a MP reenviar depois)", async () => {
     const ctx = makeDeps();
-    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async () => {
+    ctx.fetchStatus.fetchOrderStatus = async () => {
       throw new Error("MP fora do ar");
     };
 
-    await expect(handlePaymentWebhook(ctx.deps, "mp-123")).rejects.toThrow("MP fora do ar");
+    await expect(handlePaymentWebhook(ctx.deps, "pb-order-123")).rejects.toThrow("MP fora do ar");
   });
 
   it("falha na notificação não desfaz a aprovação (best-effort)", async () => {
     const ctx = makeDeps({ mpStatus: "approved", notifFail: true });
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "approved" });
     expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
@@ -348,7 +348,7 @@ describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
 
     await handlePaymentWebhook(
       { ...ctx.deps, resend, userRepo: ctx.deps.userRepo },
-      "mp-123",
+      "pb-order-123",
     );
 
     expect(resend.sent).toHaveLength(1);
@@ -360,7 +360,7 @@ describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
   it("sem resend o fluxo aprova exatamente igual (e-mail é opcional)", async () => {
     const ctx = makeDeps({ mpStatus: "approved" });
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "approved" });
     expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
@@ -375,7 +375,7 @@ describe("handlePaymentWebhook — e-mail payment_confirmed", () => {
 describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => {
   function makeDepsCard(overrides: { mpStatus?: string; externalRef?: string | null } = {}) {
     const ctx = makeDeps({ mpStatus: overrides.mpStatus ?? "approved" });
-    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async (token, _id) => {
+    ctx.fetchStatus.fetchOrderStatus = async (token, _id) => {
       if (token !== "APP_USR-vendedor") throw new Error("401");
       return {
         status: overrides.mpStatus ?? "approved",
@@ -389,7 +389,7 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
   it("id desconhecido que É cartão nosso: resolve via vendedor + external_reference e ADOPTA o id", async () => {
     const ctx = makeDepsCard();
     // a cobrança pendente tem o id do PIX, não o do webhook
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1" }) };
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
 
     const outcome = await handlePaymentWebhook(
       { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
@@ -403,8 +403,8 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
 
   it("id de OUTRA loja (nenhum vendedor lê): ignorado sem adoção", async () => {
     const ctx = makeDepsCard();
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1" }) };
-    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async () => {
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1" }) };
+    ctx.fetchStatus.fetchOrderStatus = async () => {
       throw new Error("401");
     };
 
@@ -420,7 +420,7 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
 
   it("cartão de item SEM cobrança pendente: ignora sem quebrar", async () => {
     const ctx = makeDepsCard();
-    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", orderId: "mp-pix-1", status: "expired" as PaymentStatus }) };
+    ctx.paymentRepo.payment = { ...makePayment({ id: "p1", mpPaymentId: "mp-pix-1", status: "expired" as PaymentStatus }) };
 
     const outcome = await handlePaymentWebhook(
       { ...ctx.deps, connectedSellerIds: async () => ["seller-1"] },
@@ -441,13 +441,13 @@ describe("handlePaymentWebhook — fallback do token (R5.4)", () => {
     const ctx = makeDeps({ mpStatus: "approved" });
     ctx.getAccessToken.mockRejectedValue(new Error("Vendedor sem conta Mercado Pago conectada"));
     process.env.MERCADO_PAGO_ACCESS_TOKEN = PLATFORM_TOKEN;
-    // o fetchMpPaymentStatus aceita o token da plataforma no lugar do do vendedor
-    ctx.fetchMpPaymentStatus.fetchMpPaymentStatus = async (token: string) => {
+    // o fetchStatus aceita o token da plataforma no lugar do do vendedor
+    ctx.fetchStatus.fetchOrderStatus = async (token: string) => {
       if (token !== PLATFORM_TOKEN) throw new Error("401");
       return { status: "approved", statusDetail: "accredited", externalReference: null };
     };
 
-    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+    const outcome = await handlePaymentWebhook(ctx.deps, "pb-order-123");
 
     expect(outcome).toMatchObject({ result: "approved" });
     expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
@@ -459,7 +459,7 @@ describe("handlePaymentWebhook — fallback do token (R5.4)", () => {
     ctx.getAccessToken.mockRejectedValue(new Error("Vendedor sem conta Mercado Pago conectada"));
     delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
-    await expect(handlePaymentWebhook(ctx.deps, "mp-123")).rejects.toThrow(
+    await expect(handlePaymentWebhook(ctx.deps, "pb-order-123")).rejects.toThrow(
       "conta Mercado Pago conectada",
     );
   });

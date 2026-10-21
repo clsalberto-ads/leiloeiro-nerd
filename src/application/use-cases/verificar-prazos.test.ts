@@ -53,7 +53,7 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
     amount: 10_000,
     platformFeeCents: 500,
     sellerNetCents: 9_500,
-    orderId: "mp-1",
+    mpPaymentId: "mp-1",
     pixQrCode: null,
     pixCopiaECola: null,
     paymentLink: null,
@@ -131,18 +131,20 @@ class FakeNotifRepo implements NotificationRepository {
 
 function makeMpClient() {
   const calls: Array<Record<string, unknown>> = [];
-  const client: PagBankPaymentClient & { calls: typeof calls } = {
+  const client = {
     calls,
-    async createPix(input) {
-      calls.push(input as unknown as Record<string, unknown>);
+    async createPix(input: Record<string, unknown>) {
+      calls.push(input);
       return {
-        orderId: `mp-${calls.length}`,
+        orderId: `pb-order-${calls.length}`,
+        chargeId: `pb-charge-${calls.length}`,
         qrCodeBase64: "data:image/png;base64,QR",
         qrCodeText: "000201PIX",
+        status: "PENDING",
       };
     },
     async createCheckout() {
-      return { checkoutId: `pref-${calls.length}`, checkoutUrl: "https://mp.test/checkout" };
+      return { checkoutId: `pb-checkout-${calls.length}`, checkoutUrl: "https://pagbank.test/checkout" };
     },
   };
   return client;
@@ -181,16 +183,21 @@ function makeDeps(overrides: { item?: Item; bids?: Bid[]; payments?: Payment[] }
   }
   const notifRepo = new FakeNotifRepo();
   const mpClient = makeMpClient();
-  const getAccessToken = vi.fn(async () => "APP_USR-vendedor");
+  const getAccessToken = vi.fn(async () => "pagbank-token");
   const deps = {
     itemRepo,
     bidRepo,
     paymentRepo,
     userRepo,
     notifRepo,
-    mpClient,
     getAccessToken,
-  };
+    getAccountId: vi.fn(async () => "pagbank-account-123"),
+    platformAccountId: "platform-account",
+    notificationUrl: "http://localhost:3000/api/webhooks/pagbank",
+    createPix: mpClient.createPix,
+    createCheckout: mpClient.createCheckout,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
   return { deps, itemRepo, bidRepo, paymentRepo, userRepo, notifRepo, mpClient, getAccessToken };
 }
 
@@ -327,8 +334,11 @@ describe("verificarPrazos — cascata", () => {
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeUndefined();
 
     // MP voltou: o próximo tick reencontra o expired sem a tentativa 2
-    ctx.mpClient = makeMpClient();
-    ctx.deps.mpClient = ctx.mpClient;
+    const newClient = makeMpClient();
+    ctx.deps.createPix = newClient.createPix;
+    ctx.deps.createCheckout = newClient.createCheckout;
+    ctx.mpClient = newClient;
+    shouldThrow = false;
     const second = await verificarPrazos(ctx.deps, NOW);
     expect(second.cascaded).toBe(1);
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeDefined();
@@ -344,13 +354,13 @@ describe("sincronizarMp — rede de segurança", () => {
     const stale = payment({ createdAt: new Date(NOW.getTime() - 2 * DAY) });
     const fresh = payment({
       id: "p2",
-      orderId: "mp-2",
+      mpPaymentId: "mp-2",
       createdAt: new Date(NOW.getTime() - 30 * 60 * 1000),
       deadline: new Date(NOW.getTime() + DAY),
     });
     const semMp = payment({
       id: "p3",
-      orderId: null,
+      mpPaymentId: null,
       createdAt: new Date(NOW.getTime() - 2 * DAY),
       deadline: new Date(NOW.getTime() + DAY),
     });
@@ -373,7 +383,7 @@ describe("sincronizarMp — rede de segurança", () => {
       id: "p2",
       bidderId: "bidder-2",
       bidId: "b2",
-      orderId: "mp-2",
+      mpPaymentId: "mp-2",
       createdAt: new Date(NOW.getTime() - 2 * DAY),
       deadline: new Date(NOW.getTime() + DAY),
     });

@@ -10,8 +10,8 @@ import { appBaseUrl, sendEmailBestEffort, type TransactionalEmailClient } from "
 // webhook só carrega o `id`; o status vem desta consulta, feita com o token
 // do VENDEDOR (o dono da cobrança). O use case não sabe HTTP — quem monta é
 // a rota/infraestrutura (o mesmo desenho do MpPaymentClient do createPayment).
-export interface MpStatusFetcher {
-  fetchMpPaymentStatus(
+export interface PagBankStatusFetcher {
+  fetchOrderStatus(
     accessToken: string,
     mpPaymentId: string,
   ): Promise<{ status: string; statusDetail: string | null; externalReference: string | null }>;
@@ -24,7 +24,7 @@ export interface HandlePaymentWebhookDeps {
   itemRepo: Pick<ItemRepository, "findById" | "setStatus">;
   notifRepo: NotificationRepository;
   getAccessToken: SellerAccessTokenProvider;
-  fetchStatus: MpStatusFetcher;
+  fetchStatus: PagBankStatusFetcher;
   /** Opcional: e-mail `payment_confirmed` best-effort. Ausente = só in-app. */
   resend?: TransactionalEmailClient | null;
   userRepo?: Pick<UserRepository, "findByIds">;
@@ -80,7 +80,7 @@ export async function handlePaymentWebhook(
     for (const sellerId of sellers) {
       try {
         const token = await getAccessToken(sellerId);
-        const mpPayment = await fetchStatus.fetchMpPaymentStatus(token, mpPaymentId);
+        const mpPayment = await fetchStatus.fetchOrderStatus(token, mpPaymentId);
         if (!mpPayment.externalReference) continue;
         const item = await itemRepo.findById(mpPayment.externalReference);
         if (!item || item.sellerId !== sellerId) continue;
@@ -128,7 +128,7 @@ export async function handlePaymentWebhook(
     );
     accessToken = platformToken;
   }
-  const mp = await fetchStatus.fetchMpPaymentStatus(accessToken, mpPaymentId);
+  const mp = await fetchStatus.fetchOrderStatus(accessToken, mpPaymentId);
 
   if (mp.status === "approved") {
     // Corrida entre webhooks duplicados: SÓ um recebe a linha.
