@@ -23,7 +23,11 @@ import * as authSchema from "../src/infrastructure/database/auth-schema";
 
 const MP = "https://api.mercadopago.com";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+// ponytail: DUAS credenciais no smoke. A do painel da APLICAÇÃO (APP_USR-)
+// autentica o OAuth; a do USUÁRIO DE TESTE (TEST-...) cria pagamentos.
+// Se só a APP_USR- estiver definida, o smoke avisa e pula a matriz de cartões
+// (o resto do cenário — banco, webhook, cascata — continua funcionando).
+const TOKEN = process.env.MP_TEST_SELLER_ACCESS_TOKEN ?? process.env.MERCADO_PAGO_ACCESS_TOKEN;
 const SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
 const CIPHER_KEY = process.env.MP_TOKEN_ENCRYPTION_KEY;
 
@@ -35,7 +39,12 @@ if (!TOKEN) throw new Error("MERCADO_PAGO_ACCESS_TOKEN ausente");
 if (!SECRET) throw new Error("MERCADO_PAGO_WEBHOOK_SECRET ausente");
 if (!CIPHER_KEY) throw new Error("MP_TOKEN_ENCRYPTION_KEY ausente");
 if (!TOKEN.startsWith("TEST-")) {
-  console.warn("[smoke] Token não começa com TEST- — se a MP recusar os cartões como inválidos, são credenciais de produção (a matriz revela)");
+  console.warn(
+    "[smoke] ATENÇÃO: o token NÃO é TEST-. As credenciais APP_USR- do painel da aplicação " +
+    "autenticam o OAuth, mas a API de PAGAMENTOS rejeita com 'Unauthorized use of live credentials'. " +
+    "Para a matriz de cartões, defina MP_TEST_SELLER_ACCESS_TOKEN=TEST-... no .env " +
+    "(obtido logando como o usuário de teste no site da MP)."
+  );
 }
 
 const EMAIL = "testuser_arrematante@testuser.com";
