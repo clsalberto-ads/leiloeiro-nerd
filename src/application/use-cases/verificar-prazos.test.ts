@@ -322,11 +322,13 @@ describe("verificarPrazos — cascata", () => {
     const ctx = makeDeps();
     // as DUAS portas falham no primeiro tick (só o PIX falhar já não basta:
     // o link do checkout carrega a cobrança sozinho agora)
-    ctx.mpClient.createPix = async () => {
-      throw new Error("MP fora do ar");
+    const origPix = ctx.deps.createPix;
+    const origCheckout = ctx.deps.createCheckout;
+    (ctx.deps as any).createPix = async () => {
+      throw new Error("PagBank fora do ar");
     };
-    ctx.mpClient.createCheckout = async () => {
-      throw new Error("MP fora do ar");
+    (ctx.deps as any).createCheckout = async () => {
+      throw new Error("PagBank fora do ar");
     };
 
     const first = await verificarPrazos(ctx.deps, NOW);
@@ -334,10 +336,8 @@ describe("verificarPrazos — cascata", () => {
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeUndefined();
 
     // PagBank voltou: o próximo tick reencontra o expired sem a tentativa 2
-    const newClient = makeMpClient();
-    ctx.deps.createPix = newClient.createPix;
-    ctx.deps.createCheckout = newClient.createCheckout;
-    ctx.mpClient = newClient;
+    (ctx.deps as any).createPix = origPix;
+    (ctx.deps as any).createCheckout = origCheckout;
     const second = await verificarPrazos(ctx.deps, NOW);
     expect(second.cascaded).toBe(1);
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeDefined();

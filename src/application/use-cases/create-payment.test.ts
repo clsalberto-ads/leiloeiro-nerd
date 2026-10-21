@@ -121,7 +121,7 @@ function makePixClient() {
   const fn = async (input: Record<string, unknown>) => {
     calls.push(input);
     return {
-      mpPaymentId: "pb-order-123",
+      orderId: "pb-order-123",
       chargeId: "pb-charge-123",
       qrCodeBase64: "data:image/png;base64,QR",
       qrCodeText: "00020126PIX",
