@@ -145,6 +145,7 @@ export async function handlePaymentWebhook(
         type: "payment_confirmed",
         title: "Pagamento confirmado!",
         content: `O pagamento de R$ ${formatBRL(payment.amount)} do item "${item.title}" foi confirmado. O vendedor já foi avisado.`,
+        link: `/dashboard/payments/${payment.id}`,
       });
     } catch (e) {
       console.error("[webhook] falha ao notificar pagamento confirmado:", e);

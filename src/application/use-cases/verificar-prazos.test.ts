@@ -150,6 +150,19 @@ class FakePaymentRepo implements PaymentRepository {
   async findCascadeCandidates() {
     return this.payments.filter((p) => p.status === "expired" || p.status === "cancelled");
   }
+  async findPendingByItemIds(itemIds: string[]) {
+    const map = new Map<string, Payment>();
+    for (const p of this.payments) {
+      if (p.status === "pending" && itemIds.includes(p.itemId)) {
+        const existing = map.get(p.itemId);
+        if (!existing || p.attemptNumber > existing.attemptNumber) {
+          map.set(p.itemId, p);
+        }
+      }
+    }
+    return map;
+  }
+
   async setMpPaymentId(id: string, mpPaymentId: string) {
     const p = this.payments.find((x) => x.id === id);
     if (!p || p.status !== "pending") return null;
@@ -188,7 +201,7 @@ class FakeNotifRepo implements NotificationRepository {
   notifications: CreateNotificationInput[] = [];
   async create(input: CreateNotificationInput) {
     this.notifications.push(input);
-    return { id: "n1", ...input, read: false, createdAt: NOW };
+    return { id: "n1", ...input, read: false, link: null, createdAt: NOW };
   }
   async getUnreadCount() {
     return 0;

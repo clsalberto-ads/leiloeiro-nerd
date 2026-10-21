@@ -111,6 +111,13 @@ class FakePaymentRepo implements PaymentRepository {
       ? [this.payment]
       : [];
   }
+  async findPendingByItemIds(itemIds: string[]) {
+    if (this.payment?.status === "pending" && itemIds.includes(this.payment.itemId)) {
+      return new Map([[this.payment.itemId, this.payment]]);
+    }
+    return new Map();
+  }
+
   async setMpPaymentId(id: string, mpPaymentId: string) {
     if (this.payment?.id !== id || this.payment.status !== "pending") return null;
     this.payment = { ...this.payment, mpPaymentId };
@@ -163,7 +170,7 @@ class FakeNotifRepo implements NotificationRepository {
   async create(input: CreateNotificationInput) {
     if (this.fail) throw new Error("caiu");
     this.notifications.push(input);
-    return { id: "n1", ...input, read: false, createdAt: new Date() };
+    return { id: "n1", ...input, read: false, link: null, createdAt: new Date() };
   }
   async getUnreadCount() {
     return 0;

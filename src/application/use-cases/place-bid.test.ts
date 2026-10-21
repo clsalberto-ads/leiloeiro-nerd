@@ -182,7 +182,7 @@ class FakeNotificationRepository implements NotificationRepository {
   created: CreateNotificationInput | null = null;
   async create(input: CreateNotificationInput): Promise<Notification> {
     this.created = input;
-    return { id: "notif1", ...input, read: false, createdAt: new Date() };
+    return { id: "notif1", ...input, read: false, link: null, createdAt: new Date() };
   }
   async getUnreadCount() { return 0; }
   async listRecent() { return []; }

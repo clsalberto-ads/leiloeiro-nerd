@@ -178,6 +178,23 @@ export const drizzlePaymentRepository: PaymentRepository = {
     return row ? mapPayment(row) : null;
   },
 
+  async findPendingByItemIds(itemIds: string[]): Promise<Map<string, Payment>> {
+    if (itemIds.length === 0) return new Map();
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(and(inArray(payments.itemId, itemIds), eq(payments.status, "pending")));
+    const map = new Map<string, Payment>();
+    for (const row of rows) {
+      // o MAIOR attemptNumber ganha: é a cobrança VIVA da cascata
+      const existing = map.get(row.itemId);
+      if (!existing || row.attemptNumber > existing.attemptNumber) {
+        map.set(row.itemId, mapPayment(row));
+      }
+    }
+    return map;
+  },
+
   async markReminderSent(id: string, at: Date): Promise<Payment | null> {
     // Reivindicação atômica: só o primeiro tick que chega marca (e envia).
     const [row] = await db

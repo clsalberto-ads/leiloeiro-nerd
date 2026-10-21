@@ -129,6 +129,11 @@ export const notifications = pgTable("notifications", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   read: boolean("read").notNull().default(false),
+  // ponytail (R7.1): o destino clicável da notificação (ex.: /dashboard/payments/{id}).
+  // O `content` continua sendo o TEXTO legível; o link é o que o leitor CLICA.
+  // Nullable: a maioria das notificações não tem para onde ir (lance superido
+  // vai para a vitrine, que já está visível no contexto).
+  link: text("link"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("notifications_user_id_idx").on(t.userId)]);
 export const userFavorites = pgTable(

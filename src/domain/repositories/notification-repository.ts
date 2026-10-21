@@ -13,6 +13,8 @@ export interface Notification {
   title: string;
   content: string;
   read: boolean;
+  /** (R7.1) Destino clicável — `/dashboard/payments/{id}`, ou a vitrine. Null = texto só. */
+  link: string | null;
   createdAt: Date;
 }
 
@@ -21,6 +23,8 @@ export interface CreateNotificationInput {
   type: Notification["type"];
   title: string;
   content: string;
+  /** (R7.1) O caminho clicável, quando a notificação tem para onde levar. */
+  link?: string;
 }
 
 export interface NotificationRepository {

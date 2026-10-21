@@ -57,6 +57,13 @@
       "when": 1792501019104,
       "tag": "0007_mushy_scourge",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792549273872,
+      "tag": "0008_overjoyed_manta",
+      "breakpoints": true
     }
   ]
 }

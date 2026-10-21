@@ -226,14 +226,16 @@ export async function createPayment(
         userId: winner.bidderId,
         type: "won",
         title: "Você arrematou um item!",
-        content: `Parabéns! Você venceu o leilão de "${item.title}" com R$ ${formatBRL(winner.amount)}. Pague até ${deadline.toLocaleDateString("pt-BR")} em /dashboard/payments/${payment.id}`,
+        content: `Parabéns! Você venceu o leilão de "${item.title}" com R$ ${formatBRL(winner.amount)}. Pague até ${deadline.toLocaleDateString("pt-BR")}.`,
+        link: `/dashboard/payments/${payment.id}`,
       });
     } else if (notifyType === "next_bidder_called") {
       await notifRepo.create({
         userId: winner.bidderId,
         type: "next_bidder_called",
         title: "Você foi chamado para pagar um item!",
-        content: `O arrematante anterior não pagou o item "${item.title}". Você está na sequência! Pague R$ ${formatBRL(winner.amount)} até ${deadline.toLocaleDateString("pt-BR")} em /dashboard/payments/${payment.id}`,
+        content: `O arrematante anterior não pagou o item "${item.title}". Você está na sequência! Pague R$ ${formatBRL(winner.amount)} até ${deadline.toLocaleDateString("pt-BR")}.`,
+        link: `/dashboard/payments/${payment.id}`,
       });
     }
   } catch (e) {

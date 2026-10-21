@@ -17,6 +17,7 @@ export function mapNotification(row: NotificationRow): Notification {
     title: row.title,
     content: row.content,
     read: row.read,
+    link: row.link,
     createdAt: row.createdAt,
   } satisfies Notification;
 }

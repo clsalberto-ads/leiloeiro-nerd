@@ -122,6 +122,7 @@ export async function verificarPrazos(
           type: "payment_expired",
           title: "Prazo de pagamento vencido",
           content: `Seu prazo para pagar R$ ${formatBRL(broken.amount)} pelo item "${item.title}" venceu e a sua cobrança foi encerrada.`,
+          link: `/dashboard/payments/${broken.id}`,
         });
       } catch (e) {
         console.error("[verificar-prazos] falha ao notificar expiração final:", e);

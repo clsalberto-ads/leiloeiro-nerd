@@ -10,6 +10,7 @@ function makeRow(overrides: Partial<NotificationRow> = {}): NotificationRow {
     title: "Lance superado",
     content: "Seu lance foi superado.",
     read: false,
+    link: null,
     createdAt: new Date(),
     ...overrides,
   };
@@ -26,6 +27,7 @@ describe("drizzleNotificationRepository", () => {
       title: row.title,
       content: row.content,
       read: row.read,
+      link: row.link,
       createdAt: row.createdAt,
     });
   });

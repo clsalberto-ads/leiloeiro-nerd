@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/empty-state";
+import Link from "next/link";
 
 // ponytail: como as demais páginas do dashboard, esta página NÃO renderiza o
 // `DashboardHeader` — o `(dashboard)/layout.tsx` já o fornece (junto do
@@ -25,6 +26,7 @@ interface PageNotification {
   title: string;
   content: string;
   read: boolean;
+  link: string | null;
   createdAt: Date | string;
 }
 
@@ -66,6 +68,13 @@ function NotificationBody({ n }: { n: PageNotification }) {
         {timeAgo(new Date(n.createdAt))}
         {!n.read && <span className="sr-only"> — marcar como lida</span>}
       </p>
+      {/* ponytail (R7.1): o link é um `<Link>` seguro — o caminho vem do
+          SERVIDOR (use case), não do usuário; e `Link` prefetcha a rota. */}
+      {n.link ? (
+        <Link href={n.link} className="mt-1 inline-block text-sm font-medium text-primary hover:underline">
+          Ver detalhes →
+        </Link>
+      ) : null}
     </>
   );
 

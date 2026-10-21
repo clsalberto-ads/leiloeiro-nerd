@@ -47,6 +47,7 @@ const base: Notification = {
   title: "Lance superado",
   content: "Seu lance de R$ 50,00 foi superado.",
   read: false,
+  link: null,
   createdAt: new Date("2026-10-19T12:00:00Z"),
 };
 

@@ -108,4 +108,10 @@ export interface PaymentRepository {
    * webhooks seguintes casarem direto.
    */
   setMpPaymentId(id: string, mpPaymentId: string): Promise<Payment | null>;
+  /**
+   * Pagamentos PENDENTES de uma lista de itens, em UMA consulta — o "my-bids"
+   * usa para mostrar "Pagar" nos itens arrematados sem N+1. `ids` vazio
+   * devolve Map vazio sem tocar no banco.
+   */
+  findPendingByItemIds(itemIds: string[]): Promise<Map<string, Payment>>;
 }
