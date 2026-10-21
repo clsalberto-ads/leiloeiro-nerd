@@ -423,3 +423,37 @@ describe("handlePaymentWebhook — resolvedor de cartão (Checkout Pro)", () => 
     expect(outcome).toMatchObject({ result: "ignored" });
   });
 });
+
+// ponytail (R5.4): o vendedor desconectou a conta DEPOIS de criar a cobrança —
+// o token dele falha, mas o pagamento NÃO pode ficar órfão. O token da
+// plataforma é o fallback; sem ele também, o erro sobe (o 500 pede retry).
+describe("handlePaymentWebhook — fallback do token (R5.4)", () => {
+  const PLATFORM_TOKEN = "TEST-plataforma-fallback";
+
+  it("token do vendedor falhou → usa o token da PLATAFORMA e processa normal", async () => {
+    const ctx = makeDeps({ mpStatus: "approved" });
+    ctx.getAccessToken.mockRejectedValue(new Error("Vendedor sem conta Mercado Pago conectada"));
+    process.env.MERCADO_PAGO_ACCESS_TOKEN = PLATFORM_TOKEN;
+    // o fetchStatus aceita o token da plataforma no lugar do do vendedor
+    ctx.fetchStatus.fetchMpPaymentStatus = async (token: string) => {
+      if (token !== PLATFORM_TOKEN) throw new Error("401");
+      return { status: "approved", statusDetail: "accredited", externalReference: null };
+    };
+
+    const outcome = await handlePaymentWebhook(ctx.deps, "mp-123");
+
+    expect(outcome).toMatchObject({ result: "approved" });
+    expect(ctx.itemRepo.statuses).toEqual([{ id: "i1", status: "paid" }]);
+    delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  });
+
+  it("vendedor SEM conta e plataforma SEM token: o erro original sobe (500 = MP reenvia)", async () => {
+    const ctx = makeDeps({ mpStatus: "approved" });
+    ctx.getAccessToken.mockRejectedValue(new Error("Vendedor sem conta Mercado Pago conectada"));
+    delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
+
+    await expect(handlePaymentWebhook(ctx.deps, "mp-123")).rejects.toThrow(
+      "conta Mercado Pago conectada",
+    );
+  });
+});

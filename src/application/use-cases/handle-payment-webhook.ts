@@ -103,7 +103,31 @@ export async function handlePaymentWebhook(
   const item = await itemRepo.findById(payment.itemId);
   if (!item) return { result: "ignored", reason: "payment-not-found" };
 
-  const accessToken = await getAccessToken(item.sellerId);
+  // ponytail (R5.4): o token do VENDEDOR é o caminho certo (ele é o coletor —
+  // só ele LÊ o pagamento na MP). Mas se o vendedor DESCONECTOU a conta
+  // depois de criar a cobrança, o getAccessToken lança e o pagamento fica
+  // órfão para sempre: o cron sincronizar-mp bate na mesma parede a cada 15
+  // minutos. O token da PLATAFORMA (MERCADO_PAGO_ACCESS_TOKEN no .env) é o
+  // fallback: nem sempre consegue LER um pagamento do vendedor, mas tentar é
+  // infinitamente melhor que desistir — e a falha do fallback loga qual dos
+  // dois tokens está em falta.
+  let accessToken: string;
+  try {
+    accessToken = await getAccessToken(item.sellerId);
+  } catch (sellerTokenErr) {
+    const platformToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    if (!platformToken) {
+      console.error(
+        `[webhook] vendedor ${item.sellerId} sem conta MP e sem MERCADO_PAGO_ACCESS_TOKEN na plataforma — pagamento ${mpPaymentId} fica órfão:`,
+        sellerTokenErr,
+      );
+      throw sellerTokenErr;
+    }
+    console.warn(
+      `[webhook] token do vendedor ${item.sellerId} falhou (${String(sellerTokenErr).slice(0, 80)}); tentando o token da plataforma`,
+    );
+    accessToken = platformToken;
+  }
   const mp = await fetchStatus.fetchMpPaymentStatus(accessToken, mpPaymentId);
 
   if (mp.status === "approved") {

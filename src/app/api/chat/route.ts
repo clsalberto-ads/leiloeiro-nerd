@@ -66,7 +66,7 @@ function errorResponse(error: string, status: number) {
 export async function POST(request: Request) {
   // O rate limit vem ANTES de qualquer parse: recusar um golpe não pode
   // gastar nem o custo de ler o corpo — e muito menos uma chamada de API.
-  if (isRateLimited(clientKeyOf(request), RATE_LIMIT, RATE_WINDOW_MS)) {
+  if (await isRateLimited(clientKeyOf(request), RATE_LIMIT, RATE_WINDOW_MS)) {
     return errorResponse(
       "Muitas mensagens seguidas. Aguarde um instante e tente novamente.",
       429,

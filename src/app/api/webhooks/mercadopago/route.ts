@@ -33,7 +33,7 @@ export async function POST(request: Request): Promise<Response> {
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "unknown";
-  if (isRateLimited(`mp-webhook:${ip}`, WEBHOOK_RATE_LIMIT, WEBHOOK_RATE_WINDOW_MS)) {
+  if (await isRateLimited(`mp-webhook:${ip}`, WEBHOOK_RATE_LIMIT, WEBHOOK_RATE_WINDOW_MS)) {
     return Response.json({ error: "Muitas requisições." }, { status: 429 });
   }
 
