@@ -324,9 +324,11 @@ describe("verificarPrazos — cascata", () => {
     // o link do checkout carrega a cobrança sozinho agora)
     const origPix = ctx.deps.createPix;
     const origCheckout = ctx.deps.createCheckout;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ctx.deps as any).createPix = async () => {
       throw new Error("PagBank fora do ar");
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ctx.deps as any).createCheckout = async () => {
       throw new Error("PagBank fora do ar");
     };
@@ -336,7 +338,9 @@ describe("verificarPrazos — cascata", () => {
     expect(ctx.paymentRepo.payments.find((p) => p.attemptNumber === 2)).toBeUndefined();
 
     // PagBank voltou: o próximo tick reencontra o expired sem a tentativa 2
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ctx.deps as any).createPix = origPix;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ctx.deps as any).createCheckout = origCheckout;
     const second = await verificarPrazos(ctx.deps, NOW);
     expect(second.cascaded).toBe(1);
