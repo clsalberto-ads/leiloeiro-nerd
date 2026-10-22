@@ -21,5 +21,3 @@ encerramento com a divulgação do arrematante.
 
 Na plataforma existem basicamente dois papéis: o leiloeiro, que cadastra
 e disponibiliza o item, e o arrematante, que se habilita e dá lances.
-
-> Conteúdo fictício, usado apenas para demonstrar o funcionamento do RAG.

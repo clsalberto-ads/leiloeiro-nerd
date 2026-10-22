@@ -18,5 +18,3 @@ para o item.
 
 Lances dados após o encerramento oficial do item, ou abaixo do
 incremento mínimo, são automaticamente rejeitados pelo sistema.
-
-> Conteúdo fictício, usado apenas para demonstrar o funcionamento do RAG.

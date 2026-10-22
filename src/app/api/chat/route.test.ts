@@ -30,6 +30,24 @@ vi.mock("@/lib/rag", () => ({
   KnowledgeIndexNotFoundError,
 }));
 
+// Evita abrir o Pool do pg: a rota importa a ferramenta, que importa os repositórios Drizzle.
+const { listActiveWithSeller, ofManyItems } = vi.hoisted(() => ({
+  listActiveWithSeller: vi.fn(),
+  ofManyItems: vi.fn(),
+}));
+vi.mock(
+  "@/infrastructure/database/repositories/drizzle-item-repository",
+  () => ({
+    drizzleExploreLister: { listActiveWithSeller },
+  }),
+);
+vi.mock(
+  "@/infrastructure/database/repositories/drizzle-bid-repository",
+  () => ({
+    drizzleBidStatsList: { ofManyItems },
+  }),
+);
+
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {
@@ -58,6 +76,8 @@ describe("POST /api/chat", () => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
     searchKnowledge.mockResolvedValue([]);
+    listActiveWithSeller.mockResolvedValue([]);
+    ofManyItems.mockResolvedValue(new Map());
   });
 
   describe("validação da entrada", () => {
@@ -282,6 +302,125 @@ describe("POST /api/chat", () => {
       expect(res.status).toBe(502);
       const body = (await res.json()) as { error: string };
       expect(body.error).toContain("Aguarde");
+    });
+  });
+
+  describe("Tool Calling (search_active_items)", () => {
+    const toolRequest = {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "search_active_items", arguments: "{}" },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    it("consulta os itens ativos e devolve a resposta final no formato do widget, com o RAG no prompt", async () => {
+      searchKnowledge.mockResolvedValue([
+        {
+          id: "faq-lances-001",
+          source: "knowledge/faq/lances.md",
+          content: "Lances são...",
+        },
+      ]);
+      listActiveWithSeller.mockResolvedValue([
+        {
+          id: "item-1",
+          title: "Cartas raras",
+          type: "product",
+          minInitialBid: 10_000,
+          bidDeadline: new Date("2026-12-01T12:00:00Z"),
+          imageUrl: null,
+          createdAt: new Date("2026-11-01T12:00:00Z"),
+          sellerSlug: "loja",
+        },
+      ]);
+      ofManyItems.mockResolvedValue(
+        new Map([["item-1", { total: 2, highestBid: 15_000 }]]),
+      );
+      create
+        .mockResolvedValueOnce(toolRequest)
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: { content: "Cartas raras está com lance de R$ 150,00." },
+            },
+          ],
+        });
+
+      const res = await POST(
+        makeRequest({
+          messages: [
+            { role: "user", content: "Quais itens estão com lances?" },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        message: "Cartas raras está com lance de R$ 150,00.",
+      });
+
+      // RAG continua alimentando o prompt de sistema nas duas chamadas ao modelo.
+      expect(create).toHaveBeenCalledTimes(2);
+      for (const call of create.mock.calls) {
+        expect(call[0].messages[0].content).toContain(
+          "CONTEXTO DA BASE DE CONHECIMENTO",
+        );
+        expect(call[0].tools).toHaveLength(1);
+      }
+      const toolMessage = create.mock.calls[1][0].messages.at(-1);
+      expect(toolMessage.role).toBe("tool");
+      expect(toolMessage.content).toContain("/loja/item-1");
+    });
+
+    it("sem contexto documental, a ferramenta continua disponível", async () => {
+      aiReplies("ok");
+      searchKnowledge.mockResolvedValue([]);
+
+      await POST(makeRequest(validBody));
+
+      expect(create.mock.calls[0][0].tools).toHaveLength(1);
+    });
+
+    it("falha na consulta ao banco não derruba o chat nem vaza detalhes", async () => {
+      listActiveWithSeller.mockRejectedValue(
+        new Error("password authentication failed for user admin"),
+      );
+      create
+        .mockResolvedValueOnce(toolRequest)
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: "Não consegui consultar agora." } }],
+        });
+
+      const res = await POST(makeRequest(validBody));
+
+      expect(res.status).toBe(200);
+      const toolMessage = create.mock.calls[1][0].messages.at(-1);
+      expect(toolMessage.content).not.toContain("password");
+      expect(JSON.stringify(await res.json())).not.toContain("password");
+    });
+
+    it("falha do provedor no meio do fluxo vira 502 genérico", async () => {
+      create
+        .mockResolvedValueOnce(toolRequest)
+        .mockRejectedValueOnce(new Error("segredo interno req_9"));
+
+      const res = await POST(makeRequest(validBody));
+
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({
+        error: "Não foi possível processar sua mensagem.",
+      });
     });
   });
 });

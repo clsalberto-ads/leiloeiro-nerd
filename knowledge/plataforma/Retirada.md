@@ -20,5 +20,3 @@ armazenado.
 É possível autorizar outra pessoa a retirar o item em nome do
 arrematante, desde que ela apresente uma autorização assinada e um
 documento de identificação.
-
-> Conteúdo fictício, usado apenas para demonstrar o funcionamento do RAG.

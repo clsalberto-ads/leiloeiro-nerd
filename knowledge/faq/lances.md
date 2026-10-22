@@ -20,5 +20,3 @@ superado, para que o usuário possa decidir se cobre o novo valor.
 Todo lance dado é registrado com data e hora, e o usuário recebe uma
 confirmação na própria interface. Um lance confirmado não pode ser
 cancelado pelo participante.
-
-> Conteúdo fictício, usado apenas para demonstrar o funcionamento do RAG.
